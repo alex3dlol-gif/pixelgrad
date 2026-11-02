@@ -421,7 +421,7 @@ function updateCreator(){const l=draft,f=l.g==='f';
     top:()=>row('Фасон',opt('tk',LOOK.topKind))+row('Цвет',sw('top',LOOK.top))+row('Акцент (полоски, вставки, воротник)',sw('top2',LOOK.accent)),
     bottom:()=>row('Фасон',opt('bk',f?LOOK.bottomKindF:LOOK.bottomKindM))+row('Цвет',sw('bottom',LOOK.bottom)),
     shoes:()=>row('Обувь',opt('sk',LOOK.shoeKind))+row('Цвет',sw('shoes',LOOK.shoes)),
-    acc:()=>row('Аксессуар',opt('acc',LOOK.acc))+'<div class="mut">Головные уборы покупаются за 💎 в «Ещё → Скины».</div>',
+    acc:()=>row('Аксессуар',opt('acc',LOOK.acc)),
   }[cCat]();
   $('copt').innerHTML=body;CATS.forEach(([k])=>$('cc_'+k)?.classList.toggle('on',k===cCat));
   if(pv){if(pv.obj)pv.sc.remove(pv.obj);pv.obj=world.makeAvatar(draft,me?.skin);pv.sc.add(pv.obj);}}
