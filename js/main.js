@@ -131,7 +131,8 @@ async function afterLogin(){
 function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);loadQuestLog();loadChat();tab='work';
+  joinPresence();act('settle',{},true);loadQuestLog();loadChat();
+  if(longOn()&&longLeft()<=0)toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);tab='work';
   if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
   dirty=true;
 }
@@ -153,7 +154,7 @@ const villageSpawn=()=>{const p=villagePvz[Math.floor(Math.random()*villagePvz.l
 
 // ================= РАБОТА / СМЕНЫ =================
 let shiftT=0,shiftBusy=false;
-function jobTarget(){const p=me&&me.job_prop!=null&&props.get(me.job_prop);if(!p)return null;const pl=plots[p.plot];
+function jobTarget(){const p=me&&(longOn()?props.get(me.long_prop):me.job_prop!=null&&props.get(me.job_prop));if(!p)return null;const pl=plots[p.plot];
   if(pl.sp==='market'){const t=world.marketTile();return{x:t[0],y:t[1]};}return pl.door;}
 function updateQuest(dt){const m=world.me;if(!quest||!m)return false;const Q=QUESTS[quest.id],P=world.POIS[Q.poi];
   if(quest.phase==='go'){if(!m.path.length&&Math.hypot(m.x-P.x,m.y-P.y)<2.5){quest.phase='start';act('start_quest',{p_id:quest.id}).then(r=>{if(r){quest.phase='do';quest.t=0;}else quest=null;dirty=true;});}
@@ -164,6 +165,7 @@ function updateQuest(dt){const m=world.me;if(!quest||!m)return false;const Q=QUE
 function updateJob(dt){const m=world.me;if(!m||!me)return;if(updateQuest(dt))return;const t=jobTarget();
   if(t){const key=t.x+','+t.y;if(m.goal!==key){m.goal=key;world.goMe(t.x,t.y);shiftT=0;}
     const at=!m.path.length&&Math.round(m.x)===t.x&&Math.round(m.y)===t.y;m.working=at;
+    if(longOn())return;
     if(at&&EN()<ENERGY.shift){m.working=false;const sb=$('shiftbar');if(sb)sb.style.width='0%';return;}
     if(at&&!document.hidden){shiftT+=dt;if(shiftT>=SHIFT_SEC&&!shiftBusy){shiftBusy=true;const before=me.money;
       act('work_shift',{},true).then(r=>{shiftBusy=false;shiftT=0;if(r){const d=Math.round(me.money-before);if(d>0)world.float(`+${d}💰 смена`,m.x,1.6,m.y);}else{act('settle',{},true);}});}}
@@ -293,6 +295,19 @@ function buildListHTML(pr){let h=`<div class="mut">Выбери, что пост
     h+=`<div class="row"><b>${b.ic} ${b.n}</b> <span class="mut">${ioText(b)}</span><br><span class="mut">${b.desc}<br>Стройка ${b.cost}💰${Object.keys(b.mat).length?' + '+costText(b.mat):''} · ⏱ ${BUILD_MIN[pr.kind==='office'?'office':b.kind]||3} мин · зарплата ${b.wage}💰/мин</span><br>
     <span class="btn ${can?'':'dis'}" data-act="build" data-id="${pr.id}" data-t="${k}">Построить · ${c}💰</span>${m.ok?'':'<span class="mut"> нет материалов на базе</span>'}</div>`;}
   if(locked.length){const nx=Math.min(...locked.map(([k,b])=>needFor(b)));h+=`<div class="row mut">✨ Ещё ${locked.length} видов зданий откроются позже. На ${nx} уровне: ${locked.filter(([k,b])=>needFor(b)===nx).map(([k,b])=>b.ic+' '+b.n).join(', ')}</div>`;}return h;}
+// ===== Долгая смена: 2–4 часа реального времени, награда в конце (для тех, кто заходит редко) =====
+const LONG={2:{n:15,en:15},3:{n:21,en:20},4:{n:28,en:25}};
+const longOn=()=>me&&me.long_until;const longLeft=()=>longOn()?new Date(me.long_until)-Date.now():0;
+const hm=ms=>{const m=Math.ceil(ms/60000);return m>=60?`${Math.floor(m/60)} ч ${m%60} мин`:`${m} мин`;};
+let longDone=false;setInterval(()=>{if(!longOn()){longDone=false;return;}if(longLeft()<=0&&!longDone){longDone=true;toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);}dirty=true;},20000);
+function longStatusHTML(){if(!longOn())return'';const pr=props.get(me.long_prop),j=pr&&jobInfo(pr),left=longLeft(),tot=3600e3*(me.long_n>=28?4:me.long_n>=21?3:2);
+  return`<div class="row" style="border-color:#ffd166">🕒 <b>Долгая смена</b> · ${j?j.n:'работа'} · за смену: <b>${fmt((j?j.pay:0)*me.long_n)}💰</b> и ${me.long_n} смен в карьеру
+  <div class="bar"><i style="width:${Math.min(100,(1-left/tot)*100).toFixed(0)}%"></i></div>`+
+  (left>0?`<span class="mut">Осталось ${hm(left)} — можно закрыть игру, награда дождётся.</span><br><span class="btn sm red" data-act="longcancel">Уйти раньше (без оплаты)</span>`
+         :`<span class="btn gold" data-act="longclaim">Забрать награду</span>`)+`</div>`;}
+function longBtns(pr){const j=jobInfo(pr);if(!j||!me||pr.kind!=='npc')return'';if(longOn())return me.long_prop===pr.id?longStatusHTML():'';const ok=me.shifts>=j.req;
+  return`<div style="margin-top:8px"><b>🕒 Выйти на долгую смену</b> <span class="mut">— зашёл, отправил на смену, вернулся за наградой</span><br>`+
+  Object.entries(LONG).map(([h,L])=>`<span class="btn sm ${ok&&EN()>=L.en?'gold':'dis'}" data-act="longstart" data-id="${pr.id}" data-h="${h}">${h} ч · ${fmt(j.pay*L.n)}💰 · ⚡${L.en}</span>`).join('')+`</div>`;}
 function jobBtn(pr){const j=jobInfo(pr);if(!j||!me)return'';if(pr.kind!=='npc'&&LV()<NEED.playerJob&&me.job_prop!==pr.id)return'';if(me.job_prop===pr.id)return`<div style="margin-top:6px">✅ Ты работаешь здесь<div class="bar"><i id="shiftbar" style="width:0"></i></div></div><span class="btn red" data-act="quit">Уволиться</span>`;
   const ok=me.shifts>=j.req;return`<div style="margin-top:6px"><span class="btn ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться · ${j.pay}💰/смена</span>${ok?'':`<div class="mut">Нужен опыт: ${j.req} смен (у тебя ${me.shifts})</div>`}</div>`;}
 function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
@@ -314,7 +329,7 @@ function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>На�
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство города: делает район живым, тут гуляют жители.</div>`;
   if(p.sp){const e=EMP[p.sp];return`<h3>${p.name||e.n}</h3><div>Городской работодатель. Должность: ${e.job}. Оплата <b>${e.pay}💰</b> за смену (${SHIFT_SEC} сек), смены идут, пока ты онлайн.</div>`+
     (Object.keys(e.out).length?`<div class="mut">Производит на базу: ${Object.entries(e.out).map(([g,q])=>q+GOODS[g].ic).join(' ')} в минуту</div>`:'')+
-    (p.sp==='market'?'<div class="mut">Сюда приезжают грузовики всех игроков. Цены — во вкладке «Рынок».</div>':'')+jobBtn(pr);}
+    (p.sp==='market'?'<div class="mut">Сюда приезжают грузовики всех игроков. Цены — во вкладке «Рынок».</div>':'')+(longOn()&&me.long_prop!==pr.id?'<div class="mut" style="margin-top:6px">🕒 Ты сейчас на долгой смене в другом месте.</div>':longOn()?'':jobBtn(pr))+longBtns(pr);}
   if(!pr.owner){const can=me&&me.money>=pr.price;
     const d={v:'🌲 Деревня — дёшево, лес и река рядом',d:'🏡 Дачи — самые дешёвые, рядом озеро',c:'🏙 Город — дорого, но рядом покупатели',p:'🏭 Промзона — заводы',o:'⚓ Порт — рыболовные суда и коптильни'}[pr.reg];
     return`<h3>Участок #${p.id+1}</h3><div>${d}</div>${pr.reg==='c'?`<div class="mut">Спрос района: ~${pr.demand} клиентов/мин</div>`:''}<div style="margin:6px 0">Цена: <b>${fmt(pr.price)}💰</b></div>
@@ -368,9 +383,9 @@ function questsHTML(){const l=LV();let h=`<h3>🗺 Задания в округ�
   if(qLocked)h+=`<div class="row mut">✨ Ещё ${qLocked} заданий откроются на следующих уровнях</div>`;
   return h;}
 function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
-  const cur=me.job_prop!=null&&props.get(me.job_prop);
+  h+=longStatusHTML();const cur=me.job_prop!=null&&props.get(me.job_prop);
   if(cur){const j=jobInfo(cur);h+=`<div class="row">Сейчас: <b>${j?.n}</b> · ${j?.pay}💰/смена<div class="bar"><i id="shiftbar" style="width:0"></i></div><span class="mut">Смена ${SHIFT_SEC} сек, идёт пока ты в игре</span><br><span class="btn sm blue" data-act="goto" data-plot="${cur.plot}">Показать</span><span class="btn sm red" data-act="quit">Уволиться</span></div>`;}
-  else h+=`<div class="row">Ты без работы.</div>`;
+  else if(!longOn())h+=`<div class="row">Ты без работы. <span class="mut">Нет времени сидеть в игре? Открой работу на карте и выйди на 🕒 долгую смену на 2–4 часа.</span></div>`;
   h+='<h3 style="margin-top:8px">Вакансии</h3>';
   const seen=new Set();for(const pr of props.values()){if(pr.kind!=='npc'||pr.sp==='cityhall')continue;if(pr.sp==='bc'&&seen.has('bc'))continue;seen.add(pr.sp);const j=jobInfo(pr),ok=me.shifts>=j.req;
     h+=`<div class="row"><b>${j.n}</b> · ${j.job} · <b>${j.pay}💰</b>${j.req?` <span class="mut">(от ${j.req} смен)</span>`:''}<br><span class="btn sm blue" data-act="goto" data-plot="${pr.plot}">На карте</span>${me.job_prop===pr.id?'':`<span class="btn sm ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться</span>`}</div>`;}
@@ -600,6 +615,9 @@ document.addEventListener('click',async e=>{
     case 'buyunit':if(await act('buy_unit',{p_id:id}))toast('🎉 Поздравляем с покупкой!');break;
     case 'sellprop':if(confirm('Точно продать?'))await act('sell_prop',{p_id:id});break;
     case 'sethome':await act('set_home',{p_id:id});{const h=homePlot();world.me&&(world.me.goal=null);}break;
+    case 'longstart':{const h=+t.dataset.h;if(await act('start_long_shift',{p_id:id,p_hours:h})){toast(`🕒 Ты на смене ${h} ч. Можно закрыть игру — награда будет ждать.`);}break;}
+    case 'longclaim':{const before=me.money;if(await act('claim_long_shift')){const d=Math.round(me.money-before);toast(`✅ Смена окончена: +${fmt(d)}💰`);world.me&&world.float(`+${fmt(d)}💰`,world.me.x,1.7,world.me.y,'#c8ffb0');}break;}
+    case 'longcancel':if(confirm('Уйти со смены раньше? Оплаты не будет, энергия не вернётся.'))await act('cancel_long_shift');break;
     case 'club':if(mode==='room')leaveRoom();await enterClub(id);break;
     case 'enter':if(mode==='room')leaveRoom();await enterRoom({unit:id,hostUid:me.id,hostNick:me.nick,editable:true});break;
     case 'redit':if(room.state){room.setEdit(!room.state.edit);sheetOpen=true;tab='furn';}break;
