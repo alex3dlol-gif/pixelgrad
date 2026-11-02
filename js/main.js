@@ -583,7 +583,7 @@ let camStart=null;
 const TUT=[];
 // ================= ОБУЧЕНИЕ: остров «Учебный» (всё понарошку, только у клиента) =================
 let ob=null;const IS=world.ISLAND,OB_SHIFT=4;
-const OBH={pvz:{x:IS.pvz.x,y:IS.pvz.y},alko:{x:IS.alko.x,y:IS.alko.y},lavka:{x:IS.lavka.x,y:IS.lavka.y},pier:{x:IS.pier.x+.5,y:IS.pier.y},plot:{x:IS.plot.x0+1.5,y:IS.plot.y0+1.5}};
+const OBH={pvz:{x:IS.pvz.x,y:IS.pvz.y},alko:{x:IS.alko.x,y:IS.alko.y},lavka:{x:IS.lavka.x,y:IS.lavka.y},pier:{x:IS.pier.x+.5,y:IS.pier.y},boat:{x:world.FERRY.x,y:world.FERRY.y},plot:{x:IS.plot.x0+1.5,y:IS.plot.y0+1.5}};
 const OB=[
   {t:'Добро пожаловать на остров «Учебный»! Я Петрович. Тут всё понарошку: научу работать, строить и торговать, а потом паром отвезёт тебя в Пиксельград.',btn:'Начнём'},
   {t:mobile?'Проведи пальцем по экрану, чтобы двигать карту. Двумя пальцами — приблизить или отдалить.':'Потяни карту мышкой. Колесо — приблизить или отдалить.',enter(){camStart={x:world.camT.x,z:world.camT.z};},done:()=>Math.hypot(world.camT.x-camStart.x,world.camT.z-camStart.z)>5},
@@ -607,7 +607,7 @@ function obUpdate(dt){if(!ob)return;const st=OB[ob.i];world.arrow=st&&st.arrow?O
       if((ob.job==='pvz'&&ob.shifts.pvz>=3)||(ob.job==='alko'&&ob.shifts.alko>=2)){ob.job=null;m.goal=null;m.working=false;toast('✅ Смена окончена — хватит на сегодня!');}}}
     const b=$('obbar');if(b)b.style.width=Math.min(100,ob.shiftT/OB_SHIFT*100)+'%';}
   if(ob.farm&&Date.now()>ob.farmReady){ob.farmT+=dt;if(ob.farmT>=2.5){ob.farmT=0;if((ob.inv.wheat||0)<12){ob.inv.wheat=(ob.inv.wheat||0)+1;dirty=true;}}}}
-function obHotspot(g){if(!g)return null;let best=null,bd=3.2;for(const[k,h]of Object.entries(OBH)){const d=Math.hypot(g.x-h.x,g.z-h.y);if(d<bd){bd=d;best=k;}}return best;}
+function obHotspot(g){if(!g)return null;let best=null,bd=3.2;for(const[k,h]of Object.entries(OBH)){const d=Math.hypot(g.x-h.x,g.z-h.y);if(d<bd){bd=d;best=k;}}return best==='boat'?'pier':best;}
 const OBS={pvz:2,alko:3,plot:4,farm:5,sell:7};const OBNEED={pvz:3,alko:2};
 function obCan(k){if(k==='pvz'||k==='alko')return ob.i===OBS[k]&&ob.shifts[k]<OBNEED[k];return true;}
 function obTopUp(cost,what){if(ob.money<cost){toast(`👷 Петрович подкинул ${cost-ob.money}💰 на ${what}`);ob.money=cost;}}

@@ -461,6 +461,15 @@ export function createWorld(canvas,{mobile}){
     else{B(g,.5,.25,1.2,0xf2f2f2,0,-.1,0);B(g,.52,.06,1.22,color||0x2e86ab,0,.1,0);B(g,.35,.35,.4,0xdddddd,0,.15,-.2);B(g,.03,.8,.03,0x333333,0,.15,.3);}
     return shadow(g);}
 
+  function makeFerry(){const g=new THREE.Group();
+    B(g,1.7,.55,4.4,0xf4f4f4,0,-.3,0);B(g,1.72,.12,4.42,0x1f5f9e,0,-.05,0);B(g,1.74,.08,4.44,0xc0392b,0,-.3,0);
+    B(g,1.5,.05,4.1,0x9c6b3e,0,.25,0);B(g,1.3,.55,1.8,0xffffff,0,.3,.5);B(g,1.4,.08,1.95,0xf1c40f,0,.85,.5);
+    for(let k=0;k<3;k++)B(g,.25,.18,.03,0x9fd3ff,-.4+k*.4,.55,1.41,true);B(g,.03,.18,1.4,0x9fd3ff,.66,.55,.5,true);
+    B(g,.3,.55,.3,0xc0392b,0,.93,-.1);B(g,.32,.08,.32,0x222222,0,1.48,-.1);
+    for(const z of[-1.2,1.6]){B(g,.06,.26,.26,0xff7a1a,.87,.35,z);B(g,.07,.1,.1,0xffffff,.88,.43,z);}
+    B(g,.03,.9,.03,0x333333,0,.9,1.7);B(g,.35,.22,.02,0xffd166,.18,1.55,1.7);
+    for(let k=0;k<4;k++)B(g,1.5,.03,.03,0xdddddd,0,.55,-2+k*.25);
+    B(g,.9,.04,.7,0x7a7a7a,0,.27,-2.45);g.scale.setScalar(1.35);return shadow(g);}
   const bq=new Int32Array(W*H),prev=new Int32Array(W*H);
   function bfs(sx,sy,goal,maxN=W*H){sx=Math.round(sx);sy=Math.round(sy);if(!inb(sx,sy))return[];prev.fill(-2);let h=0,t=0;const s=I(sx,sy);bq[t++]=s;prev[s]=-1;
     while(h<t&&h<maxN){const c=bq[h++],cx=c%W,cy=(c/W)|0;
@@ -483,6 +492,11 @@ export function createWorld(canvas,{mobile}){
 
   // ================= СОСТОЯНИЕ УЧАСТКОВ =================
   const units=[],vehicles=[],residents=[],ships=[];
+  // паром у пристани острова: виден всё обучение, по тапу открывается пристань
+  const FERRY={x:ISLAND.pier.x+3.2,y:ISLAND.pier.y-4.5};
+  const dock={kind:'boat',mesh:makeFerry(),x:FERRY.x,y:FERRY.y,wp:[],face:Math.PI,ferry:true,docked:true};
+  const beacon=new THREE.Mesh(new THREE.OctahedronGeometry(.32),new THREE.MeshBasicMaterial({color:0xffd166}));beacon.position.set(FERRY.x,3,FERRY.y);
+  scene.add(dock.mesh,beacon);ships.push(dock);
   // учебный участок на острове (живёт только у клиента)
   const tutPlot={id:-1,sp:null,reg:'v',x0:ISLAND.plot.x0,y0:ISLAND.plot.y0,x:ISLAND.plot.x0+1.5,y:ISLAND.plot.y0+1.5,door:{x:ISLAND.plot.x0+1,y:ISLAND.plot.y0+3},stock:{x:ISLAND.plot.x0+3,y:ISLAND.plot.y0+3},
     crops:[],wk:[],owner:null,color:'#ffd166',building:null,workers:0,builtAt:0,level:1,mat:false,fast:true};
@@ -620,6 +634,7 @@ export function createWorld(canvas,{mobile}){
   for(const b of BLOCKS)wlabel(b.name,b.x+b.cols*STEP/2,0,b.y-3,'big');
   wlabel('ОСТРОВ «УЧЕБНЫЙ»',(ISLAND.x0+ISLAND.x1)/2,0,ISLAND.y1+3,'big');wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');
   for(const[k,n]of[['pvz','ПВЗ «Коробас»'],['alko','Алкомаркет «Градус»'],['lavka','Лавка скупщика'],['spawn','Гостевой домик'],['pier','Пристань']]){wlabel(n,ISLAND[k].x,2.2,ISLAND[k].y,'emp','#ffe9a8');}
+  wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
   for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];const L=wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');L.zMax=mobile?11:15;}
@@ -711,6 +726,7 @@ export function createWorld(canvas,{mobile}){
     for(const u of units){const vis=near(u.x,u.y);u.mesh.visible=vis;if(vis){updateWorker(u,dt);animPerson(u,time);}}
     for(const r of[...residents]){if(!near(r.x,r.y,zoom*3.5)){removeRes(r);continue;}updateResident(r,dt);animPerson(r,time);}
     for(const v of[...vehicles]){updateVehicle(v,dt);v.mesh.position.set(v.x,0,v.y);v.mesh.rotation.y=v.face;}
+    beacon.visible=dock.docked&&!!fog.visible;if(beacon.visible){beacon.rotation.y=time*2;beacon.position.y=3+Math.sin(time*3)*.25;}
     for(const s of[...ships]){updateShip(s,dt);s.mesh.position.set(s.x,0,s.y);s.mesh.rotation.y=s.face||0;s.mesh.position.y=Math.sin(time*2+s.x)*.04;}
     cranes.forEach((c,k)=>c.rotation.y=Math.sin(time*.4+k*2)*1.2);
     for(const q of birds){q.a+=q.s*dt;q.b.position.set(q.L.x+Math.cos(q.a)*q.L.rx*q.r,-.08,q.L.y+Math.sin(q.a)*q.L.ry*q.r);q.b.rotation.y=-q.a;}
@@ -750,7 +766,6 @@ export function createWorld(canvas,{mobile}){
     tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);tutFence.visible=!tutPlot.owner;if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
     setFog(on){fog.visible=!!on;camBounds=on?{x0:ISLAND.x0-2,y0:ISLAND.y0-2,x1:ISLAND.x1+2,y1:ISLAND.y1+2}:null;clampCam();},
     tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutFence.visible=true;tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},
-    ferry(to,onDone){fog.visible=false;camBounds=null;const boat={kind:'boat',mesh:makeShip(false,0xffd166),x:ISLAND.pier.x+.5,y:ISLAND.pier.y-8,wp:[[ISLAND.pier.x+.5,ISLAND.pier.y-16],[to.x,to.y+10],[to.x,to.y+2]],wait:0,speed:6,ferry:true};
-      scene.add(boat.mesh);ships.push(boat);if(me)me.mesh.visible=false;const f=()=>{camFly=null;camT.x+=(boat.x-camT.x)*.1;camT.z+=(boat.y-camT.z)*.1;
+    FERRY,ferry(to,onDone){fog.visible=false;camBounds=null;const boat=dock;dock.docked=false;boat.speed=6;boat.wp=[[FERRY.x,FERRY.y-10],[to.x,to.y+10],[to.x,to.y+2]];if(me)me.mesh.visible=false;const f=()=>{camFly=null;camT.x+=(boat.x-camT.x)*.1;camT.z+=(boat.y-camT.z)*.1;
         if(boat.wp&&boat.wp.length)requestAnimationFrame(f);else{scene.remove(boat.mesh);ships.splice(ships.indexOf(boat),1);if(me)me.mesh.visible=true;onDone&&onDone();}};f();},walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
 }
