@@ -468,7 +468,7 @@ function renderUI(){
   if(me)$('hprof').innerHTML='👤'+(mobile?'':' '+esc(me.nick));
   $('topbtns').style.display=me&&me.home_unit&&!ob?'':'none';
   document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
-  if(mobile&&ob){$('coach').classList.toggle('mini',sheetOpen||coachMin);}
+  if(mobile&&ob){$('coach').classList.toggle('mini',coachMin);$('coach').classList.toggle('withsheet',sheetOpen);}
   const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile')))tab=T[0][0];
   const th=ob?'':T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
