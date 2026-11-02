@@ -492,7 +492,80 @@ export function createWorld(canvas,{mobile}){
     ud.legL.rotation.x=u.moving?Math.sin(ph)*.7:0;ud.legR.rotation.x=u.moving?-Math.sin(ph)*.7:0;
     if(u.working){ud.armR.rotation.x=u.fishing?-2.2+Math.sin(time*2)*.15:-1.6+Math.sin(time*14)*1.1;ud.armL.rotation.x=-.4;}
     else if(u.carry){ud.armR.rotation.x=ud.armL.rotation.x=-2.9;}else{ud.armR.rotation.x=u.moving?-Math.sin(ph)*.5:0;ud.armL.rotation.x=u.moving?Math.sin(ph)*.5:0;}
+    ud.armR.rotation.z=ud.armL.rotation.z=0;
+    if(u.idle&&!u.moving&&!u.working&&!u.carry)idlePose(u,ud,time);
     ud.carry.visible=!!u.carry;if(u.carry)ud.carry.material=mat(u.carry==='parcel'?0xc8a26b:(GOODS[u.carry]?.col||0xffffff));}
+  // стоящий игрок не замирает: раз в ~5 сек выбирает новую позу
+  function idlePose(u,ud,time){const sd=u.seed||(u.seed=Math.random()*100),slot=Math.floor((time+sd)/5);
+    if(slot!==u.islot){u.islot=slot;u.ik=Math.floor(hash(slot,Math.floor(sd*97))*8);}
+    const t=time+sd;let aR=0,aL=0,zR=0,zL=0,y=0,ry=0;
+    switch(u.ik){
+      case 1:ry=Math.sin(t*1.3)*.7;break;                                  // оглядывается
+      case 2:aR=aL=-2.9;y=Math.max(0,Math.sin(t*2))*.03;break;              // потягивается
+      case 3:aR=-1.35;aL=-1.15;zR=.35;zL=-.35;ry=Math.sin(t*.7)*.08;break; // залип в телефон
+      case 4:aR=-2.7;zR=-.3+Math.sin(t*10)*.45;break;                      // машет
+      case 5:aR=-2.6;zR=.7+Math.sin(t*12)*.15;break;                       // чешет затылок
+      case 6:y=-Math.abs(Math.sin(t*2.4))*.07;aR=aL=-.5;break;             // пружинит на месте
+      case 7:aR=aL=-.25;zR=-.5;zL=.5;ry=Math.sin(t*2.5)*.15;break;         // руки в боки, переминается
+    }
+    ud.armR.rotation.x=aR;ud.armL.rotation.x=aL;ud.armR.rotation.z=zR;ud.armL.rotation.z=zL;
+    u.mesh.position.y+=y+Math.sin(t*2)*.008;u.mesh.rotation.y=(u.face||0)+ry;}
+
+  // ===== Сценки у мест работы: у каждого здания свой вариант (по хешу участка), создаются только рядом с камерой =====
+  const VIG_N={alko:3,pvzCity:3,shop:3,kolkhoz:2,lesxoz:1,market:1,sortCenter:2,zbi:2,furnFactory:2,bc:2,cityhall:1,port:1};
+  function makeStroller(){const g=new THREE.Group();B(g,.3,.2,.45,0x8e44ad,0,.12,0);B(g,.3,.16,.18,0x6c3483,0,.32,-.14);B(g,.03,.25,.03,0x333333,0,.25,-.28);
+    for(const[x,z]of[[-.15,-.15],[.15,-.15],[-.15,.15],[.15,.15]])B(g,.04,.09,.09,0x222222,x,0,z);return g;}
+  function makeCow(){const g=new THREE.Group();B(g,.42,.32,.8,0xf4f4f4,0,.3,0);B(g,.2,.15,.25,0x222222,.11,.45,.1);B(g,.15,.1,.2,0x222222,-.11,.35,-.2);
+    for(const[x,z]of[[-.14,-.3],[.14,-.3],[-.14,.3],[.14,.3]])B(g,.08,.3,.08,0xeeeeee,x,0,z);const h=new THREE.Group();h.position.set(0,.5,.42);B(h,.22,.22,.28,0xf4f4f4,0,-.11,.1);B(h,.2,.1,.08,0xf2b8c6,0,-.12,.26);B(h,.04,.08,.04,0xe8e2d4,-.09,.1,0);B(h,.04,.08,.04,0xe8e2d4,.09,.1,0);g.add(h);g.userData.head=h;return shadow(g);}
+  function makeForklift(){const g=new THREE.Group();B(g,.4,.3,.55,0xf1c40f,0,.08,0);B(g,.36,.03,.36,0x333333,0,.62,-.05);for(const x of[-.15,.15])B(g,.03,.6,.03,0x333333,x,.08,-.05);
+    B(g,.06,.45,.06,0x333333,-.12,.38,.3);B(g,.06,.45,.06,0x333333,.12,.38,.3);const f=new THREE.Group();f.position.set(0,.1,.38);B(f,.36,.06,.3,0x9c6b3e,0,0,.15);B(f,.3,.25,.25,0xc8a26b,0,.06,.15);g.add(f);g.userData.fork=f;
+    for(const[x,z]of[[-.2,-.18],[.2,-.18],[-.2,.18],[.2,.18]])B(g,.06,.12,.12,0x222222,x,0,z);return shadow(g);}
+  const SH=[0xc0392b,0x2980b9,0x27ae60,0x8e44ad,0xe67e22,0x7f8c8d,0x34495e,0xd35400,0x16a085,0xf39c12];
+  function person(g,x,z,face,k,pants=0x34495e,sc=1){const m=makePerson(SH[k%SH.length],null,pants);m.position.set(x,0,z);m.rotation.y=face;m.scale.setScalar(sc);g.add(m);return m;}
+  const legs=(m,t,on)=>{const u=m.userData;u.legL.rotation.x=on?Math.sin(t*10)*.6:0;u.legR.rotation.x=on?-Math.sin(t*10)*.6:0;};
+  const arms=(m,r,l,zr=0,zl=0)=>{const u=m.userData;u.armR.rotation.x=r;u.armL.rotation.x=l;u.armR.rotation.z=zr;u.armL.rotation.z=zl;};
+  // ходит туда-обратно по x от a до b на глубине z; возвращает направление
+  function pace(m,t,a,b,z,sp=.5){const L=b-a,ph=(t*sp)%(2*L),fw=ph<L,x=fw?a+ph:b-(ph-L);m.position.set(x,0,z);m.rotation.y=fw?Math.PI/2:-Math.PI/2;legs(m,t*sp*2,true);return fw?1:-1;}
+  function makeVignette(p){const v=Math.floor(hash(p.id,77)*VIG_N[p.sp]),g=new THREE.Group();g.position.set(p.x0,0,p.y0);let tick=null;const X=p.x0,Z=p.y0;
+    switch(p.sp+v){
+      case 'alko0':{const a=person(g,2.6,3.3,Math.PI/2,0),b=person(g,3.4,3.3,-Math.PI/2,1,0x2c2c2c),c=person(g,3.7,2.6,-2.4,5);   // драка, рядом болельщик
+        tick=t=>{const s=Math.sin(t*3);a.position.x=2.55+Math.max(0,s)*.18;b.position.x=3.45-Math.max(0,-s)*.18;a.rotation.z=b.rotation.z=0;
+          arms(a,s>0?-1.6:-1,s>0?-.6:-1.2);arms(b,s<0?-1.6:-1,s<0?-.6:-1.2);if(s>.9)b.rotation.z=.15;if(s<-.9)a.rotation.z=-.15;arms(c,-2.8+Math.sin(t*8)*.3,-2.8-Math.sin(t*8)*.3);c.position.y=Math.abs(Math.sin(t*8))*.05;};break;}
+      case 'alko1':{const ms=[0,1,2].map(k=>{const an=k*2.1,m=person(g,3+Math.sin(an)*.35,3.2+Math.cos(an)*.35,an+Math.PI,k+3,0x2c2c2c);B(m.userData.armR,.05,.14,.05,0x2e7d32,0,-.4,0);return m;});
+        tick=t=>ms.forEach((m,k)=>{const sip=Math.floor(t/2.5)%3===k;arms(m,sip?-2.5:-.5,-.2);m.rotation.z=Math.sin(t*1.5+k)*.08;});break;}
+      case 'alko2':{const a=person(g,3,3.3,0,6,0x2c2c2c);a.rotation.x=-Math.PI/2;a.position.y=.1;const b=person(g,3.5,3.0,-1.2,2);B(g,.05,.14,.05,0x2e7d32,2.6,0,3.5);
+        tick=t=>{b.position.y=-.12;b.userData.legL.rotation.x=b.userData.legR.rotation.x=-1.2;arms(b,-1.2+Math.sin(t*4)*.4,-.3);a.rotation.z=Math.sin(t*.8)*.1;};break;}
+      case 'pvzCity0':case 'pvzCity2':{const mom=person(g,1,3.6,Math.PI/2,v?8:3,0x5d4037),st=makeStroller();g.add(st);let kid=null;
+        if(v===2)kid=person(g,3,3,0,4,0x2980b9,.55);
+        tick=t=>{const d=pace(mom,t,.4,3.4,3.6,.35);arms(mom,-1,-1);st.position.set(mom.position.x+d*.45,0,3.6);st.rotation.y=Math.PI/2;
+          if(kid){const a=t*1.6;kid.position.set(2.6+Math.cos(a)*.6,Math.abs(Math.sin(t*10))*.04,3.0+Math.sin(a)*.3);kid.rotation.y=-a;legs(kid,t*1.5,true);arms(kid,Math.sin(t*10)*.6,-Math.sin(t*10)*.6);}};break;}
+      case 'pvzCity1':{const q=[0,1,2,3].map(k=>person(g,1.8+k*.45,3.2,-Math.PI/2,k+1,k%2?0x34495e:0x5d4037));q.forEach((m,k)=>{if(k%2)m.userData.carry.visible=true;});
+        tick=t=>q.forEach((m,k)=>{const f=(Math.floor(t/3)+k)%4,c=m.userData.carry.visible;if(f===0)arms(m,-1.35,-1.15,.35,-.35);else if(f===1){m.rotation.y=-Math.PI/2+Math.sin(t*2)*.5;arms(m,c?-2.9:0,c?-2.9:0);}else{m.rotation.y=-Math.PI/2;arms(m,c?-2.9:0,c?-2.9:0);}});break;}
+      case 'shop0':{const b=person(g,1,3.6,0,9,0x6d4c41);b.scale.set(.9,.85,.9);B(b,.18,.2,.1,0x8e3b46,.2,.12,0);
+        tick=t=>{pace(b,t,.6,3.4,3.65,.2);arms(b,0,-.3);};break;}
+      case 'shop1':{const m=person(g,3.2,3.2,-.6,6);tick=(t,dt)=>{const sm=Math.floor(t/3)%2===0;arms(m,sm?-2.3:-.2,-.1);m.rotation.z=.06;
+        if(sm&&Math.random()<dt*2)puff(X+3.2-.12,.75,Z+3.35,0xdddddd,1,.3,.05);};break;}
+      case 'kolkhoz0':{const cow=makeCow();cow.position.set(3,0,3.2);cow.rotation.y=-.6;g.add(cow);const f=person(g,2.2,3.5,.8,2,0x2c3e50);
+        tick=t=>{cow.userData.head.rotation.x=.5+Math.sin(t*1.5)*.3;cow.rotation.y=-.6+Math.sin(t*.3)*.3;arms(f,-.8+Math.sin(t*.9)*.2,-.3);};break;}
+      case 'kolkhoz1':{B(g,.6,.45,.6,0xe8c547,3.3,0,3.2);const f=person(g,2.5,3.2,Math.PI/2,7,0x2c3e50);B(f.userData.armR,.03,.6,.03,0x8b5a2b,0,-.6,.1);
+        tick=(t,dt)=>{const s=Math.sin(t*2.5);arms(f,-1.2-s*1.1,-.8-s*.6);if(s>.95&&Math.random()<dt*20)puff(X+3.2,.6,Z+3.2,0xe8c547,2,.6,.2);};break;}
+      case 'lesxoz0':{B(g,.35,.25,.35,0x8b5a2b,3,0,3.3);B(g,.12,.35,.12,0xc8a26b,3,.25,3.3);const m=person(g,2.55,3.3,Math.PI/2,0,0x2c3e50);B(m.userData.armR,.04,.5,.04,0x6b4a2f,0,-.55,0);B(m.userData.armR,.15,.1,.04,0x95a5a6,0,-.8,.05);
+        tick=(t,dt)=>{const c=(t*1.2)%1,a=c<.6?-2.9+c/.6*.4:-2.5+(c-.6)/.4*2.2;arms(m,a,a*.7);if(c>.95&&Math.random()<dt*30)puff(X+3,.45,Z+3.3,0xd9b38c,2,.5,.25);};break;}
+      case 'market0':case 'port0':{const m=person(g,.5,3.5,Math.PI/2,4,0x2c3e50);m.userData.carry.material=mat(0xc8a26b);
+        tick=t=>{const d=pace(m,t,.5,3.5,3.55,.6);m.userData.carry.visible=d>0;arms(m,d>0?-2.9:Math.sin(t*6)*.4,d>0?-2.9:-Math.sin(t*6)*.4);};break;}
+      case 'sortCenter0':case 'zbi0':case 'furnFactory0':{const f=makeForklift();g.add(f);tick=t=>{const ph=(t*.25)%2,fw=ph<1,x=fw?.5+ph*3:3.5-(ph-1)*3;f.position.set(x,0,3.45);f.rotation.y=fw?Math.PI/2:-Math.PI/2;f.userData.fork.visible=fw;};break;}
+      case 'sortCenter1':case 'zbi1':case 'furnFactory1':{const a=person(g,2.8,3.3,.5,7,0x2c3e50),b=person(g,3.4,3.4,-2.2,1,0x2c3e50);for(const m of[a,b])B(m,.27,.1,.17,0xf1c40f,0,.72,0);
+        tick=(t,dt)=>{arms(a,-2.2+Math.sin(t*.9)*.1,-.2);arms(b,-1+Math.sin(t*3)*.6,-.6+Math.cos(t*3)*.4);if(Math.random()<dt*1.2)puff(X+2.9,.78,Z+3.4,0xdddddd,1,.3,.05);};break;}
+      case 'bc0':{const m=person(g,1,3.6,0,6,0x2c3e50);tick=t=>{pace(m,t,.6,3.4,3.65,.4);arms(m,-2.6,Math.sin(t*4)*.3,.6,0);};break;}
+      case 'bc1':{const a=person(g,2.9,3.3,1,1,0x2c3e50),b=person(g,3.5,3.3,-1.3,5,0x2c3e50);tick=t=>{arms(a,-1+Math.sin(t*3)*.6,-.3,0,Math.sin(t*2)*.3);arms(b,-2.3+Math.sin(t*.7)*.1,0);};break;}
+      case 'cityhall0':{const m=person(g,1,3.7,0,0,0x5d4037);const sg=new THREE.Group();B(sg,.04,.7,.04,0x8b5a2b,0,0,0);B(sg,.6,.35,.03,0xffffff,0,.6,0);B(sg,.45,.06,.031,0xc0392b,0,.75,0,true);B(sg,.35,.06,.031,0x222222,0,.65,0,true);
+        sg.position.set(.18,.35,.12);sg.rotation.y=-Math.PI/2;m.add(sg);tick=t=>{pace(m,t,.6,3.4,3.75,.35);arms(m,-1.4,-1.4);};break;}
+    }
+    scene.add(g);return{g,tick};}
+  const vigPlots=[];
+  function updateVignettes(time,dt){for(const p of vigPlots){const on=near(p.x,p.y,zoom*2);
+    if(on&&!p.vig)p.vig=makeVignette(p);else if(!on&&p.vig){scene.remove(p.vig.g);p.vig=null;}
+    if(p.vig&&p.vig.tick)p.vig.tick(time,dt);}}
 
   const parts=[];
   function puff(x,y,z,c,n=1,up=.6,spread=.3){for(let k=0;k<n&&parts.length<250;k++){const m=new THREE.Mesh(BOX,mat(c));const s=rand(.06,.13);m.scale.set(s,s,s);m.position.set(x,y,z);scene.add(m);
@@ -628,10 +701,10 @@ export function createWorld(canvas,{mobile}){
   const avatars=new Map(); // uid -> {x,y,tx,ty,mesh,label,nick}
   let me=null;
   function setMe(nick,color,x,y,skin,look){if(me){scene.remove(me.mesh);me.label.el.remove();wlabels.splice(wlabels.indexOf(me.label),1);}
-    me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,mesh:makeAvatar(look,skin)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
+    me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,idle:true,mesh:makeAvatar(look,skin)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
   function goMe(x,y){if(me)me.path=pathTo(me,x,y);}
   function setOther(uid,{x,y,nick,color,working,skin,look}){let a=avatars.get(uid);const lk=JSON.stringify(look||null);if(a&&(a.skin!==skin||a.lk!==lk)){removeOther(uid);a=null;}
-    if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,mesh:makeAvatar(look,skin),skin,lk,label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
+    if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,idle:true,mesh:makeAvatar(look,skin),skin,lk,label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
     a.tx=x;a.ty=y;a.working=working;}
   function removeOther(uid){const a=avatars.get(uid);if(!a)return;scene.remove(a.mesh);a.label.el.remove();wlabels.splice(wlabels.indexOf(a.label),1);avatars.delete(uid);}
 
@@ -724,6 +797,7 @@ export function createWorld(canvas,{mobile}){
   let dayState={h:12,d:1,night:0};let vanT=2,resT=1,cargoT=3,fishT=1,cullT=0;const _v=new THREE.Vector3();
   function project(p,el){_v.copy(p).project(cam);if(_v.z>1||Math.abs(_v.x)>1.05||Math.abs(_v.y)>1.05){el.style.display='none';return;}el.style.display='';el.style.left=(_v.x+1)/2*innerWidth+'px';el.style.top=(1-_v.y)/2*innerHeight+'px';}
   const near=(x,y,r=zoom*2.5)=>Math.abs(x-camT.x)+Math.abs(y-camT.z)<r;
+  for(const p of plots)if(VIG_N[p.sp]&&!(p.sp==='shop'&&hash(p.id,77)>.66))vigPlots.push(p);
   function frameUpdate(dt){
     time+=dt;
     if((cullT-=dt)<=0){cullT=.5;cullPlots();}
@@ -747,6 +821,7 @@ export function createWorld(canvas,{mobile}){
     if(me){if(stepMove(me,dt)){}animPerson(me,time);me.label.p.set(me.x,1.2,me.y);}
     for(const[,a]of avatars){const dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);a.moving=d>.05;if(d>12){a.x=a.tx;a.y=a.ty;}else if(a.moving){const s=Math.min(d,3.2*dt);a.x+=dx/d*s;a.y+=dy/d*s;a.face=Math.atan2(dx,dy);}
       animPerson(a,time);a.label.p.set(a.x,1.2,a.y);}
+    updateVignettes(time,dt);
     for(const p of plots){const a=p.anim;if(!a)continue;if(!near(p.x,p.y))continue;const busy=p.wk.some(w=>w.working)||p.sp;
       if(a.blades&&(p.workers||p.sp))a.blades.rotation.z+=dt*1.5;if(a.spin&&busy)a.spin.rotation.y+=dt*15;
       if(a.smoke&&(p.workers||p.sp)&&Math.random()<dt*3)puff(p.x0+1.5+a.smoke[0],a.smoke[1],p.y0+1.5+a.smoke[2],0xcfcfcf,1,.5,.08);
