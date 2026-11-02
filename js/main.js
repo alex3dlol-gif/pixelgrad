@@ -222,7 +222,7 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
   return`<h3>👤 Профиль</h3><div class="row"><span style="color:${me.color};font-size:20px;font-weight:700">${esc(me.nick)}</span><br>
     <span class="mut">${careerOf(me.shifts)} · уровень ${l} (${me.xp||0}/${x1} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
-  <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span><span class="btn blue" data-act="psec" data-s="skins">💎 Скины</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}<span class="btn blue" data-act="psec" data-s="levels">⭐ Уровни</span><span class="btn blue" data-act="psec" data-s="top">🏆 Рейтинг</span></div>
+  <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}<span class="btn blue" data-act="psec" data-s="levels">⭐ Уровни</span><span class="btn blue" data-act="psec" data-s="top">🏆 Рейтинг</span></div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
 function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость — ${c} каждого товара (растёт с числом и уровнем бизнесов). Сверх лимита товар пропадает.</div>`;
   if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
@@ -319,7 +319,7 @@ function questsHTML(){const l=LV();let h=`<h3>🗺 Задания в округ�
       ` <span class="btn sm blue" data-act="gopoi" data-q="${id}">На карте</span></div>`;}
   if(qLocked)h+=`<div class="row mut">✨ Ещё ${qLocked} заданий откроются на следующих уровнях</div>`;
   return h;}
-function workHTML(){if(!me)return'';let h=nextHTML()+'<div style="height:8px"></div>'+questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
+function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
   const cur=me.job_prop!=null&&props.get(me.job_prop);
   if(cur){const j=jobInfo(cur);h+=`<div class="row">Сейчас: <b>${j?.n}</b> · ${j?.pay}💰/смена<div class="bar"><i id="shiftbar" style="width:0"></i></div><span class="mut">Смена ${SHIFT_SEC} сек, идёт пока ты в игре</span><br><span class="btn sm blue" data-act="goto" data-plot="${cur.plot}">Показать</span><span class="btn sm red" data-act="quit">Уволиться</span></div>`;}
   else h+=`<div class="row">Ты без работы.</div>`;
@@ -360,7 +360,7 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
   if(st.editable)h+=`<div>Позови друга по нику:</div><input id="invnick" maxlength="16" placeholder="Ник игрока"><span class="btn gold" data-act="invite">Пригласить</span>`;
   h+=`<div class="row">В комнате: ${[...st.people.keys()].map(nm).join(', ')||'—'}</div><div class="mut">Пиши в чат сверху — сообщения увидят все в комнате.</div>`;return h;}
 let moreSec='goals';
-function moreHTML(){const sec=[['goals','📋 Цели'],['gov','🏛 Мэрия'],...(LV()>=3?[['gear','🦺 Экипировка']]:[]),['look','👤 Персонаж'],['skins','💎 Скины'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
+function moreHTML(){const sec=[['goals','📋 Цели'],['gov','🏛 Мэрия'],...(LV()>=3?[['gear','🦺 Экипировка']]:[]),['look','👤 Персонаж'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
   return`<div style="margin-bottom:8px">${sec.map(([k,n])=>`<span class="btn sm ${moreSec===k?'on':'blue'}" data-act="moresec" data-s="${k}">${n}</span>`).join('')}</div>`+
     ({gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,look:()=>{showCreator(false);moreSec='goals';return goalsHTML();},skins:skinsHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]());}
 function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=`<h3>🦺 Рабочая экипировка</h3><div class="mut">Даёт бонусы к производству. Получить трудно: за многократные задания, стаж или дорого. Один предмет на слот.</div>`;
@@ -447,13 +447,13 @@ function showEnergy(){const e=EN(),full=Math.ceil((EMAX()-e)*ENERGY.regenMin);
   <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин, максимум растёт с уровнем (+10). Новый уровень и ежедневная награда — полная зарядка${e<EMAX()?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.</div>
   <div style="margin-top:10px"><span class="btn gold ${(me.gems||0)>=ENERGY.refillGems&&e<EMAX()?'':'dis'}" data-act="refill">Восполнить за ${ENERGY.refillGems}💎</span><span class="btn blue" data-act="gems">Кристаллы</span><span class="btn" data-act="closedaily">Закрыть</span></div>`;}
 function showGems(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">💎 Кристаллы</h3><div>У тебя: <b>${me.gems||0}💎</b></div>
-  <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию, покупают скины и редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
+  <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию и покупают редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
   ${[[100,'99 ₽'],[550,'449 ₽ · +10%'],[1200,'899 ₽ · +20%'],[3000,'1990 ₽ · +50%']].map(([g,p])=>`<div class="row">💎 <b>${g}</b> — ${p} <span class="btn sm dis">Скоро</span></div>`).join('')}
   <div class="mut">Оплата подключается.</div><span class="btn" data-act="closedaily">Закрыть</span>`;}
 function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10),s=me.last_daily===y?(me.streak||0)+1:1;
   $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:15px">🎁 Ежедневная награда</h3><div>День ${s} подряд: <b>+${DAILY[Math.min(s,7)-1]}💎</b> и +20 XP</div>
   <div style="display:flex;gap:4px;margin:10px 0;flex-wrap:wrap">${DAILY.map((g,i)=>`<div class="chip" style="${i+1===Math.min(s,7)?'outline:2px solid #ffd166;':''}opacity:${i+1<Math.min(s,7)?.5:1}">д${i+1}<br>${g}💎</div>`).join('')}</div>
-  <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 тратятся на скины (Ещё → Скины).</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
+  <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 восполняют энергию и ускоряют стройку.</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
 let lastBody='',lastTabs='';
 function renderUI(){
   if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1),fr=Math.max(0,Math.min(1,((me.xp||0)-x0)/(x1-x0)));
