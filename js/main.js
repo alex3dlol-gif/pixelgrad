@@ -3,6 +3,7 @@ import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_
 import {createWorld} from './world.js';
 import {createRoom,WALL_COLORS,FLOOR_COLORS} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
+import {clean} from './filter.js';
 
 const $=id=>document.getElementById(id);
 const fmt=n=>Math.floor(n).toLocaleString('ru-RU');
@@ -65,6 +66,7 @@ async function loadWorld(){
   const A=await sb.from('auctions').select('*').eq('status','open');(A.data||[]).forEach(a=>auctions.set(a.id,a));
   const L=await sb.from('listings').select('*').gt('qty',0).order('price');(L.data||[]).forEach(l=>listings.set(l.id,l));for(const l of listings.values())if(!profiles.has(l.seller))await fetchProfile(l.seller);
   sb.channel('db')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat'},p=>onChat(p.new))
     .on('postgres_changes',{event:'*',schema:'public',table:'props'},p=>p.new&&p.new.id!=null&&applyProp(p.new))
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'goods'},p=>{goods.set(p.new.good,p.new);dirty=true;})
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},p=>onEvent(p.new))
@@ -129,10 +131,23 @@ async function afterLogin(){
 function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);loadQuestLog();tab='work';
+  joinPresence();act('settle',{},true);loadQuestLog();loadChat();tab='work';
   if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
   dirty=true;
 }
+// ================= ЧАТ ГОРОДА =================
+const chatMsgs=[];let chatOpen=false;
+const okColor=c=>/^#[0-9a-f]{3,6}$/i.test(c||'')?c:'#ffd166';
+const chatLine=m=>`<div class="cl"><b style="color:${okColor(m.color)}">${esc(clean(m.nick))}:</b> ${esc(clean(m.text))}</div>`;
+function drawChat(){$('cclist').innerHTML=(chatOpen?chatMsgs.slice(-40):chatMsgs.slice(-3)).map(chatLine).join('')||'<div class="cl mut">Пока тихо — напиши первым 💬</div>';
+  $('cchat').classList.toggle('open',chatOpen);if(chatOpen){const l=$('cclist');l.scrollTop=l.scrollHeight;}}
+function onChat(m){if(!m||chatMsgs.some(x=>x.id===m.id))return;chatMsgs.push(m);if(chatMsgs.length>60)chatMsgs.shift();drawChat();}
+async function loadChat(){if(!sb)return;const{data}=await sb.from('chat').select('*').order('id',{ascending:false}).limit(40);if(data){chatMsgs.length=0;chatMsgs.push(...data.reverse());}drawChat();}
+async function sendChat(){const i=$('ccin'),t=i.value.trim();if(!t||!sb)return;i.value='';if(!await act('say',{p_text:t}))i.value=t;}
+$('cclist').onclick=()=>{if(chatOpen)return;chatOpen=true;if(mobile&&sheetOpen){sheetOpen=false;dirty=true;}drawChat();setTimeout(()=>$('ccin').focus(),50);};
+$('ccx').onclick=()=>{chatOpen=false;$('ccin').blur();drawChat();};
+$('ccsend').onclick=sendChat;$('ccin').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();if(e.key==='Escape')$('ccx').onclick();});
+drawChat();
 function homePlot(){const u=me?.home_unit&&props.get(me.home_unit);return u?plots[u.plot]:dormPlot;}
 const villageSpawn=()=>{const p=villagePvz[Math.floor(Math.random()*villagePvz.length)]||dormPlot;return{x:p.x0+1,y:p.y0+3};};
 
@@ -174,7 +189,7 @@ async function enterRoom({unit,hostUid,hostNick,editable}){
   tab='furn';sheetOpen=!mobile;dirty=true;
   roomCh=sb.channel('room:'+unit,{config:{presence:{key:me.id}}});
   roomCh.on('presence',{event:'sync'},()=>{const st=roomCh.presenceState();room.setPeople(Object.entries(st).map(([uid,a])=>({uid,...a[a.length-1]})));dirty=true;})
-    .on('broadcast',{event:'chat'},({payload})=>room.say(payload.uid,payload.text))
+    .on('broadcast',{event:'chat'},({payload})=>room.say(payload.uid,clean(payload.text)))
     .on('broadcast',{event:'move'},({payload})=>room.moveOther(payload.uid,payload))
     .subscribe(s2=>{if(s2==='SUBSCRIBED')roomCh.track({nick:me.nick,color:me.color,look:me.look||null,skin:me.skin||null});});
 }
@@ -182,7 +197,7 @@ function leaveRoom(){room.close();if(roomCh){roomCh.unsubscribe();roomCh=null;}m
   $('roomui').style.display='none';$('chat').style.display='none';tab='home';dirty=true;}
 function onInvite(inv){if(!inv.unit)return;toast(`🔔 <b>${esc(inv.from_nick)}</b> зовёт в гости! <span class="btn gold" data-visit="${inv.unit}" data-host="${inv.from_uid}" data-hn="${esc(inv.from_nick)}">Пойти</span>`,12000);}
 $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;const t=e.target.value.trim().slice(0,120);if(!t)return;
-  roomCh.send({type:'broadcast',event:'chat',payload:{uid:me.id,text:t}});room.say(me.id,t);e.target.value='';});
+  roomCh.send({type:'broadcast',event:'chat',payload:{uid:me.id,text:t}});room.say(me.id,clean(t));e.target.value='';});
 {let rd=null;const cv=$('c');
   cv.addEventListener('pointerdown',e=>{if(mode==='room')rd={x:e.clientX,y:e.clientY};});
   cv.addEventListener('pointermove',e=>{if(mode==='room'&&e.pointerType==='mouse')room.pointer(e.clientX,e.clientY,false);});
@@ -458,6 +473,7 @@ function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10
   <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 восполняют энергию и ускоряют стройку.</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
 let lastBody='',lastTabs='';
 function renderUI(){
+  document.body.classList.toggle('chaton',!!me&&!ob&&mode==='city');
   if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1),fr=Math.max(0,Math.min(1,((me.xp||0)-x0)/(x1-x0)));
     $('hlvl').textContent=l;$('hxp').setAttribute('stroke-dasharray',`${(fr*100.5).toFixed(1)} 101`);
     $('money').textContent='💰 '+fmt(me.money);$('hgems').textContent='💎 '+(me.gems||0);
