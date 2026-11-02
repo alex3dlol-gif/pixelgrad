@@ -192,12 +192,11 @@ const CLUBS={
 async function enterClub(id){const pr=props.get(id),C=pr&&CLUBS[pr.sp];if(!C)return;
   if(!await act('club_enter',{p_id:id}))return;
   await enterRoom({unit:id,club:C,editable:false});
-  clubT=setInterval(()=>act('club_ping',{},true),30000);toast(`${C.ic} ${C.n}: ⚡ копится втрое быстрее, пока ты здесь`);}
+  clubT=setInterval(()=>act('club_ping',{},true),30000);toast(`${C.ic} ${C.n} · ⚡×3`);}
 function clubHTML(){const C=roomCtx&&roomCtx.club;if(!C)return'';const n=room.state?Math.max(1,room.state.people.size):1;
-  return`<h3>${C.ic} ${C.n}</h3><div>⚡ Пока ты здесь, энергия копится <b>в 3 раза быстрее</b>.</div>
+  return`<h3>${C.ic} ${C.n}</h3><div>⚡ Энергия здесь копится <b>×3</b></div>
   <div style="font-size:22px;margin:6px 0">⚡ ${Math.floor(EN())}/${EMAX()}</div>
   <div>👥 Сейчас здесь: <b>${n}</b></div>
-  <div class="mut" style="margin-top:6px">Нажми на диван или стул — сядешь. Пиши в чат, знакомься. Мебель тут общая, двигать её нельзя.</div>
   <span class="btn red" data-act="leave">← Выйти в город</span>`;}
 async function enterRoom({unit,hostUid,hostNick,editable,club}){
   if(club){roomCtx={unit:'club'+unit,club,editable:false};
@@ -217,7 +216,7 @@ async function enterRoom({unit,hostUid,hostNick,editable,club}){
     onMove:m=>roomCh&&roomCh.send({type:'broadcast',event:'move',payload:{uid:me.id,...m}})});
   tab='furn';}
   mode='room';document.body.classList.add('inroom');$('roomui').style.display='flex';$('chat').style.display='block';
-  $('reditbtn').style.display=editable?'':'none';$('chatin').placeholder=club?'Сообщение всем в зале… (Enter)':'Сообщение гостям… (Enter)';
+  $('reditbtn').style.display=editable?'':'none';$('chatin').placeholder=club?'Сообщение…':'Сообщение…';
   sheetOpen=!mobile||!!club;dirty=true;
   roomCh=sb.channel('room:'+unit,{config:{presence:{key:me.id}}});
   roomCh.on('presence',{event:'sync'},()=>{const st=roomCh.presenceState();room.setPeople(Object.entries(st).map(([uid,a])=>({uid,...a[a.length-1]})));dirty=true;})
@@ -241,10 +240,10 @@ $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;co
 const nearStop=(x,y,r)=>{let b=null,bd=r;world.STOPS.forEach((s,i)=>{const d=Math.hypot(s.x+.5-x,s.y-.5-y);if(d<bd){bd=d;b=i;}});return b;};
 let stopSel=null;
 function stopHTML(){const s=world.STOPS[stopSel];if(!s)return'';const m=world.me,d=m?Math.hypot(m.x-s.x,m.y-s.y):99;
-  return`<h3>🚌 Остановка «${esc(s.name)}»</h3><div>Автобус ходит между деревнями и городом. <b>Бесплатно.</b></div>`+
-  (d<=3?`<span class="btn gold" data-act="busmap">🗺 Куда едем?</span>`:`<div class="mut" style="margin-top:6px">Подойди к остановке, чтобы сесть в автобус.</div><span class="btn blue" data-act="gostop">Идти к остановке</span>`);}
+  return`<h3>🚌 Остановка «${esc(s.name)}»</h3><div>Проезд бесплатный</div>`+
+  (d<=3?`<span class="btn gold" data-act="busmap">🗺 Куда едем?</span>`:`<div class="mut" style="margin-top:6px">Подойди ближе к остановке.</div><span class="btn blue" data-act="gostop">Идти к остановке</span>`);}
 function showBusMap(){const S=world.STOPS,from=stopSel;$('auth').style.display='flex';
-  $('authbox').innerHTML=`<h3 style="font-size:14px">🚌 Куда едем?</h3><div class="mut">Нажми на остановку на карте или выбери из списка</div>
+  $('authbox').innerHTML=`<h3 style="font-size:14px">🚌 Куда едем?</h3>
   <canvas id="buscv" width="800" height="640" style="width:100%;image-rendering:pixelated;border:3px solid #0e0b14;cursor:pointer;touch-action:manipulation"></canvas>
   <div style="max-height:22vh;overflow:auto;margin-top:6px">${S.map((s,i)=>i===from?'':`<span class="btn sm ${s.reg==='c'?'blue':''}" data-act="busgo" data-i="${i}">${s.reg==='c'?'🏙':'🏡'} ${esc(s.name)}</span>`).join('')}</div>
   <span class="btn" data-act="closemodal">Отмена</span>`;
@@ -289,7 +288,7 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
   <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}</div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
-function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость — ${c} каждого товара (растёт с числом и уровнем бизнесов). Сверх лимита товар пропадает.</div>`;
+function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость: ${c} на товар</div>`;
   if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
   for(const g of gs){const q=Math.floor(inv(me,g)),pc=Math.min(100,q/c*100);h+=`<div class="row">${GOODS[g].ic} <b>${GOODS[g].n}</b> — ${q}/${c} <span class="mut">≈${Math.round(q*price(g,q/2))}💰 на базе</span><div class="bar"><i style="width:${pc}%;background:${pc>=100?'#c0392b':pc>80?'#e67e22':'#ffd166'}"></i></div>
     <span class="btn sm" data-act="sell" data-g="${g}">Продать на базу</span>${LV()>=2?`<span class="btn sm blue" data-act="toex">На биржу</span>`:''}</div>`;}
@@ -302,12 +301,12 @@ function bizHTML(pr){const b=BLD[pr.building],building=pr.built_at&&Date.parse(p
   if(building){const left=Math.max(0,Math.ceil((Date.parse(pr.built_at)-Date.now())/1000)),gc=Math.max(1,Math.ceil(left/120));h+=`<div>🏗 Строится… <b>${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}</b> <span class="btn sm gold" data-act="speedup" data-id="${pr.id}">⚡ Ускорить за ${gc}💎</span></div>`;}
   h+=`<div style="margin:6px 0">Работники: <b>${pr.workers}/${mx}</b> · уровень здания <b>${lv}</b> (выпуск ×${(1+.4*(lv-1)).toFixed(1)})</div>`;
   if(!building&&lv<5){const nl=lv+1,cost=b.cost*[1,2,4,8][nl-2],mins=({gather:3,retail:10,proc:15,service:30}[b.kind]||3)*(pr.kind==='office'?4:1)*[3,8,20,60][nl-2],mat={planks:6*nl,...(nl>=3?{bricks:5*(nl-2)}:{})},m=missCost(mat);
-    h+=`<div class="row">⬆ <b>Улучшить до ${nl} уровня</b>: выпуск ×${(1+.4*(nl-1)).toFixed(1)}${nl===3||nl===5?', +1 место для работника':''}, склад +50<br><span class="mut">${fmt(cost)}💰 + ${costText(mat)} · ⏱ ${mins>=60?Math.round(mins/60*10)/10+' ч':mins+' мин'} (здание стоит) · нужен ${nl} ур. игрока</span><br>`+
+    h+=`<div class="row">⬆ <b>Улучшить до ${nl} уровня</b>: выпуск ×${(1+.4*(nl-1)).toFixed(1)}${nl===3||nl===5?', +1 место для работника':''}, склад +50<br><span class="mut">${fmt(cost)}💰 + ${costText(mat)} · ⏱ ${mins>=60?Math.round(mins/60*10)/10+' ч':mins+' мин'} · нужен ${nl} ур. игрока</span><br>`+
       (LV()>=nl?`<span class="btn gold ${me.money>=cost+m.c&&m.ok?'':'dis'}" data-act="upgrade" data-id="${pr.id}">Улучшить · ${fmt(cost+m.c)}💰</span>`:lock(nl))+'</div>';}
   if(LV()>=NEED.hire)h+=`<span class="btn ${pr.workers<mx?'':'dis'}" data-act="hire" data-id="${pr.id}">Нанять (+${HIRE_FEE}💰)</span><span class="btn red ${pr.workers?'':'dis'}" data-act="fire" data-id="${pr.id}">Уволить</span>`;
   h+=`<div class="mut" style="margin-top:6px">Живые игроки тоже могут устроиться к тебе: ты платишь им ${OWNER_JOB_PAY}💰 за смену, а их смена даёт продукцию.</div>`;
   h+=`<div style="margin-top:8px">${LV()>=2?aucBtn(pr):''}<span class="btn red sm" data-act="sellprop" data-id="${pr.id}">Продать городу (~50%)</span></div>`;return h;}
-function buildListHTML(pr){let h=`<div class="mut">Выбери, что построить. Недостающие материалы докупятся на базе — если они там есть.</div>`;
+function buildListHTML(pr){let h=`<div class="mut">Выбери, что построить.</div>`;
   const here=Object.entries(BLD).filter(([k,b])=>b.reg.includes(pr.reg)),locked=here.filter(([k,b])=>LV()<needFor(b));
   for(const[k,b]of here){if(LV()<needFor(b))continue;const m=missCost(b.mat),c=b.cost+m.c,can=me&&me.money>=c&&m.ok;
     h+=`<div class="row"><b>${b.ic} ${b.n}</b> <span class="mut">${ioText(b)}</span><br><span class="mut">${b.desc}<br>Стройка ${b.cost}💰${Object.keys(b.mat).length?' + '+costText(b.mat):''} · ⏱ ${BUILD_MIN[pr.kind==='office'?'office':b.kind]||3} мин · зарплата ${b.wage}💰/мин</span><br>
@@ -321,11 +320,11 @@ let longDone=false;setInterval(()=>{if(!longOn()){longDone=false;return;}if(long
 function longStatusHTML(){if(!longOn())return'';const pr=props.get(me.long_prop),j=pr&&jobInfo(pr),left=longLeft(),tot=3600e3*(me.long_n>=28?4:me.long_n>=21?3:2);
   return`<div class="row" style="border-color:#ffd166">🕒 <b>Долгая смена</b> · ${j?j.n:'работа'} · за смену: <b>${fmt((j?j.pay:0)*me.long_n)}💰</b> и ${me.long_n} смен в карьеру
   <div class="bar"><i style="width:${Math.min(100,(1-left/tot)*100).toFixed(0)}%"></i></div>`+
-  (left>0?`<span class="mut">Осталось ${hm(left)} — можно закрыть игру, награда дождётся.</span><br><span class="btn sm red" data-act="longcancel">Уйти раньше (без оплаты)</span>`
+  (left>0?`<span class="mut">Осталось ${hm(left)}</span><br><span class="btn sm red" data-act="longcancel">Уйти раньше (без оплаты)</span>`
          :`<span class="btn gold" data-act="longclaim">Забрать награду</span>`)+`</div>`;}
 function longBtns(pr){const j=jobInfo(pr);if(!j||!me||pr.kind!=='npc')return'';if(longOn())return me.long_prop===pr.id?longStatusHTML():'';const ok=me.shifts>=j.req;
-  return`<div style="margin-top:8px"><b>🕒 Выйти на долгую смену</b> <span class="mut">— зашёл, отправил на смену, вернулся за наградой</span><br>`+
-  Object.entries(LONG).map(([h,L])=>`<span class="btn sm ${ok&&EN()>=L.en?'gold':'dis'}" data-act="longstart" data-id="${pr.id}" data-h="${h}">${h} ч · ${fmt(j.pay*L.n)}💰 · ⚡${L.en}</span>`).join('')+`</div>`;}
+  return`<div style="margin-top:8px"><b>🕒 Долгая смена</b><br>`+
+  Object.entries(LONG).map(([h,L])=>`<span class="btn sm ${ok?'gold':'dis'}" data-act="longstart" data-id="${pr.id}" data-h="${h}">${h} ч · ${fmt(j.pay*L.n)}💰</span>`).join('')+`</div>`;}
 function jobBtn(pr){const j=jobInfo(pr);if(!j||!me)return'';if(pr.kind!=='npc'&&LV()<NEED.playerJob&&me.job_prop!==pr.id)return'';if(me.job_prop===pr.id)return`<div style="margin-top:6px">✅ Ты работаешь здесь<div class="bar"><i id="shiftbar" style="width:0"></i></div></div><span class="btn red" data-act="quit">Уволиться</span>`;
   const ok=me.shifts>=j.req;return`<div style="margin-top:6px"><span class="btn ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться · ${j.pay}💰/смена</span>${ok?'':`<div class="mut">Нужен опыт: ${j.req} смен (у тебя ${me.shifts})</div>`}</div>`;}
 function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
@@ -338,16 +337,16 @@ function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
     h+='</div>';}return h;}
 function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>Нажми на участок, дом или предприятие на карте.</div><div class="mut" style="margin-top:6px">${mobile?'Двигай карту пальцем, щипок — зум.':'Тяни мышью, колесо — зум, Q/E — поворот.'}</div>`;
   if(p.sp==='res'){const r=RES[p.rt];return`<h3>🏢 ${r.n}</h3><div class="mut">${r.floors} этажей · комната ${r.room[0]}×${r.room[1]}. Купи квартиру, обставь мебелью и зови друзей.</div>${unitsHTML(p)}`;}
-  if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство: делает район живым, тут гуляют жители.</div>`;
+  if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3>`;
   if(p.sp==='cityhall'){const c=city||{};return`<h3>🏛 Мэрия</h3><div style="font-size:20px;margin:6px 0">💰 В казне: <b>${fmt(c.treasury||0)}</b></div>
-    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}.<br>Выборы мэра и работа в мэрии — 🚧 в разработке.</div>`;}
-  if(CLUBS[p.sp]){const C=CLUBS[p.sp];return`<h3>${C.ic} ${C.n}</h3><div>Место, где собираются игроки. Посиди на диване, поболтай в чате — <b>⚡ энергия копится втрое быстрее</b>, пока ты внутри.</div><span class="btn gold" data-act="club" data-id="${p.id}">Войти</span>`;}
+    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}.</div>`;}
+  if(CLUBS[p.sp]){const C=CLUBS[p.sp];return`<h3>${C.ic} ${C.n}</h3><div>⚡ Внутри энергия копится <b>×3</b></div><span class="btn gold" data-act="club" data-id="${p.id}">Войти</span>`;}
   const pr=props.get(p.id);if(!pr)return'<div class="mut">Загрузка…</div>';
   if(p.sp==='bc')return`<h3>🏙 Бизнес-центр</h3><div class="mut">Офисная карьера и офисы для кофеен и ресторанов. Клерк: 12💰 · с 100 смен менеджер 20💰 · с 300 директор 30💰.</div>${jobBtn(pr)}<h3 style="margin-top:10px">Офисы</h3>${unitsHTML(p)}`;
-  if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство города: делает район живым, тут гуляют жители.</div>`;
+  if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3>`;
   if(p.sp){const e=EMP[p.sp];return`<h3>${p.name||e.n}</h3><div>Городской работодатель. Должность: ${e.job}. Оплата <b>${e.pay}💰</b> за смену (${SHIFT_SEC} сек), смены идут, пока ты онлайн.</div>`+
     (Object.keys(e.out).length?`<div class="mut">Производит на базу: ${Object.entries(e.out).map(([g,q])=>q+GOODS[g].ic).join(' ')} в минуту</div>`:'')+
-    (p.sp==='market'?'<div class="mut">Сюда приезжают грузовики всех игроков. Цены — во вкладке «Рынок».</div>':'')+(longOn()&&me.long_prop!==pr.id?'<div class="mut" style="margin-top:6px">🕒 Ты сейчас на долгой смене в другом месте.</div>':longOn()?'':jobBtn(pr))+longBtns(pr);}
+    (longOn()&&me.long_prop!==pr.id?'<div class="mut" style="margin-top:6px">🕒 Ты на долгой смене</div>':longOn()?'':jobBtn(pr))+longBtns(pr);}
   if(!pr.owner){const can=me&&me.money>=pr.price;
     const d={v:'🌲 Деревня — дёшево, лес и река рядом',d:'🏡 Дачи — самые дешёвые, рядом озеро',c:'🏙 Город — дорого, но рядом покупатели',p:'🏭 Промзона — заводы',o:'⚓ Порт — рыболовные суда и коптильни'}[pr.reg];
     return`<h3>Участок #${p.id+1}</h3><div>${d}</div>${pr.reg==='c'?`<div class="mut">Спрос района: ~${pr.demand} клиентов/мин</div>`:''}<div style="margin:6px 0">Цена: <b>${fmt(pr.price)}💰</b></div>
@@ -369,13 +368,13 @@ function auctionHTML(){let h=`<h3>🔨 Аукцион недвижимости</
       ` <span class="btn sm blue" data-act="goto" data-plot="${pr?.plot}">На карте</span></div>`;}
   return h;}
 function showAucCreate(pr){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">🔨 Выставить на аукцион</h3><div>${propName(pr)}</div>
-  <div class="mut">Комиссия города 5%. Пока идут торги, объект работает на тебя.</div>
+  <div class="mut">Комиссия 5%.</div>
   <div class="crow">Стартовая цена 💰<input id="ac_s" type="number" value="${Math.round(pr.price*.8)}"></div><div class="crow">Цена выкупа 💰 (необязательно)<input id="ac_b" type="number" placeholder="пусто — без выкупа"></div>
   <div class="crow">Длительность: <select id="ac_h" style="font-family:inherit;font-size:15px;background:#120f18;color:#fff;border:2px solid #4a3f5c;padding:5px"><option value="1">1 час</option><option value="6" selected>6 часов</option><option value="24">24 часа</option><option value="48">48 часов</option></select></div>
   <span class="btn gold" data-act="aucgo" data-id="${pr.id}">Выставить</span><span class="btn blue" data-act="closedaily">Отмена</span>`;}
 const aucOf=propId=>[...auctions.values()].find(a=>a.prop===propId);
 const aucBtn=pr=>{const a=aucOf(pr.id);return a?`<div class="row">🔨 На аукционе · ${a.cur_bid?'ставка '+fmt(a.cur_bid)+'💰':'без ставок'} · ${leftTxt(a.ends_at)} <span class="btn sm blue" data-act="openauc">Открыть</span></div>`:`<span class="btn sm" data-act="aucnew" data-id="${pr.id}">🔨 На аукцион</span>`;};
-function exchangeHTML(){let h=`<h3>🤝 Биржа игроков</h3><div class="mut">Продавай свой товар другим игрокам по своей цене — выгоднее, чем базе. Налог с продажи идёт в казну города.</div>`;
+function exchangeHTML(){let h=`<h3>🤝 Биржа игроков</h3><div class="mut">Продавай другим игрокам по своей цене.</div>`;
   if(me){const mine=GK.filter(g=>inv(me,g)>=1);
     h+=LV()<2?`<div>${lock(2)}</div>`:mine.length?`<div class="row">Выставить: <select id="ex_g" style="font-family:inherit;font-size:15px;background:#120f18;color:#fff;border:2px solid #4a3f5c;padding:5px">${mine.map(g=>`<option value="${g}">${GOODS[g].ic} ${GOODS[g].n} (${Math.floor(inv(me,g))})</option>`).join('')}</select>
       <input id="ex_q" type="number" min="1" placeholder="кол-во" style="width:80px;display:inline-block"><input id="ex_p" type="number" min="1" placeholder="цена за шт" style="width:100px;display:inline-block"><span class="btn gold" data-act="exlist">Выставить</span></div>`:'<div class="mut">На складе пусто — нечего выставить.</div>';}
@@ -386,7 +385,7 @@ function exchangeHTML(){let h=`<h3>🤝 Биржа игроков</h3><div class
       h+=`<div>• ${nm(l.seller)} — <b>${(+l.price).toFixed(1)}💰</b> × ${l.qty} ${mine?`<span class="btn sm red" data-act="excancel" data-id="${l.id}">Снять</span>`:me?`<span class="btn sm" data-act="exbuy" data-id="${l.id}" data-q="1">Купить 1</span><span class="btn sm gold" data-act="exbuy" data-id="${l.id}" data-q="${l.qty}">Все</span>`:''}</div>`;}
     h+='</div>';}
   return h;}
-function baseHTML(){let h=`<h3>🏭 Оптовая база</h3><div class="mut">Цена зависит от склада: везут много — дешевеет. Купить можно только то, что реально лежит на складе.</div><table>`;
+function baseHTML(){let h=`<h3>🏭 Оптовая база</h3><table>`;
   for(const g of GK){const pr=price(g),q=me?Math.floor(inv(me,g)):0;
     h+=`<tr><td>${GOODS[g].ic} ${GOODS[g].n}</td><td><b>${pr.toFixed(1)}</b></td><td class="mut">склад ${fmt(stock(g))}</td>${me?`<td>${q}</td><td><span class="btn sm ${q?'':'dis'}" data-act="sell" data-g="${g}">Продать</span>${LV()>=NEED.buyMarket?`<span class="btn sm blue ${stock(g)>=5?'':'dis'}" data-act="buy" data-g="${g}">+5</span>`:''}</td>`:''}</tr>`;}
   return h+'</table>';}
@@ -403,7 +402,7 @@ function questsHTML(){const l=LV();let h=`<h3>🗺 Задания в округ�
 function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
   h+=longStatusHTML();const cur=me.job_prop!=null&&props.get(me.job_prop);
   if(cur){const j=jobInfo(cur);h+=`<div class="row">Сейчас: <b>${j?.n}</b> · ${j?.pay}💰/смена<div class="bar"><i id="shiftbar" style="width:0"></i></div><span class="mut">Смена ${SHIFT_SEC} сек, идёт пока ты в игре</span><br><span class="btn sm blue" data-act="goto" data-plot="${cur.plot}">Показать</span><span class="btn sm red" data-act="quit">Уволиться</span></div>`;}
-  else if(!longOn())h+=`<div class="row">Ты без работы. <span class="mut">Нет времени сидеть в игре? Открой работу на карте и выйди на 🕒 долгую смену на 2–4 часа.</span></div>`;
+  else if(!longOn())h+=`<div class="row">Ты без работы.</div>`;
   h+='<h3 style="margin-top:8px">Вакансии</h3>';
   const seen=new Set();for(const pr of props.values()){if(pr.kind!=='npc'||pr.sp==='cityhall')continue;if(pr.sp==='bc'&&seen.has('bc'))continue;seen.add(pr.sp);const j=jobInfo(pr),ok=me.shifts>=j.req;
     h+=`<div class="row"><b>${j.n}</b> · ${j.job} · <b>${j.pay}💰</b>${j.req?` <span class="mut">(от ${j.req} смен)</span>`:''}<br><span class="btn sm blue" data-act="goto" data-plot="${pr.plot}">На карте</span>${me.job_prop===pr.id?'':`<span class="btn sm ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться</span>`}</div>`;}
@@ -431,7 +430,7 @@ function furnHTML(){const st=room.state;if(!st)return'';
   else{h+=`<div class="mut" style="margin:6px 0">${mobile?'«Поставить» → нажми на пол. Нажми на вещь — переставить.':'«Поставить» → клик по полу, R — повернуть, клик по вещи — переставить.'}</div>
     <div class="crow"><div class="mut">Цвет стен</div><div class="swrow">${WALL_COLORS.map(c=>`<span class="sw ${st.decor.wall===c?'on':''}" style="background:${c}" data-act="rwall" data-v="${c}"></span>`).join('')}</div></div>
     <div class="crow"><div class="mut">Пол</div><div class="swrow">${FLOOR_COLORS.map(c=>`<span class="sw ${st.decor.floor===c?'on':''}" style="background:${c}" data-act="rfloor" data-v="${c}"></span>`).join('')}</div></div>`;}
-  h+=`<h3 style="margin-top:8px">Мебель</h3><div class="mut">Мебель делают игроки в мебельных цехах — цена зависит от склада базы.</div>`;
+  h+=`<h3 style="margin-top:8px">Мебель</h3>`;
   for(const[k,f]of Object.entries(FURN)){const owned=Math.floor(me.furn?.[k]||0),free=room.free(k),m=missCost(f.cost),c=f.money+m.c;
     h+=`<div class="row">${f.ic} <b>${f.n}</b> <span class="mut">${f.w}×${f.d}</span> · есть ${owned}, свободно ${Math.max(0,free)}<br>
     <span class="btn sm ${free>0?'':'dis'}" data-act="place" data-it="${k}">Поставить</span><span class="btn sm gold ${me.money>=c&&m.ok&&LV()>=NEED.furn?'':'dis'}" data-act="buyfurn" data-it="${k}">Купить · ${costText(f.cost)} + ${f.money}💰 (≈${c}💰)</span></div>`;}
@@ -527,12 +526,12 @@ function randomLook(){const pk=a=>a[Math.floor(Math.random()*a.length)],f=draft.
     bk:pk(f?LOOK.bottomKindF:LOOK.bottomKindM)[0],bottom:pk(LOOK.bottom),sk:pk(LOOK.shoeKind)[0],shoes:pk(LOOK.shoes),acc:Math.random()<.6?'none':pk(LOOK.acc)[0]};}
 function showEnergy(){const e=EN(),full=Math.ceil((EMAX()-e)*ENERGY.regenMin);
   $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">⚡ Энергия</h3><div style="font-size:28px">${Math.floor(e)}/${EMAX()}</div>
-  <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин, максимум растёт с уровнем (+10). Новый уровень и ежедневная награда — полная зарядка${e<EMAX()?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.<br>🎭 В Доме культуры (в деревне) или 🎬 кинотеатре (в городе) энергия копится <b>втрое быстрее</b>.</div>
+  <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин, максимум растёт с уровнем (+10). Новый уровень и ежедневная награда — полная зарядка${e<EMAX()?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.<br>🎭 В Доме культуры и 🎬 кинотеатре — ×3.</div>
   <div style="margin-top:10px"><span class="btn gold ${(me.gems||0)>=ENERGY.refillGems&&e<EMAX()?'':'dis'}" data-act="refill">Восполнить за ${ENERGY.refillGems}💎</span><span class="btn blue" data-act="gems">Кристаллы</span><span class="btn" data-act="closedaily">Закрыть</span></div>`;}
 function showGems(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">💎 Кристаллы</h3><div>У тебя: <b>${me.gems||0}💎</b></div>
   <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию и покупают редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
   ${[[100,'99 ₽'],[550,'449 ₽ · +10%'],[1200,'899 ₽ · +20%'],[3000,'1990 ₽ · +50%']].map(([g,p])=>`<div class="row">💎 <b>${g}</b> — ${p} <span class="btn sm dis">Скоро</span></div>`).join('')}
-  <div class="mut">Оплата подключается.</div><span class="btn" data-act="closedaily">Закрыть</span>`;}
+  <div class="mut">Скоро</div><span class="btn" data-act="closedaily">Закрыть</span>`;}
 function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10),s=me.last_daily===y?(me.streak||0)+1:1;
   $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:15px">🎁 Ежедневная награда</h3><div>День ${s} подряд: <b>+${DAILY[Math.min(s,7)-1]}💎</b> и +20 XP</div>
   <div style="display:flex;gap:4px;margin:10px 0;flex-wrap:wrap">${DAILY.map((g,i)=>`<div class="chip" style="${i+1===Math.min(s,7)?'outline:2px solid #ffd166;':''}opacity:${i+1<Math.min(s,7)?.5:1}">д${i+1}<br>${g}💎</div>`).join('')}</div>
@@ -628,14 +627,14 @@ document.addEventListener('click',async e=>{
     case 'fire':await act('hire',{p_id:id,p_delta:-1});break;
     case 'sell':await act('sell',{p_good:t.dataset.g,p_q:Math.floor(inv(me,t.dataset.g))});break;
     case 'buy':await act('buy',{p_good:t.dataset.g,p_q:5});break;
-    case 'job':if(await act('take_job',{p_id:id}))toast('Иди на работу — смены пойдут автоматически');break;
+    case 'job':if(await act('take_job',{p_id:id}))toast('💼 Принят на работу');break;
     case 'quit':await act('quit_job');break;
     case 'buyunit':if(await act('buy_unit',{p_id:id}))toast('🎉 Поздравляем с покупкой!');break;
     case 'sellprop':if(confirm('Точно продать?'))await act('sell_prop',{p_id:id});break;
     case 'sethome':await act('set_home',{p_id:id});{const h=homePlot();world.me&&(world.me.goal=null);}break;
-    case 'longstart':{const h=+t.dataset.h;if(await act('start_long_shift',{p_id:id,p_hours:h})){toast(`🕒 Ты на смене ${h} ч. Можно закрыть игру — награда будет ждать.`);}break;}
+    case 'longstart':{const h=+t.dataset.h;if(await act('start_long_shift',{p_id:id,p_hours:h})){toast(`🕒 Смена началась: ${h} ч`);}break;}
     case 'longclaim':{const before=me.money;if(await act('claim_long_shift')){const d=Math.round(me.money-before);toast(`✅ Смена окончена: +${fmt(d)}💰`);world.me&&world.float(`+${fmt(d)}💰`,world.me.x,1.7,world.me.y,'#c8ffb0');}break;}
-    case 'longcancel':if(confirm('Уйти со смены раньше? Оплаты не будет, энергия не вернётся.'))await act('cancel_long_shift');break;
+    case 'longcancel':if(confirm('Уйти со смены раньше? Оплаты не будет.'))await act('cancel_long_shift');break;
     case 'busmap':showBusMap();break;
     case 'busgo':busGo(+t.dataset.i);break;
     case 'gostop':{const s=world.STOPS[stopSel];if(s){world.goMe(s.x,s.y);if(mobile)sheetOpen=false;}break;}
@@ -681,16 +680,17 @@ const OB=[
   {t:'В <b>Алкомаркете «Градус»</b> платят больше. Отработай там 2 смены.',arrow:'alko',done:()=>ob.shifts.alko>=2},
   {t:'Энергия ⚡ сверху тратится на смены и сама восстанавливается. Теперь купи <b>учебный участок</b> за 40💰 (он за деревянным забором) — своя земля, свой бизнес.',arrow:'plot',done:()=>ob.plot},
   {t:'Построй на участке <b>ферму</b> (20💰). Стройка займёт пару секунд (в настоящем мире — минуты).',arrow:'plot',done:()=>ob.farm},
-  {t:'Работник сам собирает урожай. Загляни на склад — круглая кнопка <b>📦</b> справа.',done:()=>tab==='inv'&&sheetOpen&&(ob.inv.wheat||0)>=3},
+  {t:'Работник сам собирает урожай. Загляни на склад — нажми на подсвеченную кнопку <b>📦</b>.',hl:'inv',done:()=>tab==='inv'&&sheetOpen&&(ob.inv.wheat||0)>=3},
   {t:'Отнеси урожай в <b>Лавку скупщика</b> и продай. Совет: в большом мире сырьё дешёвое, а переработка (мука, хлеб) приносит в разы больше.',arrow:'lavka',done:()=>ob.sold},
-  {t:'Ты готов(а)! Иди к <b>пристани</b> — паром отвезёт тебя в Пиксельград. Начни с работы в ПВЗ или «Градусе» в своей деревне. Удачи!',arrow:'pier'},
+  {t:'Ты готов(а)! Паром у <b>пристани</b> отвезёт тебя в Пиксельград. Начни с работы в ПВЗ или «Градусе» в своей деревне. Удачи!',arrow:'pier'},
 ];
 function startOnboarding(){ob={i:-1,money:0,en:20,inv:{},shifts:{pvz:0,alko:0},job:null,shiftT:0,plot:false,farm:false,farmT:0,sold:false,sel:null};
   world.tutReset();world.setFog(true);world.setMe(me.nick,me.color,IS.spawn.x,IS.spawn.y+2,me.skin,me.look);world.jump(IS.spawn.x,IS.spawn.y+2);tab='ob';sheetOpen=false;obGo(0);}
-function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter();$('coach').style.display='flex';$('coach').classList.remove('mini');coachMin=false;
+function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter();document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));if(st.hl)$(st.hl).classList.add('hl');$('coach').style.display='flex';$('coach').classList.remove('mini');coachMin=false;
   $('cwho').textContent=`ОСТРОВ «УЧЕБНЫЙ» · ${i+1}/${OB.length}`;$('ctxt').innerHTML=st.t;$('cbtn').innerHTML=st.btn?`<span class="btn gold" data-ob="next">${st.btn}</span>`:'<span class="mut">▶ выполни — и продолжим</span>';
   if(st.arrow){const h=OBH[st.arrow];world.flyTo(h.x,h.y,mobile?11:13);}dirty=true;}
 function obUpdate(dt){if(!ob)return;const st=OB[ob.i];world.arrow=st&&st.arrow?OBH[st.arrow]:null;if(st&&st.done&&st.done())obGo(ob.i+1);
+  if(ob.toPier&&ob.i>=OB.length-1&&world.me&&!world.me.path.length){ob.toPier=false;ob.sel='pier';tab='ob';sheetOpen=true;dirty=true;}
   const m=world.me;if(ob.job&&m){const h=OBH[ob.job],tx=Math.round(h.x),ty=Math.round(h.y)+1;if(m.goal!==ob.job){m.goal=ob.job;world.goMe(tx,ty);ob.shiftT=0;}
     const at=!m.path.length&&Math.hypot(m.x-tx,m.y-ty)<1.3;m.working=at;
     if(at){ob.shiftT+=dt;if(ob.shiftT>=OB_SHIFT){ob.shiftT=0;const pay=ob.job==='pvz'?10:15;ob.money+=pay;ob.en=Math.max(1,ob.en-1);ob.shifts[ob.job]++;world.float(`+${pay}💰  −1⚡`,m.x,1.6,m.y);dirty=true;
@@ -713,14 +713,14 @@ function obHTML(){const k=ob.sel,mny=n=>`<b>${n}💰</b>`;
   if(k==='lavka')return`<h3>🧺 Лавка скупщика</h3><div>Пшеница по ${mny(3)} за штуку. У тебя: ${Math.floor(ob.inv.wheat||0)}🌾</div>`+(ob.i>=OBS.sell?`<span class="btn gold ${(ob.inv.wheat||0)>=1?'':'dis'}" data-ob="sell">Продать всё</span>`:'<div class="mut">⏳ Сначала вырасти урожай — следуй подсказке Петровича.</div>')+`<div class="mut">В большом мире есть оптовая база, биржа игроков и свои магазины.</div>`;
   if(k==='pier')return`<h3>⛴ Пристань</h3>`+(ob.i>=OB.length-1?`<div>Паром в Пиксельград готов. Учебные деньги останутся тут, а в городе тебя ждут 150💰 и работа в деревне.</div><span class="btn gold" data-ob="sail">Отплыть в Пиксельград →</span>`:'<div>Паром ждёт, пока ты закончишь обучение.</div>');
   return`<h3>🏝 Остров «Учебный»</h3><div>Нажимай на здания — следуй подсказкам Петровича сверху.</div>`;}
-function obInvHTML(){const q=Math.floor(ob.inv.wheat||0);return`<h3>📦 Склад</h3><div class="mut">Здесь копится всё, что производят твои бизнесы. У склада есть лимит — излишек пропадает.</div><div class="row">🌾 Пшеница — ${q}/100<div class="bar"><i style="width:${q}%"></i></div></div>`;}
+function obInvHTML(){const q=Math.floor(ob.inv.wheat||0);return`<h3>📦 Склад</h3><div class="row">🌾 Пшеница — ${q}/100<div class="bar"><i style="width:${q}%"></i></div></div>`;}
 async function obAction(a,t){
   if(a==='next')obGo(ob.i+1);
   if(a==='job'&&obCan(t.dataset.k)){if(ob.en<1){ob.en=20;toast('👷 Петрович угостил чаем — ⚡ восстановлена');}ob.job=t.dataset.k;if(mobile)sheetOpen=false;}
   if(a==='quit'){ob.job=null;if(world.me)world.me.goal=null;}
   if(a==='buy'&&!ob.plot&&ob.i>=OBS.plot){obTopUp(40,'участок');ob.money-=40;ob.plot=true;world.tutPlotState({owner:'me',color:me.color,nick:me.nick});toast('🌱 Участок твой!');}
   if(a==='build'&&ob.plot&&!ob.farm){obTopUp(20,'ферму');ob.money-=20;ob.farm=true;ob.farmReady=Date.now()+5000;ob.job=null;world.tutPlotState({owner:'me',color:me.color,nick:me.nick,building:'farm',workers:1,builtAt:Date.now()+5000});toast('🏗 Стройка пошла!');}
-  if(a==='sell'&&ob.i>=OBS.sell&&(ob.inv.wheat||0)>=1){const q=Math.floor(ob.inv.wheat||0);ob.money+=q*3;ob.inv.wheat=0;ob.sold=true;toast(`🧺 Продано ${q}🌾 за ${q*3}💰`);}
+  if(a==='sell'&&ob.i>=OBS.sell&&(ob.inv.wheat||0)>=1){const q=Math.floor(ob.inv.wheat||0);ob.money+=q*3;ob.inv.wheat=0;ob.sold=true;toast(`🧺 Продано ${q}🌾 за ${q*3}💰`);ob.sel=null;sheetOpen=false;ob.toPier=true;const h=OBH.pier;world.goMe(Math.round(h.x),Math.round(h.y)+1);}
   if(a==='sail'){ob.job=null;sheetOpen=false;$('coach').style.display='none';world.arrow=null;const sp=villageSpawn();
     toast('⛴ Паром отчаливает в Пиксельград…',6000);
     world.ferry({x:171.5,y:170},async()=>{const r=await act('finish_onboarding',{p_x:sp.x,p_y:sp.y});if(!r)return;ob=null;world.tutReset();
