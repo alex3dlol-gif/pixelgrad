@@ -64,7 +64,7 @@ export const ECON={rate:.3,svc:.4,wage:.35,cost:2.5,mat:3};
 for(const b of Object.values(BLD)){b.rate=Math.round(b.rate*((b.kind==='service'||b.kind==='retail')?ECON.svc:ECON.rate)*100)/100;
   b.wage=Math.round(b.wage*ECON.wage*100)/100;b.cost=Math.round(b.cost*({gather:b.cost<200?1.5:3,proc:6,retail:5,service:6}[b.kind]||ECON.cost)/10)*10;for(const k in b.mat)b.mat[k]=Math.ceil(b.mat[k]*ECON.mat);}
 export const BUILD_MIN={gather:3,retail:10,proc:15,service:30,office:60};
-export const ENERGY={max:40,regenMin:6,shift:1,quest:3,refillGems:20};
+export const ENERGY={base:60,perLvl:10,cap:150,regenMin:3,shift:1,quest:2,refillGems:20};
 export const HIRE_FEE=100, MAX_WORKERS=3, SHIFT_SEC=20, BUILD_SEC=20, START_MONEY=150, OWNER_JOB_PAY=7;
 
 // Городские работодатели (NPC-фирмы). out — что фирма сама производит в склад базы в минуту.

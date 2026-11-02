@@ -17,7 +17,8 @@ let me=null,mode='city',sel=null,tab='work',sheetOpen=!mobile,dirty=true;
 const props=new Map(),profiles=new Map(),goods=new Map(),events=[],unitsByPlot=new Map();
 let city=null;const qlog=new Map();let quest=null;const listings=new Map(),auctions=new Map();let mkSec='base',aucDraft=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
 const LV=()=>me?lvlOf(me.xp||0):1;
-const EN=()=>me?Math.min(ENERGY.max,Number(me.energy??ENERGY.max)+(Date.now()-Date.parse(me.energy_at||Date.now()))/60000/ENERGY.regenMin):0;
+const EMAX=()=>Math.min(ENERGY.cap,ENERGY.base+ENERGY.perLvl*(LV()-1));
+const EN=()=>me?Math.min(EMAX(),Number(me.energy??EMAX())+(Date.now()-Date.parse(me.energy_at||Date.now()))/60000/ENERGY.regenMin):0;
 const CAP=()=>100+50*myProps().filter(p=>p.building).length;const lock=n=>`<span class="mut">🔒 откроется на ${n} уровне</span>`;
 const DECOR={park:'🌳 Сквер — тут гуляют жители',yard:'🛝 Двор с детской площадкой',parking:'🚗 Парковка'};
 const inv=(p,g)=>Number(p?.inv?.[g]||0);
@@ -423,10 +424,10 @@ function randomLook(){const pk=a=>a[Math.floor(Math.random()*a.length)],f=draft.
   draft={...draft,skin:Math.floor(Math.random()*LOOK.skin.length),height:pk(LOOK.height)[0],build:pk(LOOK.build)[0],eyes:pk(LOOK.eyes),brows:pk(LOOK.brows)[0],mouth:pk(LOOK.mouth)[0],
     beard:f?'none':pk(LOOK.beard)[0],glasses:Math.random()<.7?'none':pk(LOOK.glasses)[0],hair:pk(f?LOOK.hairF:LOOK.hairM)[0],hc:pk(LOOK.hairCol),tk:pk(LOOK.topKind)[0],top:pk(LOOK.top),top2:pk(LOOK.accent),
     bk:pk(f?LOOK.bottomKindF:LOOK.bottomKindM)[0],bottom:pk(LOOK.bottom),sk:pk(LOOK.shoeKind)[0],shoes:pk(LOOK.shoes),acc:Math.random()<.6?'none':pk(LOOK.acc)[0]};}
-function showEnergy(){const e=EN(),full=Math.ceil((ENERGY.max-e)*ENERGY.regenMin);
-  $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">⚡ Энергия</h3><div style="font-size:28px">${Math.floor(e)}/${ENERGY.max}</div>
-  <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин${e<ENERGY.max?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.</div>
-  <div style="margin-top:10px"><span class="btn gold ${(me.gems||0)>=ENERGY.refillGems&&e<ENERGY.max?'':'dis'}" data-act="refill">Восполнить за ${ENERGY.refillGems}💎</span><span class="btn blue" data-act="gems">Кристаллы</span><span class="btn" data-act="closedaily">Закрыть</span></div>`;}
+function showEnergy(){const e=EN(),full=Math.ceil((EMAX()-e)*ENERGY.regenMin);
+  $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">⚡ Энергия</h3><div style="font-size:28px">${Math.floor(e)}/${EMAX()}</div>
+  <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин, максимум растёт с уровнем (+10). Новый уровень и ежедневная награда — полная зарядка${e<EMAX()?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.</div>
+  <div style="margin-top:10px"><span class="btn gold ${(me.gems||0)>=ENERGY.refillGems&&e<EMAX()?'':'dis'}" data-act="refill">Восполнить за ${ENERGY.refillGems}💎</span><span class="btn blue" data-act="gems">Кристаллы</span><span class="btn" data-act="closedaily">Закрыть</span></div>`;}
 function showGems(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">💎 Кристаллы</h3><div>У тебя: <b>${me.gems||0}💎</b></div>
   <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию, покупают скины и редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
   ${[[100,'99 ₽'],[550,'449 ₽ · +10%'],[1200,'899 ₽ · +20%'],[3000,'1990 ₽ · +50%']].map(([g,p])=>`<div class="row">💎 <b>${g}</b> — ${p} <span class="btn sm dis">Скоро</span></div>`).join('')}
@@ -440,7 +441,7 @@ function renderUI(){
   if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1),fr=Math.max(0,Math.min(1,((me.xp||0)-x0)/(x1-x0)));
     $('hlvl').textContent=l;$('hxp').setAttribute('stroke-dasharray',`${(fr*100.5).toFixed(1)} 101`);
     $('money').textContent='💰 '+fmt(me.money);$('hgems').textContent='💎 '+(me.gems||0);
-    const e=Math.floor(EN());$('hen').textContent='⚡ '+e+(mobile?'':'/'+ENERGY.max);$('hen').classList.toggle('low',e<ENERGY.shift);
+    const e=Math.floor(EN());$('hen').textContent='⚡ '+e+(mobile?'':'/'+EMAX());$('hen').classList.toggle('low',e<ENERGY.shift);
     const c=CAP(),full=GK.some(g=>inv(me,g)>=c),n=GK.reduce((a,g)=>a+Math.floor(inv(me,g)),0);$('invn').textContent=full?'!':n?(n>999?'999+':n):'';$('invn').style.background=full?'#c0392b':'#3a7d44';}
   {const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('htime').textContent=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;}
   document.body.classList.toggle('sheetopen',sheetOpen);
