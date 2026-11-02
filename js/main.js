@@ -23,7 +23,7 @@ const EN=()=>me?Math.min(EMAX(),Number(me.energy??EMAX())+(Date.now()-Date.parse
 const CAP=()=>100+50*myProps().filter(p=>p.building).length;const lock=n=>`<span class="mut">🔒 откроется на ${n} уровне</span>`;
 const DECOR={park:'🌳 Сквер — тут гуляют жители',yard:'🛝 Двор с детской площадкой',parking:'🚗 Парковка'};
 const inv=(p,g)=>Number(p?.inv?.[g]||0);
-const nm=uid=>{const p=profiles.get(uid);return p?`<b style="color:${p.color}">${esc(p.nick)}</b>`:'<b>игрок</b>';};
+const nm=uid=>{const p=profiles.get(uid);return p?`<b style="color:${/^#[0-9a-f]{6}$/i.test(p.color||'')?p.color:'#fff'}">${esc(p.nick)}</b>`:'<b>игрок</b>';};
 const marketPlot=plots.find(p=>p.sp==='market'),pvzPlot=plots.find(p=>p.sp==='pvzCity');
 const villagePvz=plots.filter(p=>p.sp==='pvzCity'&&p.reg==='v');
 const dormPlot=villagePvz[0]||plots.filter(p=>p.sp==='res').sort((a,b)=>Math.hypot(a.x-marketPlot.x,a.y-marketPlot.y)-Math.hypot(b.x-marketPlot.x,b.y-marketPlot.y))[0];
@@ -132,7 +132,7 @@ async function afterLogin(){
 function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);loadQuestLog();loadChat();loadShips();
+  joinPresence();act('settle',{},true);loadQuestLog();loadChat();loadShips();if(me.club)act('club_leave',{},true);
   if(longOn()&&longLeft()<=0)toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);tab='work';
   if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
   dirty=true;
@@ -173,7 +173,7 @@ function updateJob(dt){const m=world.me;if(!m||!me)return;if(m.hold){m.working=f
     const sb_=$('shiftbar');if(sb_)sb_.style.width=Math.min(100,shiftT/SHIFT_SEC*100)+'%';}
   else{m.working=false;m.goal=null;}}
 function jobInfo(p){if(!p)return null;if(p.kind==='npc'){const e=EMP[p.sp];let pay=e.pay;if(p.sp==='bc'&&me)pay=me.shifts>=300?30:me.shifts>=100?20:12;return{n:p.sp==='bc'?'Бизнес-центр':e.n,pay,req:e.req,job:e.job};}
-  if(p.building&&p.owner&&(!me||p.owner!==me.id))return{n:`${BLD[p.building].n} (${profiles.get(p.owner)?.nick||'игрок'})`,pay:OWNER_JOB_PAY,req:0,job:BLD[p.building].w.toLowerCase()};return null;}
+  if(p.building&&p.owner&&(!me||p.owner!==me.id))return{n:`${BLD[p.building].n} (${esc(profiles.get(p.owner)?.nick||'игрок')})`,pay:OWNER_JOB_PAY,req:0,job:BLD[p.building].w.toLowerCase()};return null;}
 
 // ================= КВАРТИРА =================
 let roomCh=null,roomCtx=null,saveT=null,clubT=null;
@@ -191,7 +191,15 @@ const CLUBS={
     ...[1,2,3,4,5,6,7,8].map(x=>({i:'chair',x,y:5,r:2})),
     {i:'lamp',x:0,y:7},{i:'table',x:4,y:7},{i:'table',x:5,y:7},{i:'lamp',x:9,y:7}]},
 };
-async function enterClub(id){const pr=props.get(id),C=pr&&CLUBS[pr.sp];if(!C)return;
+// в клуб заходят ногами: сначала персонаж доходит до здания, потом вход
+let pendingClub=null;
+function goClub(id){const pr=props.get(id);if(!pr)return;const pl=plots[pr.plot],m=world.me;if(!m)return;
+  if(Math.hypot(m.x-pl.door.x,m.y-pl.door.y)<=3)return enterClub(id);
+  pendingClub=id;m.hold=true;m.goal=null;world.goMe(pl.door.x,pl.door.y);if(mobile)sheetOpen=false;dirty=true;}
+function checkPendingClub(){if(pendingClub==null)return;const m=world.me,pr=props.get(pendingClub);if(!m||!pr){pendingClub=null;return;}const pl=plots[pr.plot];
+  if(Math.hypot(m.x-pl.door.x,m.y-pl.door.y)<=1.5&&!m.path.length&&!m.riding){const id=pendingClub;pendingClub=null;enterClub(id);}}
+async function enterClub(id){const pr=props.get(id),C=pr&&CLUBS[pr.sp];if(!C)return;const m=world.me;
+  if(m)await rpc('set_pos',{p_x:m.x,p_y:m.y}).catch(()=>{});
   if(!await act('club_enter',{p_id:id}))return;
   await enterRoom({unit:id,club:C,editable:false});
   clubT=setInterval(()=>act('club_ping',{},true),30000);toast(`${C.ic} ${C.n} · ⚡×3`);}
@@ -255,7 +263,7 @@ function busGo(i){const s=world.STOPS[i],f=world.STOPS[stopSel];if(!s)return;
   $('authbox').innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:48px" id="busic">🚌</div><div>${esc(f?f.name:'')} → <b>${esc(s.name)}</b></div></div>`;
   setTimeout(()=>{$('auth').style.display='none';sheetOpen=false;dirty=true;const m=world.me;if(m){m.goal=null;m.hold=true;}
     world.busRide(stopSel,i,()=>{stopSel=i;const m=world.me;if(m){m.goal=null;m.hold=true;}trackPos(true);rpc('set_pos',{p_x:s.x,p_y:s.y}).catch(()=>{});toast(`🚌 ${esc(s.name)}`);dirty=true;});},400);}
-world.onTap=(p,g)=>{if(mode!=='city')return;if(world.me)world.me.hold=false;if(!ob&&g){const si=nearStop(g.x,g.z,1.6);if(si!=null){stopSel=si;tab='stop';sheetOpen=true;sel=null;world.select(null);dirty=true;return;}}if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
+world.onTap=(p,g)=>{if(mode!=='city')return;if(world.me)world.me.hold=false;pendingClub=null;if(!ob&&g){const si=nearStop(g.x,g.z,1.6);if(si!=null){stopSel=si;tab='stop';sheetOpen=true;sel=null;world.select(null);dirty=true;return;}}if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
 world.onHover=(p,e)=>{const t=$('tip');if(!p||!e){t.style.display='none';return;}t.style.display='block';t.style.left=e.clientX+16+'px';t.style.top=e.clientY+12+'px';t.innerHTML=tipHTML(p);};
 function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(CLUBS[p.sp])return`${CLUBS[p.sp].ic} ${CLUBS[p.sp].n} · ⚡×3, пока ты внутри`;if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
@@ -649,7 +657,7 @@ document.addEventListener('click',async e=>{
     case 'busgo':busGo(+t.dataset.i);break;
     case 'gostop':{const s=world.STOPS[stopSel];if(s){world.goMe(s.x,s.y);if(mobile)sheetOpen=false;}break;}
     case 'closemodal':$('auth').style.display='none';break;
-    case 'club':if(mode==='room')leaveRoom();await enterClub(id);break;
+    case 'club':if(mode==='room')leaveRoom();goClub(id);break;
     case 'enter':if(mode==='room')leaveRoom();await enterRoom({unit:id,hostUid:me.id,hostNick:me.nick,editable:true});break;
     case 'redit':if(room.state){room.setEdit(!room.state.edit);sheetOpen=true;tab='furn';}break;
     case 'rwall':room.setDecor('wall',t.dataset.v);break;
@@ -748,7 +756,7 @@ function tutCheck(){if(!me||tutI<0||tutI>=TUT.length)return;const s=TUT[tutI];s.
 let last=performance.now(),uiT=0,settleT=10,lastSaved='';
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
   if(mode==='city')world.frameUpdate(dt);else room.render(dt);
-  if(me){if(ob)obUpdate(dt);else updateJob(dt);trackPos(false);if((settleT-=dt)<=0){settleT=15;act('settle',{},true);const m=world.me;if(m){const k=Math.round(m.x)+','+Math.round(m.y);if(k!==lastSaved){lastSaved=k;rpc('set_pos',{p_x:m.x,p_y:m.y}).catch(()=>{});}}}}
+  if(me){if(ob)obUpdate(dt);else{updateJob(dt);checkPendingClub();}trackPos(false);if((settleT-=dt)<=0){settleT=15;act('settle',{},true);const m=world.me;if(m){const k=Math.round(m.x)+','+Math.round(m.y);if(k!==lastSaved){lastSaved=k;rpc('set_pos',{p_x:m.x,p_y:m.y}).catch(()=>{});}}}}
   if((uiT-=dt)<=0||dirty){uiT=.5;renderUI();}}
 requestAnimationFrame(loop);
 renderUI();
