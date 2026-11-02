@@ -657,7 +657,15 @@ export function createWorld(canvas,{mobile}){
   canvas.addEventListener('wheel',e=>{zoomT=Math.max(5,Math.min(40,zoomT*(e.deltaY>0?1.12:1/1.12)));e.preventDefault();},{passive:false});
   const keys={};addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;keys[e.code]=true;if(e.code==='KeyQ')camAT-=Math.PI/2;if(e.code==='KeyE')camAT+=Math.PI/2;});
   addEventListener('keyup',e=>keys[e.code]=false);
-  const clampCam=()=>{camT.x=Math.max(0,Math.min(W,camT.x));camT.z=Math.max(0,Math.min(H,camT.z));};
+  let camBounds=null;
+  const clampCam=()=>{const b=camBounds||{x0:0,y0:0,x1:W,y1:H};camT.x=Math.max(b.x0,Math.min(b.x1,camT.x));camT.z=Math.max(b.y0,Math.min(b.y1,camT.z));if(camBounds)zoomT=Math.min(zoomT,mobile?13:16);};
+  // туман вокруг учебного острова: плоскость с дырой-эллипсом, рисуется поверх всего
+  const fog=new THREE.Group();{const cx=(ISLAND.x0+ISLAND.x1)/2,cy=(ISLAND.y0+ISLAND.y1)/2,rx=(ISLAND.x1-ISLAND.x0)/2,ry=(ISLAND.y1-ISLAND.y0)/2;
+    for(const[k,op]of[[1.25,.55],[1.5,.97]]){const sh=new THREE.Shape();sh.moveTo(-600,-600);sh.lineTo(600,-600);sh.lineTo(600,600);sh.lineTo(-600,600);sh.lineTo(-600,-600);
+      const hole=new THREE.Path();hole.absellipse(0,0,rx*k,ry*k,0,Math.PI*2,true);sh.holes.push(hole);
+      const m=new THREE.Mesh(new THREE.ShapeGeometry(sh,48),new THREE.MeshBasicMaterial({color:0xc9d3df,transparent:true,opacity:op,depthTest:false,depthWrite:false}));
+      m.rotation.x=-Math.PI/2;m.position.set(cx,6,cy);m.renderOrder=999;fog.add(m);}
+    fog.visible=false;scene.add(fog);}
 
   // ================= МИНИКАРТА =================
   const mmBase=new ImageData(W,H);
@@ -733,8 +741,9 @@ export function createWorld(canvas,{mobile}){
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
     marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
     tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
+    setFog(on){fog.visible=!!on;camBounds=on?{x0:ISLAND.x0-2,y0:ISLAND.y0-2,x1:ISLAND.x1+2,y1:ISLAND.y1+2}:null;clampCam();},
     tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},
-    ferry(to,onDone){const boat={kind:'boat',mesh:makeShip(false,0xffd166),x:ISLAND.pier.x+.5,y:ISLAND.pier.y-8,wp:[[ISLAND.pier.x+.5,ISLAND.pier.y-16],[to.x,to.y+10],[to.x,to.y+2]],wait:0,speed:6,ferry:true};
+    ferry(to,onDone){fog.visible=false;camBounds=null;const boat={kind:'boat',mesh:makeShip(false,0xffd166),x:ISLAND.pier.x+.5,y:ISLAND.pier.y-8,wp:[[ISLAND.pier.x+.5,ISLAND.pier.y-16],[to.x,to.y+10],[to.x,to.y+2]],wait:0,speed:6,ferry:true};
       scene.add(boat.mesh);ships.push(boat);if(me)me.mesh.visible=false;const f=()=>{camFly=null;camT.x+=(boat.x-camT.x)*.1;camT.z+=(boat.y-camT.z)*.1;
         if(boat.wp&&boat.wp.length)requestAnimationFrame(f);else{scene.remove(boat.mesh);ships.splice(ships.indexOf(boat),1);if(me)me.mesh.visible=true;onDone&&onDone();}};f();},walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
 }

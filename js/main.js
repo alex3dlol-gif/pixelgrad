@@ -126,7 +126,7 @@ async function afterLogin(){
   if(!me.onboarded){startOnboarding();return;}
   enterWorld();
 }
-function enterWorld(){
+function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
   joinPresence();act('settle',{},true);loadQuestLog();tab='work';
@@ -596,7 +596,7 @@ const OB=[
   {t:'Ты готов(а)! Иди к <b>пристани</b> — паром отвезёт тебя в Пиксельград. Начни с работы в ПВЗ или «Градусе» в своей деревне. Удачи!',arrow:'pier'},
 ];
 function startOnboarding(){ob={i:-1,money:0,en:20,inv:{},shifts:{pvz:0,alko:0},job:null,shiftT:0,plot:false,farm:false,farmT:0,sold:false,sel:null};
-  world.tutReset();world.setMe(me.nick,me.color,IS.spawn.x,IS.spawn.y+2,me.skin,me.look);world.jump(IS.spawn.x,IS.spawn.y+2);tab='ob';sheetOpen=false;obGo(0);}
+  world.tutReset();world.setFog(true);world.setMe(me.nick,me.color,IS.spawn.x,IS.spawn.y+2,me.skin,me.look);world.jump(IS.spawn.x,IS.spawn.y+2);tab='ob';sheetOpen=false;obGo(0);}
 function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter();$('coach').style.display='flex';$('coach').classList.remove('mini');coachMin=false;
   $('cwho').textContent=`ОСТРОВ «УЧЕБНЫЙ» · ${i+1}/${OB.length}`;$('ctxt').innerHTML=st.t;$('cbtn').innerHTML=st.btn?`<span class="btn gold" data-ob="next">${st.btn}</span>`:'<span class="mut">▶ выполни — и продолжим</span>';
   if(st.arrow){const h=OBH[st.arrow];world.flyTo(h.x,h.y,mobile?11:13);}dirty=true;}
@@ -646,6 +646,7 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
   if((uiT-=dt)<=0||dirty){uiT=.5;renderUI();}}
 requestAnimationFrame(loop);
 renderUI();
+if(new URLSearchParams(location.search).has('fog'))setTimeout(()=>{world.setFog(true);world.jump(215,245);},60);
 {const c=new URLSearchParams(location.search).get('cam');if(c){const[x,y]=c.split(',').map(Number);setTimeout(()=>world.jump(x,y),50);}}
 
 if(!sb)showAuth('noserver');
