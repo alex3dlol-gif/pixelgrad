@@ -77,7 +77,7 @@ export function createWorld(canvas,{mobile}){
   const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
   renderer.setPixelRatio(1);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.BasicShadowMap;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x8fbfe0);
-  scene.add(new THREE.HemisphereLight(0xd6e8ff,0x4a6b3a,1.0));
+  const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4a6b3a,1.0);scene.add(hemi);
   const sun=new THREE.DirectionalLight(0xfff0d0,1.9);scene.add(sun,sun.target);sun.castShadow=true;
   const SM=mobile?1024:2048;sun.shadow.mapSize.set(SM,SM);
   Object.assign(sun.shadow.camera,{left:-50,right:50,top:50,bottom:-50,near:1,far:220});sun.shadow.bias=-0.0006;
@@ -160,7 +160,12 @@ export function createWorld(canvas,{mobile}){
         if(glass)x.fillRect(w*8,f*8+1,7,6);else x.fillRect(w*8+2,f*8+2,4,5);
         if(!glass&&Math.random()<.12){x.fillStyle='#d8d2c4';x.fillRect(w*8+1,f*8+6,6,2);}}
       if(stripe){x.fillStyle=stripe;x.fillRect(0,f*8+7,c.width,1);}}
-    const t=new THREE.CanvasTexture(c);t.magFilter=t.minFilter=THREE.NearestFilter;t.colorSpace=THREE.SRGBColorSpace;return t;}
+    const t=new THREE.CanvasTexture(c);t.magFilter=t.minFilter=THREE.NearestFilter;t.colorSpace=THREE.SRGBColorSpace;
+    const e=document.createElement('canvas');e.width=c.width;e.height=c.height;const ex=e.getContext('2d'),src=x.getImageData(0,0,c.width,c.height),dst=ex.createImageData(c.width,c.height);
+    const lr=parseInt(lit.slice(1,3),16),lg=parseInt(lit.slice(3,5),16),lb=parseInt(lit.slice(5,7),16);for(let i=0;i<src.data.length;i+=4){const on=Math.abs(src.data[i]-lr)<6&&Math.abs(src.data[i+1]-lg)<6&&Math.abs(src.data[i+2]-lb)<6;
+      dst.data[i]=on?255:0;dst.data[i+1]=on?220:0;dst.data[i+2]=on?140:0;dst.data[i+3]=255;}ex.putImageData(dst,0,0);
+    const et=new THREE.CanvasTexture(e);et.magFilter=et.minFilter=THREE.NearestFilter;et.colorSpace=THREE.SRGBColorSpace;t.userData.emi=et;return t;}
+  const nightMats=[];
   const STYLES={
     khrush:[{base:'#b5654a',stripe:'#9a5038'},{base:'#d9c27a',stripe:'#c0a860'},{base:'#c97b5a',stripe:null}],
     panel9:[{base:'#d9d4c8',stripe:'#b8b2a4'},{base:'#cfd8dc',stripe:'#5b7fa6'},{base:'#e2d6c0',stripe:'#c49a6c'}],
@@ -170,7 +175,7 @@ export function createWorld(canvas,{mobile}){
     bc:[{base:'#2f5d5a',win:'#5aa39b',lit:'#d8fff8',glass:true,cols:8},{base:'#3a4a5a',win:'#6b8aa8',lit:'#f0f6ff',glass:true,cols:8}],
   };
   const FMAT={};
-  function facadeMat(type,v,floors){const k=type+v;if(!FMAT[k]){const st=STYLES[type][v];FMAT[k]=new THREE.MeshLambertMaterial({map:facadeTex(floors,st)});FMAT[k].side_=mat(new THREE.Color(st.base).multiplyScalar(.85).getHex());}return FMAT[k];}
+  function facadeMat(type,v,floors){const k=type+v;if(!FMAT[k]){const st=STYLES[type][v];const tx=facadeTex(floors,st);FMAT[k]=new THREE.MeshLambertMaterial({map:tx,emissiveMap:tx.userData.emi,emissive:0xffffff,emissiveIntensity:0});nightMats.push(FMAT[k]);FMAT[k].side_=mat(new THREE.Color(st.base).multiplyScalar(.85).getHex());}return FMAT[k];}
   function tower(type,v,floors,fh,w,d){const fm=facadeMat(type,v,floors);const h=floors*fh;
     const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),[fm,fm,mat(0x6d6a66),mat(0x6d6a66),fm,fm]);m.position.y=h/2;m.castShadow=m.receiveShadow=true;return m;}
   const CAR_COLS=[0xb03a2e,0xe8e8e8,0x2e5e8c,0x3c3c3c,0x6b8e23,0xd4b106];
@@ -464,15 +469,24 @@ export function createWorld(canvas,{mobile}){
   const units=[],vehicles=[],residents=[],ships=[];
   function setPlotState(id,st){
     const p=plots[id];if(!p||p.sp)return;
-    const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0);
+    const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0)||(p.level||1)!==(st.level||1);
     if(p.building&&!st.building)for(let y=p.y0+1;y<=p.y0+2;y++)for(let x=p.x0+1;x<=p.x0+2;x++)walk[I(x,y)]=1;
-    Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0});
+    Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0,level:st.level||1});
     setSign(p,!p.owner);if(p.building)blockFoot(p);
     if(changed&&p.mat){dematerialize(p);materialize(p);}else if(p.mat)syncWorkers(p);
   }
+  // украшения по уровню здания: растёт, пристройки, огни, табличка со звёздами
+  function levelDecor(g,lv,col){if(lv<=1)return;const k=1+.07*(lv-1);for(const c of g.children)if(!c.userData.ld){c.scale.multiplyScalar(k);c.position.x*=k;c.position.z*=k;}
+    const add=m=>{m.userData.ld=1;return m;};
+    if(lv>=2){for(const[x,z]of[[-1.5,1.6],[-1.1,1.6],[-.7,1.6]]){add(B(g,.22,.12,.22,0x8b5a2b,x,0,z));add(B(g,.16,.08,.16,[0xff8fab,0xffe066,0xb388eb][Math.abs(x*10|0)%3],x,.12,z));}}
+    if(lv>=3){add(B(g,.9,.6,.8,0xd9cbb0,-1.25,0,-1.1));add(GR(g,1,.35,.9,col,-1.25,.6,-1.1));}
+    if(lv>=4){add(B(g,.08,1.4,.08,0x555555,1.3,0,-1.2));add(B(g,.18,.18,.18,0xfff1b0,1.3,1.4,-1.2,true));add(B(g,.5,.04,.4,0x2c3e50,1.2,.62,-1.15));}
+    if(lv>=5){add(B(g,.06,1.8,.06,0xdddddd,-1.6,0,-1.6));add(B(g,.5,.3,.03,0xf1c40f,-1.33,1.5,-1.6));}
+    add(B(g,.05,.7,.05,0x6b4a2f,-1.65,0,1.25));add(B(g,.12+.11*(lv-1),.16,.04,0x2b2438,-1.65+.05*(lv-1),.62,1.25));
+    for(let i=0;i<lv-1;i++)add(B(g,.08,.08,.05,0xf1c40f,-1.65+i*.11,.66,1.28,true));}
   function materialize(p){if(p.mat||!p.owner)return;p.mat=true;
     p.fence=makeFence(p,p.color);scene.add(p.fence);
-    if(p.building){const b=makeBuilding(p.building,new THREE.Color(p.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);scene.add(b.g);p.group=b.g;p.anim=b.a;
+    if(p.building){const b=makeBuilding(p.building,new THREE.Color(p.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);levelDecor(b.g,p.level||1,new THREE.Color(p.color||'#fff').getHex());scene.add(b.g);p.group=b.g;p.anim=b.a;
       if(p.building==='farm')makeCrops(p,'wheat');if(p.building==='garden')makeCrops(p,'veg');}
     syncWorkers(p);}
   function dematerialize(p){if(!p.mat)return;p.mat=false;
@@ -628,8 +642,20 @@ export function createWorld(canvas,{mobile}){
     const cs=[[0,0],[innerWidth,0],[innerWidth,innerHeight],[0,innerHeight]].map(([x,y])=>groundAt(x,y));
     if(cs.every(Boolean)){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1;ctx.beginPath();cs.forEach((c,i)=>i?ctx.lineTo(c.x,c.z):ctx.moveTo(c.x,c.z));ctx.closePath();ctx.stroke();}}
 
+
+  // игровое время: полные сутки за один реальный час, одинаково у всех
+  const HOV=new URLSearchParams(location.search).get('hour');const gameHour=()=>HOV!=null?+HOV:((Date.now()/1000)%3600)/3600*24;
+  const SKY_DAY=new THREE.Color(0x8fbfe0),SKY_NIGHT=new THREE.Color(0x0b1530),SKY_DUSK=new THREE.Color(0xf0a070),SUN_DAY=new THREE.Color(0xfff0d0),SUN_DUSK=new THREE.Color(0xff9a5a),SUN_NIGHT=new THREE.Color(0x6a7cc0),_c=new THREE.Color();
+  function applyDayNight(){const h=gameHour(),d=Math.max(0,Math.sin((h-6)/12*Math.PI)),dusk=Math.max(0,1-Math.abs(h-6.5)/1.5)+Math.max(0,1-Math.abs(h-18.5)/1.5);
+    const night=1-Math.min(1,d*2.5);
+    _c.copy(SKY_NIGHT).lerp(SKY_DAY,Math.min(1,d*1.6)).lerp(SKY_DUSK,Math.min(.6,dusk*.6));scene.background.copy(_c);
+    sun.intensity=.25+1.65*d;sun.color.copy(SUN_NIGHT).lerp(SUN_DAY,Math.min(1,d*2)).lerp(SUN_DUSK,Math.min(.7,dusk*.7));
+    hemi.intensity=.42+.58*Math.min(1,d*1.5);
+    const a=(h-6)/12*Math.PI,sx=Math.round(camT.x/2)*2,sz=Math.round(camT.z/2)*2;sun.position.set(sx-Math.cos(a)*45,15+Math.max(.2,Math.sin(a))*45,sz+20);
+    for(const m of nightMats)m.emissiveIntensity=night*1.8;
+    return{h,d,night};}
   // ================= КАДР =================
-  let vanT=2,resT=1,cargoT=3,fishT=1,cullT=0;const _v=new THREE.Vector3();
+  let dayState={h:12,d:1,night:0};let vanT=2,resT=1,cargoT=3,fishT=1,cullT=0;const _v=new THREE.Vector3();
   function project(p,el){_v.copy(p).project(cam);if(_v.z>1||Math.abs(_v.x)>1.05||Math.abs(_v.y)>1.05){el.style.display='none';return;}el.style.display='';el.style.left=(_v.x+1)/2*innerWidth+'px';el.style.top=(1-_v.y)/2*innerHeight+'px';}
   const near=(x,y,r=zoom*2.5)=>Math.abs(x-camT.x)+Math.abs(y-camT.z)<r;
   function frameUpdate(dt){
@@ -648,7 +674,7 @@ export function createWorld(canvas,{mobile}){
     for(const q of birds){q.a+=q.s*dt;q.b.position.set(q.L.x+Math.cos(q.a)*q.L.rx*q.r,-.08,q.L.y+Math.sin(q.a)*q.L.ry*q.r);q.b.rotation.y=-q.a;}
     for(const f of fires)if(near(f[0],f[2])&&Math.random()<dt*f[3]*2)puff(f[0],f[1],f[2],f[3]>1?0xff8c1a:0xcfcfcf,1,.6,.08);
     if((vanT-=dt)<=0){vanT=rand(3,6);if(vehicles.filter(v=>v.kind==='van').length<8)spawnVan();}
-    if((resT-=dt)<=0){resT=rand(.3,.7);if(residents.length<(mobile?35:60))spawnResident();}
+    if((resT-=dt)<=0){resT=rand(.3,.7);if(residents.length<(mobile?35:60)*(dayState.night>.5?.3:1))spawnResident();}
     if((cargoT-=dt)<=0){cargoT=rand(35,60);if(ships.filter(s=>s.kind==='cargo').length<3)spawnCargo();}
     if((fishT-=dt)<=0){fishT=rand(6,12);if(ships.filter(s=>s.kind==='fishing').length<6)spawnFishing();}
     if(me){if(stepMove(me,dt)){}animPerson(me,time);me.label.p.set(me.x,1.2,me.y);}
@@ -666,7 +692,7 @@ export function createWorld(canvas,{mobile}){
     const fx=-Math.sin(camA),fz=-Math.cos(camA),sp=zoom*1.2*dt;
     if(keys.KeyW||keys.ArrowUp){camT.x+=fx*sp;camT.z+=fz*sp;}if(keys.KeyS||keys.ArrowDown){camT.x-=fx*sp;camT.z-=fz*sp;}
     if(keys.KeyA||keys.ArrowLeft){camT.x+=fz*sp;camT.z-=fx*sp;}if(keys.KeyD||keys.ArrowRight){camT.x-=fz*sp;camT.z+=fx*sp;}
-    clampCam();updateCam();
+    clampCam();updateCam();dayState=applyDayNight();
     renderer.render(scene,cam);
     for(let i=floats.length-1;i>=0;i--){const f=floats[i];f.t+=dt;f.p.y+=dt*.7;project(f.p,f.el);f.el.style.opacity=1-f.t/1.6;if(f.t>1.6){f.el.remove();floats.splice(i,1);}}
     for(const L of wlabels)project(L.p,L.el);
@@ -678,5 +704,5 @@ export function createWorld(canvas,{mobile}){
     set arrow(p){arrowTarget=p;},
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
-    marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
+    marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
 }

@@ -60,9 +60,9 @@ export const BLD={
   restaurant:{n:'Ресторан',ic:'🍽️',w:'Шеф',reg:'B',kind:'service',in:{cheese:1,smoked:1,veg:1},pay:120,rate:4,wage:10,cost:3000,mat:{furniture:4},ord:3,hat:0xffffff,desc:'Сыр + копчёная рыба + овощи → +120💰. Топ-бизнес.'},
 };
 // ===== Баланс: «охлаждение» экономики — развитие на недели, а не за вечер =====
-export const ECON={rate:.3,svc:.4,wage:.35,cost:2.5,mat:2};
+export const ECON={rate:.3,svc:.4,wage:.35,cost:2.5,mat:3};
 for(const b of Object.values(BLD)){b.rate=Math.round(b.rate*((b.kind==='service'||b.kind==='retail')?ECON.svc:ECON.rate)*100)/100;
-  b.wage=Math.round(b.wage*ECON.wage*100)/100;b.cost=Math.round(b.cost*(b.kind==='gather'&&b.cost<200?1.2:ECON.cost)/10)*10;for(const k in b.mat)b.mat[k]=Math.ceil(b.mat[k]*ECON.mat);}
+  b.wage=Math.round(b.wage*ECON.wage*100)/100;b.cost=Math.round(b.cost*({gather:b.cost<200?1.5:3,proc:6,retail:5,service:6}[b.kind]||ECON.cost)/10)*10;for(const k in b.mat)b.mat[k]=Math.ceil(b.mat[k]*ECON.mat);}
 export const BUILD_MIN={gather:3,retail:10,proc:15,service:30,office:60};
 export const ENERGY={max:40,regenMin:6,shift:1,quest:3,refillGems:20};
 export const HIRE_FEE=100, MAX_WORKERS=3, SHIFT_SEC=20, BUILD_SEC=20, START_MONEY=150, OWNER_JOB_PAY=7;

@@ -15,7 +15,7 @@ const plots=world.plots;
 // ================= СОСТОЯНИЕ =================
 let me=null,mode='city',sel=null,tab='obj',sheetOpen=!mobile,dirty=true;
 const props=new Map(),profiles=new Map(),goods=new Map(),events=[],unitsByPlot=new Map();
-let city=null;const qlog=new Map();let quest=null;const listings=new Map();let mkSec='base';const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
+let city=null;const qlog=new Map();let quest=null;const listings=new Map(),auctions=new Map();let mkSec='base',aucDraft=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
 const LV=()=>me?lvlOf(me.xp||0):1;
 const EN=()=>me?Math.min(ENERGY.max,Number(me.energy??ENERGY.max)+(Date.now()-Date.parse(me.energy_at||Date.now()))/60000/ENERGY.regenMin):0;
 const CAP=()=>100+50*myProps().filter(p=>p.building).length;const lock=n=>`<span class="mut">🔒 откроется на ${n} уровне</span>`;
@@ -43,7 +43,7 @@ const myPlots=()=>myProps().filter(p=>p.kind==='land').map(p=>({...plots[p.plot]
 function applyProp(r){const old=props.get(r.id);const n={...old,...r};props.set(r.id,n);
   if(!old&&(n.kind==='apt'||n.kind==='office')){if(!unitsByPlot.has(n.plot))unitsByPlot.set(n.plot,[]);unitsByPlot.get(n.plot).push(n.id);}
   if(n.kind==='land'){const pr=n.owner?profiles.get(n.owner):null;
-    world.setPlotState(n.plot,{owner:n.owner,color:pr?.color||'#ffffff',building:n.building,workers:n.workers,builtAt:n.built_at?Date.parse(n.built_at):0});
+    world.setPlotState(n.plot,{owner:n.owner,color:pr?.color||'#ffffff',building:n.building,workers:n.workers,builtAt:n.built_at?Date.parse(n.built_at):0,level:n.level||1});
     if(n.owner&&!pr)fetchProfile(n.owner).then(()=>applyProp(props.get(n.id)));}
   dirty=true;}
 async function fetchProfile(id){const {data}=await sb.from('profiles').select('id,nick,color,money,shifts').eq('id',id).maybeSingle();if(data)profiles.set(id,data);}
@@ -55,11 +55,12 @@ function renderTicker(){$('ticker').innerHTML=events.slice(-6).reverse().map((e,
 // ================= ЗАГРУЗКА И REALTIME =================
 async function loadWorld(){
   const [g,pr,ps,ev]=await Promise.all([selectAll('goods'),selectAll('profiles','id,nick,color,money,shifts'),
-    selectAll('props','id,kind,plot,reg,sp,tier,floor,price,demand,owner,building,workers,built_at'),
+    selectAll('props','id,kind,plot,reg,sp,tier,floor,price,demand,owner,building,workers,built_at,premium,level'),
     sb.from('events').select('*').order('id',{ascending:false}).limit(40)]);
   g.forEach(x=>goods.set(x.good,x));pr.forEach(p=>profiles.set(p.id,p));ps.forEach(applyProp);
   (ev.data||[]).reverse().forEach(e=>events.push(e));renderTicker();
   await loadGov();
+  const A=await sb.from('auctions').select('*').eq('status','open');(A.data||[]).forEach(a=>auctions.set(a.id,a));
   const L=await sb.from('listings').select('*').gt('qty',0).order('price');(L.data||[]).forEach(l=>listings.set(l.id,l));for(const l of listings.values())if(!profiles.has(l.seller))await fetchProfile(l.seller);
   sb.channel('db')
     .on('postgres_changes',{event:'*',schema:'public',table:'props'},p=>p.new&&p.new.id!=null&&applyProp(p.new))
@@ -67,6 +68,7 @@ async function loadWorld(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},p=>onEvent(p.new))
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{const r=p.new;if(!r||!r.id)return;profiles.set(r.id,{...profiles.get(r.id),...r});if(me&&r.id===me.id)setMe(r);dirty=true;})
     .on('postgres_changes',{event:'*',schema:'public',table:'city'},p=>{city=p.new;dirty=true;})
+    .on('postgres_changes',{event:'*',schema:'public',table:'auctions'},p=>{const a=p.new;if(!a||!a.id)return;if(a.status==='open')auctions.set(a.id,a);else auctions.delete(a.id);for(const u of[a.seller,a.bidder])if(u&&!profiles.has(u))fetchProfile(u);dirty=true;})
     .on('postgres_changes',{event:'*',schema:'public',table:'listings'},p=>{const l=p.new;if(!l||!l.id)return;if(l.qty>0){listings.set(l.id,l);if(!profiles.has(l.seller))fetchProfile(l.seller);}else listings.delete(l.id);dirty=true;})
     .on('postgres_changes',{event:'*',schema:'public',table:'government'},p=>{gov.set(p.new.position,p.new);dirty=true;})
     .on('postgres_changes',{event:'*',schema:'public',table:'elections'},()=>loadGov())
@@ -209,13 +211,17 @@ function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),
   return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'gov',b:'Мэрия'};}
 function nextHTML(){const n=nextStep();if(!n)return'';return`<div class="box" style="border-color:#7bd389;padding:8px"><div class="mut" style="color:#7bd389">🎯 ЧТО ДЕЛАТЬ ДАЛЬШЕ</div><b>${n.t}</b><div style="font-size:14px;margin:4px 0">${n.d}</div><span class="btn gold sm" data-act="next" data-a="${n.a}" data-v="${n.v??''}">${n.b} →</span></div>`;}
 function bizHTML(pr){const b=BLD[pr.building],building=pr.built_at&&Date.parse(pr.built_at)>Date.now();
-  let h=`<h3>${b.ic} ${b.n}</h3><div class="mut">${b.desc}</div><div style="margin:6px 0">${ioText(b)} на работника · зарплата ${b.wage}💰/мин каждому</div><div class="mut">🟢 Пока ты в игре — 100% выработки, офлайн — ${Math.round(OFFLINE_RATE*100)}% (до 8 ч).</div>`;
+  const lv=pr.level||1,mx=MAX_WORKERS+(lv>=3?1:0)+(lv>=5?1:0);
+  let h=`<h3>${b.ic} ${b.n} <span style="color:#f1c40f">${'★'.repeat(lv)}${'☆'.repeat(5-lv)}</span></h3><div class="mut">${b.desc}</div><div style="margin:6px 0">${ioText(b)} на работника · зарплата ${b.wage}💰/мин каждому</div><div class="mut">🟢 Пока ты в игре — 100% выработки, офлайн — ${Math.round(OFFLINE_RATE*100)}% (до 8 ч).</div>`;
   if(b.kind==='service'||b.kind==='retail')h+=`<div class="mut">Спрос района: ~${pr.demand} клиентов/мин (делится с конкурентами рядом)</div>`;
   if(building){const left=Math.max(0,Math.ceil((Date.parse(pr.built_at)-Date.now())/1000)),gc=Math.max(1,Math.ceil(left/120));h+=`<div>🏗 Строится… <b>${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}</b> <span class="btn sm gold" data-act="speedup" data-id="${pr.id}">⚡ Ускорить за ${gc}💎</span></div>`;}
-  h+=`<div style="margin:6px 0">Работники: <b>${pr.workers}/${MAX_WORKERS}</b></div>`;
-  if(LV()>=NEED.hire)h+=`<span class="btn ${pr.workers<MAX_WORKERS?'':'dis'}" data-act="hire" data-id="${pr.id}">Нанять (+${HIRE_FEE}💰)</span><span class="btn red ${pr.workers?'':'dis'}" data-act="fire" data-id="${pr.id}">Уволить</span>`;
+  h+=`<div style="margin:6px 0">Работники: <b>${pr.workers}/${mx}</b> · уровень здания <b>${lv}</b> (выпуск ×${(1+.4*(lv-1)).toFixed(1)})</div>`;
+  if(!building&&lv<5){const nl=lv+1,cost=b.cost*[1,2,4,8][nl-2],mins=({gather:3,retail:10,proc:15,service:30}[b.kind]||3)*(pr.kind==='office'?4:1)*[3,8,20,60][nl-2],mat={planks:6*nl,...(nl>=3?{bricks:5*(nl-2)}:{})},m=missCost(mat);
+    h+=`<div class="row">⬆ <b>Улучшить до ${nl} уровня</b>: выпуск ×${(1+.4*(nl-1)).toFixed(1)}${nl===3||nl===5?', +1 место для работника':''}, склад +50<br><span class="mut">${fmt(cost)}💰 + ${costText(mat)} · ⏱ ${mins>=60?Math.round(mins/60*10)/10+' ч':mins+' мин'} (здание стоит) · нужен ${nl} ур. игрока</span><br>`+
+      (LV()>=nl?`<span class="btn gold ${me.money>=cost+m.c&&m.ok?'':'dis'}" data-act="upgrade" data-id="${pr.id}">Улучшить · ${fmt(cost+m.c)}💰</span>`:lock(nl))+'</div>';}
+  if(LV()>=NEED.hire)h+=`<span class="btn ${pr.workers<mx?'':'dis'}" data-act="hire" data-id="${pr.id}">Нанять (+${HIRE_FEE}💰)</span><span class="btn red ${pr.workers?'':'dis'}" data-act="fire" data-id="${pr.id}">Уволить</span>`;
   h+=`<div class="mut" style="margin-top:6px">Живые игроки тоже могут устроиться к тебе: ты платишь им ${OWNER_JOB_PAY}💰 за смену, а их смена даёт продукцию.</div>`;
-  h+=`<div style="margin-top:8px"><span class="btn red sm" data-act="sellprop" data-id="${pr.id}">Продать (вернёшь ~70%)</span></div>`;return h;}
+  h+=`<div style="margin-top:8px">${LV()>=2?aucBtn(pr):''}<span class="btn red sm" data-act="sellprop" data-id="${pr.id}">Продать городу (~50%)</span></div>`;return h;}
 function buildListHTML(pr){let h=`<div class="mut">Выбери, что построить. Недостающие материалы докупятся на базе — если они там есть.</div>`;
   const here=Object.entries(BLD).filter(([k,b])=>b.reg.includes(pr.reg)),locked=here.filter(([k,b])=>LV()<needFor(b));
   for(const[k,b]of here){if(LV()<needFor(b))continue;const m=missCost(b.mat),c=b.cost+m.c,can=me&&me.money>=c&&m.ok;
@@ -227,8 +233,8 @@ function jobBtn(pr){const j=jobInfo(pr);if(!j||!me)return'';if(pr.kind!=='npc'&&
 function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
   for(const id of ids){const u=props.get(id);const mine=me&&u.owner===me.id;
     h+=`<div class="row">${u.kind==='apt'?'🚪 Квартира':'🏢 Офис'}, ${u.floor} этаж · <b>${fmt(u.price)}💰</b> `;
-    if(!u.owner){const n=u.kind==='apt'?NEED.apt:NEED.office;h+=LV()<n?lock(n):`<span class="btn sm gold" data-act="buyunit" data-id="${id}">Купить</span>`;}
-    else if(mine){if(u.kind==='apt')h+=`<span class="btn sm" data-act="enter" data-id="${id}">Войти</span>${me.home_unit===id?'<span class="mut"> 🏠 дом</span>':`<span class="btn sm blue" data-act="sethome" data-id="${id}">Сделать домом</span>`}`;
+    if(!u.owner){const n=u.kind==='apt'?NEED.apt:NEED.office;h+=u.premium?(aucOf(id)?'👑 <span class="btn sm gold" data-act="openauc">На аукционе</span>':'<span class="mut">👑 только через аукцион</span>'):LV()<n?lock(n):`<span class="btn sm gold" data-act="buyunit" data-id="${id}">Купить</span>`;}
+    else if(mine){h+=aucBtn(u);if(u.kind==='apt')h+=`<span class="btn sm" data-act="enter" data-id="${id}">Войти</span>${me.home_unit===id?'<span class="mut"> 🏠 дом</span>':`<span class="btn sm blue" data-act="sethome" data-id="${id}">Сделать домом</span>`}`;
       else h+=u.building?`<div>${bizHTML(u)}</div>`:`<div>${buildListHTML(u)}</div>`;h+=`<span class="btn sm red" data-act="sellprop" data-id="${id}">Продать</span>`;}
     else h+=`<span class="mut">владелец: </span>${nm(u.owner)}${u.building?` · ${BLD[u.building].ic} ${BLD[u.building].n}`+jobBtn(u):''}`;
     h+='</div>';}return h;}
@@ -245,11 +251,29 @@ function objHTML(){const p=sel;if(!p)return nextHTML()+`<h3 style="margin-top:10
     const d={v:'🌲 Деревня — дёшево, лес и река рядом',d:'🏡 Дачи — самые дешёвые, рядом озеро',c:'🏙 Город — дорого, но рядом покупатели',p:'🏭 Промзона — заводы',o:'⚓ Порт — рыболовные суда и коптильни'}[pr.reg];
     return`<h3>Участок #${p.id+1}</h3><div>${d}</div>${pr.reg==='c'?`<div class="mut">Спрос района: ~${pr.demand} клиентов/мин</div>`:''}<div style="margin:6px 0">Цена: <b>${fmt(pr.price)}💰</b></div>
     <div class="mut">Можно: ${Object.values(BLD).filter(b=>b.reg.includes(pr.reg)).map(b=>b.ic+' '+b.n).join(', ')}</div>
-    ${LV()<NEED.land?lock(NEED.land):`<span class="btn gold ${can?'':'dis'}" data-act="buyland" data-id="${pr.id}">Купить участок</span>`}${me&&!can?`<div class="mut">Не хватает ${fmt(pr.price-me.money)}💰</div>`:''}`;}
-  if(me&&pr.owner===me.id)return pr.building?bizHTML(pr):`<h3>Твой участок #${p.id+1}</h3>`+buildListHTML(pr);
+    ${pr.premium?`<div>👑 <b>Элитный участок</b> — продаётся только на аукционе.</div>${aucOf(pr.id)?'<span class="btn gold" data-act="openauc">Перейти к торгам</span>':'<div class="mut">Город выставляет такие лоты по очереди — загляни в «Рынок → Аукцион».</div>'}`:LV()<NEED.land?lock(NEED.land):`<span class="btn gold ${can?'':'dis'}" data-act="buyland" data-id="${pr.id}">Купить участок</span>`}${me&&!can?`<div class="mut">Не хватает ${fmt(pr.price-me.money)}💰</div>`:''}`;}
+  if(me&&pr.owner===me.id)return pr.building?bizHTML(pr):`<h3>Твой участок #${p.id+1}</h3>`+(LV()>=2?aucBtn(pr):'')+buildListHTML(pr);
   return`<h3>Участок #${p.id+1}</h3><div>Владелец: ${nm(pr.owner)}</div><div>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n+' · работников: '+pr.workers:'пока пусто'}</div>${jobBtn(pr)}`;}
-function marketHTML(){const tabs=`<div style="margin-bottom:6px"><span class="btn sm ${mkSec==='base'?'on':'blue'}" data-act="mksec" data-s="base">🏭 Оптовая база</span>${LV()>=2?`<span class="btn sm ${mkSec==='ex'?'on':'blue'}" data-act="mksec" data-s="ex">🤝 Биржа игроков</span>`:''}</div>`;if(LV()<2)mkSec='base';
-  return tabs+(mkSec==='ex'?exchangeHTML():baseHTML());}
+function marketHTML(){const tabs=`<div style="margin-bottom:6px"><span class="btn sm ${mkSec==='base'?'on':'blue'}" data-act="mksec" data-s="base">🏭 Оптовая база</span>${LV()>=2?`<span class="btn sm ${mkSec==='ex'?'on':'blue'}" data-act="mksec" data-s="ex">🤝 Биржа игроков</span><span class="btn sm ${mkSec==='auc'?'on':'blue'}" data-act="mksec" data-s="auc">🔨 Аукцион${auctions.size?' ('+auctions.size+')':''}</span>`:''}</div>`;if(LV()<2)mkSec='base';
+  return tabs+(mkSec==='ex'?exchangeHTML():mkSec==='auc'?auctionHTML():baseHTML());}
+const propName=pr=>{if(!pr)return'?';if(pr.kind==='apt')return`🚪 Квартира · ${RES[pr.tier]?.n||''}, ${pr.floor} эт.`;if(pr.kind==='office')return`🏢 Офис в БЦ, ${pr.floor} эт.`;
+  return`🌱 Участок #${pr.plot+1} · ${REGN[pr.reg]}${pr.building?' · '+BLD[pr.building].ic+' '+BLD[pr.building].n+(pr.workers?` (${pr.workers} раб.)`:''):''}`;};
+const leftTxt=t=>{const s2=Math.max(0,Math.floor((Date.parse(t)-Date.now())/1000));return s2>=3600?`${Math.floor(s2/3600)} ч ${Math.floor(s2%3600/60)} мин`:`${Math.floor(s2/60)}:${String(s2%60).padStart(2,'0')}`;};
+function auctionHTML(){let h=`<h3>🔨 Аукцион недвижимости</h3><div class="mut">Участки с бизнесом, квартиры и офисы. 👑 Элитные лоты в центре и пентхаусы продаёт город — только здесь. Ставка блокирует деньги; если перебьют — вернутся. Ставка в последние 2 минуты продлевает торги.</div>`;
+  const list=[...auctions.values()].sort((a,b)=>Date.parse(a.ends_at)-Date.parse(b.ends_at));if(!list.length)return h+'<div class="row mut">Сейчас торгов нет.</div>';
+  for(const a of list){const pr=props.get(a.prop),cur=a.cur_bid?+a.cur_bid:null,minb=cur?Math.ceil(cur*1.05):+a.start_price,mine=me&&a.seller===me.id,lead=me&&a.bidder===me.id;
+    h+=`<div class="row">${a.seller?'':'👑 '}<b>${propName(pr)}</b><br><span class="mut">Продавец: ${a.seller?nm(a.seller):'<b>Город</b>'} · осталось ${leftTxt(a.ends_at)}</span><br>`+
+      `${cur?`Ставка: <b>${fmt(cur)}💰</b> — ${nm(a.bidder)}${lead?' (ты лидируешь)':''}`:`Старт: <b>${fmt(a.start_price)}💰</b>, ставок нет`}${a.buyout?` · выкуп ${fmt(a.buyout)}💰`:''}<br>`+
+      (mine?(cur?'<span class="mut">Есть ставки — ждём окончания</span>':`<span class="btn sm red" data-act="auccancel" data-id="${a.id}">Снять</span>`):me&&!lead?`<span class="btn sm gold" data-act="bid" data-id="${a.id}" data-v="${minb}">Ставка ${fmt(minb)}💰</span><span class="btn sm" data-act="bidx" data-id="${a.id}" data-v="${minb}">Своя…</span>${a.buyout?`<span class="btn sm blue" data-act="bid" data-id="${a.id}" data-v="${a.buyout}">Выкупить</span>`:''}`:'')+
+      ` <span class="btn sm blue" data-act="goto" data-plot="${pr?.plot}">На карте</span></div>`;}
+  return h;}
+function showAucCreate(pr){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">🔨 Выставить на аукцион</h3><div>${propName(pr)}</div>
+  <div class="mut">Комиссия города 5%. Пока идут торги, объект работает на тебя.</div>
+  <div class="crow">Стартовая цена 💰<input id="ac_s" type="number" value="${Math.round(pr.price*.8)}"></div><div class="crow">Цена выкупа 💰 (необязательно)<input id="ac_b" type="number" placeholder="пусто — без выкупа"></div>
+  <div class="crow">Длительность: <select id="ac_h" style="font-family:inherit;font-size:15px;background:#120f18;color:#fff;border:2px solid #4a3f5c;padding:5px"><option value="1">1 час</option><option value="6" selected>6 часов</option><option value="24">24 часа</option><option value="48">48 часов</option></select></div>
+  <span class="btn gold" data-act="aucgo" data-id="${pr.id}">Выставить</span><span class="btn blue" data-act="closedaily">Отмена</span>`;}
+const aucOf=propId=>[...auctions.values()].find(a=>a.prop===propId);
+const aucBtn=pr=>{const a=aucOf(pr.id);return a?`<div class="row">🔨 На аукционе · ${a.cur_bid?'ставка '+fmt(a.cur_bid)+'💰':'без ставок'} · ${leftTxt(a.ends_at)} <span class="btn sm blue" data-act="openauc">Открыть</span></div>`:`<span class="btn sm" data-act="aucnew" data-id="${pr.id}">🔨 На аукцион</span>`;};
 function exchangeHTML(){let h=`<h3>🤝 Биржа игроков</h3><div class="mut">Продавай свой товар другим игрокам по своей цене — выгоднее, чем базе. Налог с продажи идёт в казну города.</div>`;
   if(me){const mine=GK.filter(g=>inv(me,g)>=1);
     h+=LV()<2?`<div>${lock(2)}</div>`:mine.length?`<div class="row">Выставить: <select id="ex_g" style="font-family:inherit;font-size:15px;background:#120f18;color:#fff;border:2px solid #4a3f5c;padding:5px">${mine.map(g=>`<option value="${g}">${GOODS[g].ic} ${GOODS[g].n} (${Math.floor(inv(me,g))})</option>`).join('')}</select>
@@ -407,7 +431,7 @@ function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10
   <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 тратятся на скины (Ещё → Скины).</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
 let lastBody='',lastTabs='';
 function renderUI(){
-  if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1);$('money').innerHTML='💰 '+fmt(me.money)+` <span style="color:#9be7ff;font-size:15px">💎${me.gems||0}</span>`;$('rank').innerHTML=`Ур. ${l} · ${careerOf(me.shifts)} · <span data-act="energy" style="cursor:pointer;color:${EN()<3?'#ff9b9b':'#ffd166'}">⚡${Math.floor(EN())}/${ENERGY.max}</span><div class="bar" style="height:6px"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div>`;
+  if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1);$('money').innerHTML='💰 '+fmt(me.money)+` <span style="color:#9be7ff;font-size:15px">💎${me.gems||0}</span>`;const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('rank').innerHTML=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')} · Ур. ${l} · ${careerOf(me.shifts)} · <span data-act="energy" style="cursor:pointer;color:${EN()<3?'#ff9b9b':'#ffd166'}">⚡${Math.floor(EN())}/${ENERGY.max}</span><div class="bar" style="height:6px"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div>`;
     $('inv').innerHTML=GK.filter(g=>inv(me,g)>=1).map(g=>{const q=Math.floor(inv(me,g)),c=CAP();return`<span class="chip" style="${q>=c?'color:#ff9b9b':''}" title="склад ${q}/${c}">${GOODS[g].ic} ${q}${q>=c*.8?'/'+c:''}</span>`;}).join('')||'<span class="mut">склад пуст</span>';}
   const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab))tab=T[0][0];
   const th=T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
@@ -440,6 +464,13 @@ document.addEventListener('click',async e=>{
     case 'govset':{const raw=$('gv_'+t.dataset.k)?.value??t.dataset.v??'0';const v=parseFloat(String(raw).replace(',','.'))||0;if(await act('gov_set',{p_key:t.dataset.k,p_val:t.dataset.pct?v/100:v}))toast('Сохранено');break;}
     case 'moresec':moreSec=t.dataset.s;break;
     case 'mksec':mkSec=t.dataset.s;break;
+    case 'aucnew':showAucCreate(props.get(id));return;
+    case 'aucgo':{const st=+$('ac_s').value,bo=+($('ac_b').value||0),hh=+$('ac_h').value;if(await act('create_auction',{p_id:id,p_start:st,p_buyout:bo||null,p_hours:hh})){$('auth').style.display='none';toast('🔨 Лот выставлен');mkSec='auc';tab='market';}break;}
+    case 'auccancel':if(await act('cancel_auction',{p_auction:id}))toast('Лот снят');break;
+    case 'bid':if(await act('bid',{p_auction:id,p_amount:+t.dataset.v}))toast('🔨 Ставка принята');break;
+    case 'bidx':{const v=prompt('Твоя ставка, 💰 (минимум '+t.dataset.v+')',t.dataset.v);if(v&&await act('bid',{p_auction:id,p_amount:+v}))toast('🔨 Ставка принята');break;}
+    case 'openauc':tab='market';mkSec='auc';sheetOpen=true;break;
+    case 'upgrade':if(await act('upgrade',{p_id:id}))toast('⬆ Улучшение началось');break;
     case 'speedup':if(await act('speedup',{p_id:id}))toast('🏗 Готово!');break;
     case 'energy':showEnergy();return;
     case 'refill':if(await act('refill_energy')){$('auth').style.display='none';toast('⚡ Энергия восполнена');}return;

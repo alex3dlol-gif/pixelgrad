@@ -27,7 +27,7 @@ export const BLOCKS=[
   {reg:'v',name:'С. ЛУГОВОЕ',x:330,y:240,cols:12,rows:12,link:220},
 ];
 export const RING={x0:57+OX,y0:27+OY,x1:143+OX,y1:103+OY};
-const SPECIAL={'c,9,7':'cityhall','c,0,7':'market','c,5,8':'pvzCity','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
+const SPECIAL={'c,9,7':'cityhall','c,0,7':'market','c,2,9':'pvzCity','c,5,8':'keep','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
 const CBD_FIXED={'6,4':'bc','9,4':'bc','6,8':'bc','9,9':'bc','8,5':'bc','6,9':'bc','7,4':'tower','9,5':'tower','6,6':'tower','8,9':'tower','7,8':'park','8,8':'park'};
 const FLOORS={khrush:5,panel9:9,panel16:16,novostroy:25,tower:30,bc:30};
 export const SHOP_NAMES=['Продукты 24','Аптека','Цветы','Хозтовары','Гастроном «Ромашка»','Минимаркет','Овощи-фрукты','Шаверма-бар','Ремонт обуви','Зоомагазин'];
@@ -74,16 +74,17 @@ export function buildLayout(){
     let sp=SPECIAL[`${reg},${i},${j}`]||null,rt=null,price=0,zone=null;
     if(reg==='c'){
       const d=Math.hypot(i-7.5,j-6.5),h=hash(i*7+3,j*13+5);zone=zoneOf(i,j);
-      if(!sp&&(i===7||i===8)&&(j===6||j===7))sp='park'; // центральный парк
-      const fix=CBD_FIXED[i+','+j];if(!sp&&fix){if(fix==='tower'){rt='tower';sp='res';}else sp=fix;}
-      if(!sp&&(i===7||i===8)&&(j===0||j===13))sp='park'; // бульвар на въездах
-      if(!sp){let a=0,k=null;for(const[t,w]of ZONE_MIX[zone]){a+=w;if(h<a){k=t;break;}}
+      const keep=sp==='keep';if(keep)sp=null;
+      if(!keep&&!sp&&(i===7||i===8)&&(j===6||j===7))sp='park'; // центральный парк
+      const fix=CBD_FIXED[i+','+j];if(!keep&&!sp&&fix){if(fix==='tower'){rt='tower';sp='res';}else sp=fix;}
+      if(!keep&&!sp&&(i===7||i===8)&&(j===0||j===13))sp='park'; // бульвар на въездах
+      if(!sp&&!keep){let a=0,k=null;for(const[t,w]of ZONE_MIX[zone]){a+=w;if(h<a){k=t;break;}}
         if(k&&RES[k]){rt=k;sp='res';}else sp=k;}
-      price=Math.max(400,Math.round((1150-d*85)/10)*10);
-    }else if(reg==='v')price=b.link?140:(i===0?150:170);
-    else if(reg==='d')price=b.link?100:110+(j===2?20:0);
-    else if(reg==='p')price=b.link?260:380;
-    else price=450;
+      price=2*Math.max(400,Math.round((1150-d*85)/10)*10);
+    }else if(reg==='v')price=200;
+    else if(reg==='d')price=150;
+    else if(reg==='p')price=500;
+    else price=600;
     plots.push({id:plots.length,reg,i,j,x0,y0,x:x0+1.5,y:y0+1.5,sp,rt,price,demand:0,zone,name:sp==='shop'?SHOP_NAMES[Math.floor(hash(i,j+99)*SHOP_NAMES.length)]:null});
   }
   const dens=plots.filter(p=>p.sp==='res'||p.sp==='bc');
