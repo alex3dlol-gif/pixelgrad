@@ -173,8 +173,36 @@ function jobInfo(p){if(!p)return null;if(p.kind==='npc'){const e=EMP[p.sp];let p
   if(p.building&&p.owner&&(!me||p.owner!==me.id))return{n:`${BLD[p.building].n} (${profiles.get(p.owner)?.nick||'игрок'})`,pay:OWNER_JOB_PAY,req:0,job:BLD[p.building].w.toLowerCase()};return null;}
 
 // ================= КВАРТИРА =================
-let roomCh=null,roomCtx=null,saveT=null;
-async function enterRoom({unit,hostUid,hostNick,editable}){
+let roomCh=null,roomCtx=null,saveT=null,clubT=null;
+// Клубы: ДК в деревнях и кинотеатр в городе. Мебель общая, двигать нельзя; пока ты внутри — ⚡ копится втрое быстрее
+const CLUBS={
+  dk:{n:'Дом культуры',ic:'🎭',size:[9,7],tier:'club',layout:[
+    {i:'plant',x:0,y:0},{i:'shelf',x:1,y:0},{i:'aquarium',x:7,y:0},{i:'plant',x:8,y:0},
+    {i:'sofa',x:0,y:2,r:2},{i:'chair',x:3,y:2,r:2},{i:'chair',x:4,y:2,r:2},{i:'chair',x:5,y:2,r:2},{i:'sofa',x:7,y:2,r:2},
+    {i:'chair',x:1,y:5},{i:'table',x:2,y:5},{i:'chair',x:3,y:5},{i:'chair',x:5,y:5},{i:'table',x:6,y:5},{i:'chair',x:7,y:5},
+    {i:'lamp',x:0,y:6},{i:'lamp',x:8,y:6}]},
+  cinema:{n:'Кинотеатр «Мир»',ic:'🎬',size:[10,8],tier:'cinema',layout:[
+    {i:'plant',x:0,y:0},{i:'plant',x:9,y:0},
+    {i:'sofa',x:1,y:3,r:2},{i:'sofa',x:3,y:3,r:2},{i:'sofa',x:5,y:3,r:2},{i:'sofa',x:7,y:3,r:2},
+    ...[1,2,3,4,5,6,7,8].map(x=>({i:'chair',x,y:5,r:2})),
+    {i:'lamp',x:0,y:7},{i:'table',x:4,y:7},{i:'table',x:5,y:7},{i:'lamp',x:9,y:7}]},
+};
+async function enterClub(id){const pr=props.get(id),C=pr&&CLUBS[pr.sp];if(!C)return;
+  if(!await act('club_enter',{p_id:id}))return;
+  await enterRoom({unit:id,club:C,editable:false});
+  clubT=setInterval(()=>act('club_ping',{},true),30000);toast(`${C.ic} ${C.n}: ⚡ копится втрое быстрее, пока ты здесь`);}
+function clubHTML(){const C=roomCtx&&roomCtx.club;if(!C)return'';const n=room.state?Math.max(1,room.state.people.size):1;
+  return`<h3>${C.ic} ${C.n}</h3><div>⚡ Пока ты здесь, энергия копится <b>в 3 раза быстрее</b>.</div>
+  <div style="font-size:22px;margin:6px 0">⚡ ${Math.floor(EN())}/${EMAX()}</div>
+  <div>👥 Сейчас здесь: <b>${n}</b></div>
+  <div class="mut" style="margin-top:6px">Нажми на диван или стул — сядешь. Пиши в чат, знакомься. Мебель тут общая, двигать её нельзя.</div>
+  <span class="btn red" data-act="leave">← Выйти в город</span>`;}
+async function enterRoom({unit,hostUid,hostNick,editable,club}){
+  if(club){roomCtx={unit:'club'+unit,club,editable:false};
+    room.open({size:club.size,tier:club.tier,layout:club.layout,editable:false,owned:{},elsewhere:{},title:club.ic+' '+club.n,makeAvatar:world.makeAvatar,meId:me.id,
+      onSave:()=>{},onMove:m=>roomCh&&roomCh.send({type:'broadcast',event:'move',payload:{uid:me.id,...m}})});
+    unit='club'+unit;tab='club';}
+  else{
   if(!unit){toast('Своего жилья пока нет. Квартиры продаются во вкладке «🏠 Жильё» (с 4 уровня).');return;}
   const {data,error}=await sb.from('props').select('room,tier').eq('id',unit).single();if(error||!data)return toast('Не удалось открыть квартиру');
   const layout=data.room||[],tier=data.tier,size=RES[tier].room;const elsewhere={};
@@ -185,15 +213,17 @@ async function enterRoom({unit,hostUid,hostNick,editable}){
   room.open({size,tier,layout,editable,owned:me.furn||{},elsewhere,title,makeAvatar:world.makeAvatar,meId:me.id,
     onSave:l=>{clearTimeout(saveT);saveT=setTimeout(()=>act('save_room',{p_unit:unit,p_layout:l}),500);dirty=true;},
     onMove:m=>roomCh&&roomCh.send({type:'broadcast',event:'move',payload:{uid:me.id,...m}})});
+  tab='furn';}
   mode='room';document.body.classList.add('inroom');$('roomui').style.display='flex';$('chat').style.display='block';
-  tab='furn';sheetOpen=!mobile;dirty=true;
+  $('reditbtn').style.display=editable?'':'none';$('chatin').placeholder=club?'Сообщение всем в зале… (Enter)':'Сообщение гостям… (Enter)';
+  sheetOpen=!mobile||!!club;dirty=true;
   roomCh=sb.channel('room:'+unit,{config:{presence:{key:me.id}}});
   roomCh.on('presence',{event:'sync'},()=>{const st=roomCh.presenceState();room.setPeople(Object.entries(st).map(([uid,a])=>({uid,...a[a.length-1]})));dirty=true;})
     .on('broadcast',{event:'chat'},({payload})=>room.say(payload.uid,clean(payload.text)))
     .on('broadcast',{event:'move'},({payload})=>room.moveOther(payload.uid,payload))
     .subscribe(s2=>{if(s2==='SUBSCRIBED')roomCh.track({nick:me.nick,color:me.color,look:me.look||null,skin:me.skin||null});});
 }
-function leaveRoom(){room.close();if(roomCh){roomCh.unsubscribe();roomCh=null;}mode='city';roomCtx=null;document.body.classList.remove('inroom');
+function leaveRoom(){if(clubT){clearInterval(clubT);clubT=null;act('club_leave',{},true);}room.close();if(roomCh){roomCh.unsubscribe();roomCh=null;}mode='city';roomCtx=null;document.body.classList.remove('inroom');
   $('roomui').style.display='none';$('chat').style.display='none';tab='home';dirty=true;}
 function onInvite(inv){if(!inv.unit)return;toast(`🔔 <b>${esc(inv.from_nick)}</b> зовёт в гости! <span class="btn gold" data-visit="${inv.unit}" data-host="${inv.from_uid}" data-hn="${esc(inv.from_nick)}">Пойти</span>`,12000);}
 $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;const t=e.target.value.trim().slice(0,120);if(!t)return;
@@ -207,14 +237,14 @@ $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;co
 // ================= ВЫБОР НА КАРТЕ =================
 world.onTap=(p,g)=>{if(mode!=='city')return;if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
 world.onHover=(p,e)=>{const t=$('tip');if(!p||!e){t.style.display='none';return;}t.style.display='block';t.style.left=e.clientX+16+'px';t.style.top=e.clientY+12+'px';t.innerHTML=tipHTML(p);};
-function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
+function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(CLUBS[p.sp])return`${CLUBS[p.sp].ic} ${CLUBS[p.sp].n} · ⚡×3, пока ты внутри`;if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
 
 // ================= ВКЛАДКИ =================
 const CITY_TABS=[['work','💼','Дела'],['market','🏪','Рынок'],['home','🏠','Жильё',2],['more','☰','Ещё']];
 let coachMin=false,lastInvOpen=false;
 const newTabs=new Set();
-const ROOM_TABS=[['furn','🛋','Мебель'],['guests','👥','Гости']];
+const ROOM_TABS=[['furn','🛋','Мебель'],['guests','👥','Гости']],CLUB_TABS=[['club','⚡','Клуб']];
 function ioText(b){if(b.kind==='retail')return'твой товар со склада → розница ×1.6';if(b.kind==='gather')return`→ ${b.rate}${Object.keys(b.out).map(g=>GOODS[g].ic).join('')}/мин`;
   if(b.kind==='proc')return`${costText(b.in)} → ${Object.entries(b.out).map(([g,q])=>q+GOODS[g].ic).join('')} · ${b.rate}/мин`;
   return`${Object.keys(b.in).length?costText(b.in):'📦'} → ${b.pay}💰/клиент`;}
@@ -276,6 +306,9 @@ function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
 function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>Нажми на участок, дом или предприятие на карте.</div><div class="mut" style="margin-top:6px">${mobile?'Двигай карту пальцем, щипок — зум.':'Тяни мышью, колесо — зум, Q/E — поворот.'}</div>`;
   if(p.sp==='res'){const r=RES[p.rt];return`<h3>🏢 ${r.n}</h3><div class="mut">${r.floors} этажей · комната ${r.room[0]}×${r.room[1]}. Купи квартиру, обставь мебелью и зови друзей.</div>${unitsHTML(p)}`;}
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство: делает район живым, тут гуляют жители.</div>`;
+  if(p.sp==='cityhall'){const c=city||{};return`<h3>🏛 Мэрия</h3><div style="font-size:20px;margin:6px 0">💰 В казне: <b>${fmt(c.treasury||0)}</b></div>
+    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}.<br>Выборы мэра и работа в мэрии — 🚧 в разработке.</div>`;}
+  if(CLUBS[p.sp]){const C=CLUBS[p.sp];return`<h3>${C.ic} ${C.n}</h3><div>Место, где собираются игроки. Посиди на диване, поболтай в чате — <b>⚡ энергия копится втрое быстрее</b>, пока ты внутри.</div><span class="btn gold" data-act="club" data-id="${p.id}">Войти</span>`;}
   const pr=props.get(p.id);if(!pr)return'<div class="mut">Загрузка…</div>';
   if(p.sp==='bc')return`<h3>🏙 Бизнес-центр</h3><div class="mut">Офисная карьера и офисы для кофеен и ресторанов. Клерк: 12💰 · с 100 смен менеджер 20💰 · с 300 директор 30💰.</div>${jobBtn(pr)}<h3 style="margin-top:10px">Офисы</h3>${unitsHTML(p)}`;
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство города: делает район живым, тут гуляют жители.</div>`;
@@ -339,7 +372,7 @@ function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10
   if(cur){const j=jobInfo(cur);h+=`<div class="row">Сейчас: <b>${j?.n}</b> · ${j?.pay}💰/смена<div class="bar"><i id="shiftbar" style="width:0"></i></div><span class="mut">Смена ${SHIFT_SEC} сек, идёт пока ты в игре</span><br><span class="btn sm blue" data-act="goto" data-plot="${cur.plot}">Показать</span><span class="btn sm red" data-act="quit">Уволиться</span></div>`;}
   else h+=`<div class="row">Ты без работы.</div>`;
   h+='<h3 style="margin-top:8px">Вакансии</h3>';
-  const seen=new Set();for(const pr of props.values()){if(pr.kind!=='npc')continue;if(pr.sp==='bc'&&seen.has('bc'))continue;seen.add(pr.sp);const j=jobInfo(pr),ok=me.shifts>=j.req;
+  const seen=new Set();for(const pr of props.values()){if(pr.kind!=='npc'||pr.sp==='cityhall')continue;if(pr.sp==='bc'&&seen.has('bc'))continue;seen.add(pr.sp);const j=jobInfo(pr),ok=me.shifts>=j.req;
     h+=`<div class="row"><b>${j.n}</b> · ${j.job} · <b>${j.pay}💰</b>${j.req?` <span class="mut">(от ${j.req} смен)</span>`:''}<br><span class="btn sm blue" data-act="goto" data-plot="${pr.plot}">На карте</span>${me.job_prop===pr.id?'':`<span class="btn sm ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться</span>`}</div>`;}
   return h+`<div class="mut">Также можно устроиться в бизнес любого игрока — кликни его участок.</div>`;}
 function homeHTML(){if(!me)return'';const apts=myProps().filter(p=>p.kind==='apt'),off=myProps().filter(p=>p.kind==='office');
@@ -461,7 +494,7 @@ function randomLook(){const pk=a=>a[Math.floor(Math.random()*a.length)],f=draft.
     bk:pk(f?LOOK.bottomKindF:LOOK.bottomKindM)[0],bottom:pk(LOOK.bottom),sk:pk(LOOK.shoeKind)[0],shoes:pk(LOOK.shoes),acc:Math.random()<.6?'none':pk(LOOK.acc)[0]};}
 function showEnergy(){const e=EN(),full=Math.ceil((EMAX()-e)*ENERGY.regenMin);
   $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">⚡ Энергия</h3><div style="font-size:28px">${Math.floor(e)}/${EMAX()}</div>
-  <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин, максимум растёт с уровнем (+10). Новый уровень и ежедневная награда — полная зарядка${e<EMAX()?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.</div>
+  <div class="mut">Смена стоит ⚡${ENERGY.shift}, задание — ⚡${ENERGY.quest}. Восстанавливается +1 каждые ${ENERGY.regenMin} мин, максимум растёт с уровнем (+10). Новый уровень и ежедневная награда — полная зарядка${e<EMAX()?` · полная через ~${Math.floor(full/60)} ч ${full%60} мин`:''}.<br>Пока энергия копится — бизнесы работают сами.<br>🎭 В Доме культуры (в деревне) или 🎬 кинотеатре (в городе) энергия копится <b>втрое быстрее</b>.</div>
   <div style="margin-top:10px"><span class="btn gold ${(me.gems||0)>=ENERGY.refillGems&&e<EMAX()?'':'dis'}" data-act="refill">Восполнить за ${ENERGY.refillGems}💎</span><span class="btn blue" data-act="gems">Кристаллы</span><span class="btn" data-act="closedaily">Закрыть</span></div>`;}
 function showGems(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">💎 Кристаллы</h3><div>У тебя: <b>${me.gems||0}💎</b></div>
   <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию и покупают редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
@@ -485,11 +518,11 @@ function renderUI(){
   $('topbtns').style.display=me&&me.home_unit&&!ob?'':'none';
   document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
   if(mobile&&ob){$('coach').classList.toggle('mini',coachMin);$('coach').classList.toggle('withsheet',sheetOpen);}
-  const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile')))tab=T[0][0];
+  const T=mode==='room'?(roomCtx&&roomCtx.club?CLUB_TABS:ROOM_TABS):CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile')))tab=T[0][0];
   const th=ob?'':T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
-  const body=ob?(tab==='inv'?obInvHTML():obHTML()):{profile:profileHTML,inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
+  const body=ob?(tab==='inv'?obInvHTML():obHTML()):{profile:profileHTML,inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML,club:clubHTML}[tab]();
   if(body!==lastBody){const s=$('tabbody').scrollTop;$('tabbody').innerHTML=body;$('tabbody').scrollTop=s;lastBody=body;}
   $('hand').style.display=room.state&&room.state.hand?'inline':'none';
   dirty=false;tutCheck();
@@ -567,6 +600,7 @@ document.addEventListener('click',async e=>{
     case 'buyunit':if(await act('buy_unit',{p_id:id}))toast('🎉 Поздравляем с покупкой!');break;
     case 'sellprop':if(confirm('Точно продать?'))await act('sell_prop',{p_id:id});break;
     case 'sethome':await act('set_home',{p_id:id});{const h=homePlot();world.me&&(world.me.goal=null);}break;
+    case 'club':if(mode==='room')leaveRoom();await enterClub(id);break;
     case 'enter':if(mode==='room')leaveRoom();await enterRoom({unit:id,hostUid:me.id,hostNick:me.nick,editable:true});break;
     case 'redit':if(room.state){room.setEdit(!room.state.edit);sheetOpen=true;tab='furn';}break;
     case 'rwall':room.setDecor('wall',t.dataset.v);break;

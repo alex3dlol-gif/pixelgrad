@@ -241,6 +241,14 @@ export function createWorld(canvas,{mobile}){
     case 'shop':{const h=hash(color?1:2,0),cols=[[0xe74c3c,0xffffff],[0x27ae60,0xffffff],[0x2980b9,0xf1c40f],[0x8e44ad,0xffffff],[0xf39c12,0x2c3e50]][Math.floor(Math.random()*5)];
       B(g,2,.85,1.5,0xe8e2d4);B(g,2.1,.1,1.6,0x555555,0,.85,0);B(g,1.6,.28,.05,cols[0],0,.6,.78,true);B(g,1.4,.4,.03,0x9fd3ff,0,.12,.76,true);
       const aw=B(g,1.8,.05,.45,cols[0],0,.55,.95);aw.rotation.x=.35;B(g,.5,.4,.4,0x8b5a2b,.9,0,1.2);for(let k=0;k<3;k++)B(g,.12,.12,.12,pick([0xe74c3c,0xf39c12,0x27ae60]),.75+k*.13,.4,1.2);}break;
+    case 'dk':B(g,2.8,1.2,1.7,0xeee2c4);B(g,3,.14,1.9,0xd8c9a4,0,1.2,0);B(g,1.4,.5,1.2,0xeee2c4,0,1.34,-.1);GR(g,1.5,.4,1.3,0xb04a3a,0,1.84,-.1);
+      B(g,1.6,.12,.5,0xd8c9a4,0,0,1.1);B(g,1.4,.1,.35,0xd8c9a4,0,.12,1.05);for(let k=0;k<4;k++)B(g,.14,1.1,.14,0xfaf3e0,-.6+k*.4,.2,1.15);B(g,1.6,.14,.45,0xeee2c4,0,1.3,1.1);
+      {const pd=GR(g,1.6,.35,.45,0xeee2c4,0,1.44,1.1);pd.rotation.y=Math.PI/2;}B(g,.9,.2,.03,0xc0392b,0,1.52,1.34,true);B(g,.7,.09,.031,0xffd166,0,1.58,1.35,true);
+      for(const x of[-1.1,1.1])for(const y of[.25,.75])B(g,.4,.3,.03,0x9fd3ff,x,y,.86,true);B(g,.4,.6,.03,0x6b4a2f,0,.22,.86);break;
+    case 'cinema':B(g,2.8,1.6,2.2,0x3b2a4a);B(g,2.9,.12,2.3,0x2a1e36,0,1.6,0);B(g,2.6,.35,.12,0x14101c,0,1.15,1.15);
+      B(g,2.2,.22,.03,0xff3b6b,0,1.2,1.22,true);B(g,1.4,.09,.031,0xffe9a8,0,1.27,1.23,true);B(g,2.9,.08,.5,0xffd166,0,.95,1.3,true);
+      for(const x of[-1.05,1.05]){B(g,.55,.75,.04,0x111111,x,.12,1.12);B(g,.47,.67,.03,[0x2e86ab,0xe67e22][x>0?1:0],x,.16,1.15,true);}
+      B(g,.9,.75,.03,0x9fd3ff,0,.1,1.11,true);for(let k=0;k<6;k++)B(g,.1,.1,.1,k%2?0xffd166:0xfff3c4,-1.25+k*.5,1.0,1.55,true);break;
     case 'cityhall':B(g,2.6,1.3,1.8,0xf2ead8);B(g,2.8,.15,2,0xd8cfb8,0,1.3,0);PY(g,2.8,.6,2,0x4f7a5a,0,1.45,0);B(g,1,1.1,.6,0xf2ead8,0,1.45,0);
       PY(g,1.1,.7,.7,0x4f7a5a,0,2.55,0);B(g,.06,1,.06,0xdddddd,0,3.2,0);B(g,.45,.28,.03,0xe63946,.24,3.85,0);B(g,.45,.1,.031,0x2a6fdb,.24,3.85,0);
       for(let k=0;k<6;k++)B(g,.14,1.1,.14,0xffffff,-1.1+k*.44,0,1);B(g,2.7,.12,.3,0xd8cfb8,0,1.1,1.05);B(g,1,.12,.6,0xbdb6a6,0,0,1.25);
@@ -637,6 +645,7 @@ export function createWorld(canvas,{mobile}){
   wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
+  for(const p of plots)if(p.sp==='dk'||p.sp==='cinema'){const L=wlabel(p.sp==='dk'?'🎭 Дом культуры':'🎬 Кинотеатр «Мир»',p.x,2.6,p.y,'emp','#ffd166');L.zMax=mobile?11:15;}
   for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];const L=wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');L.zMax=mobile?11:15;}
 
   // ================= КАМЕРА =================

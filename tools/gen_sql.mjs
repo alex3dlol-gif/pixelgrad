@@ -23,7 +23,7 @@ const {plots,units}=buildLayout();
 const rows=[];
 for(const p of plots){
   if(p.sp==='res')continue;
-  const kind=p.sp?(isEmployer(p.sp)?'npc':null):'land';
+  const kind=p.sp?(p.sp==='dk'||p.sp==='cinema'?'club':isEmployer(p.sp)?'npc':null):'land';
   if(!kind)continue;
   rows.push(`(${p.id},${q(kind)},${p.id},${q(p.reg)},${p.sp?q(p.sp):'null'},null,null,${p.price},${p.x},${p.y},${p.demand})`);
 }

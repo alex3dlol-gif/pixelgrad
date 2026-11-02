@@ -27,7 +27,7 @@ export const BLOCKS=[
   {reg:'v',name:'С. ЛУГОВОЕ',x:330,y:240,cols:12,rows:12,link:220},
 ];
 export const RING={x0:57+OX,y0:27+OY,x1:143+OX,y1:103+OY};
-const SPECIAL={'c,9,7':'cityhall','c,0,7':'market','c,2,9':'pvzCity','c,5,8':'keep','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
+const SPECIAL={'c,4,9':'cinema','c,9,7':'cityhall','c,0,7':'market','c,2,9':'pvzCity','c,5,8':'keep','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
 const CBD_FIXED={'6,4':'bc','9,4':'bc','6,8':'bc','9,9':'bc','8,5':'bc','6,9':'bc','7,4':'tower','9,5':'tower','6,6':'tower','8,9':'tower','7,8':'park','8,8':'park'};
 const FLOORS={khrush:5,panel9:9,panel16:16,novostroy:25,tower:30,bc:30};
 export const SHOP_NAMES=['Продукты 24','Аптека','Цветы','Хозтовары','Гастроном «Ромашка»','Минимаркет','Овощи-фрукты','Шаверма-бар','Ремонт обуви','Зоомагазин'];
@@ -72,7 +72,7 @@ export function buildLayout(){
   for(const b of BLOCKS)for(let j=0;j<b.rows;j++)for(let i=0;i<b.cols;i++){
     const x0=b.x+1+STEP*i,y0=b.y+1+STEP*j,reg=b.reg;
     let sp=SPECIAL[`${reg},${i},${j}`]||null,rt=null,price=0,zone=null;
-    if(!sp&&reg==='v'&&j===0&&i===1)sp='pvzCity';if(!sp&&reg==='v'&&j===0&&i===2)sp='alko'; // первая работа в каждой деревне
+    if(!sp&&reg==='v'&&j===0&&i===1)sp='pvzCity';if(!sp&&reg==='v'&&j===0&&i===2)sp='alko';if(!sp&&reg==='v'&&j===0&&i===3)sp='dk'; // первая работа в каждой деревне
     if(reg==='c'){
       const d=Math.hypot(i-7.5,j-6.5),h=hash(i*7+3,j*13+5);zone=zoneOf(i,j);
       const keep=sp==='keep';if(keep)sp=null;

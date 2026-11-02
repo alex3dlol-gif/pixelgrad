@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {FURN} from './config.js';
 
-const WALLS={khrush:[0xc9b79c,0x8b5a2b],panel9:[0xb8c4c9,0x9c6b3e],panel16:[0xd6cfc2,0xa0743f],novostroy:[0xeae6df,0xc8a26b],tower:[0x2f3640,0x3b3b3b]};
+const WALLS={khrush:[0xc9b79c,0x8b5a2b],panel9:[0xb8c4c9,0x9c6b3e],panel16:[0xd6cfc2,0xa0743f],novostroy:[0xeae6df,0xc8a26b],tower:[0x2f3640,0x3b3b3b],club:[0xe8d8b0,0x8a5a3a],cinema:[0x3a2030,0x5a2a3a]};
 export const WALL_COLORS=['#c9b79c','#e8dcc0','#b8c4c9','#9fc5b0','#f4c7c3','#c3b1e1','#f6e7a1','#8fa3b8','#5d6d7e','#ffffff','#7a4a3a','#2f3640'];
 export const FLOOR_COLORS=['#8b5a2b','#a0743f','#c8a26b','#6b4a2f','#d9cbb0','#7f8c8d','#3b3b3b','#9c6b3e','#b5651d','#e8e2d4'];
 // где можно сесть/лечь: смещение внутри предмета (до поворота) и поза
@@ -49,7 +49,10 @@ export function createRoom(renderer){
     for(let x=0;x<w;x++)for(let z=0;z<d;z++){const m=new THREE.Mesh(BOX,mat(new THREE.Color(fc).multiplyScalar((x+z)%2?.92:1).getHex()));m.scale.set(1,.1,1);m.position.set(x+.5,-.05,z+.5);m.receiveShadow=true;m.userData.floor=1;g.add(m);}
     const wallH=2.6;B(g,w,wallH,.12,wc,w/2,0,-.06);B(g,.12,wallH,d,new THREE.Color(wc).multiplyScalar(.85).getHex(),-.06,0,d/2);
     B(g,w,.12,.14,0xf4ecd8,w/2,0,0);B(g,.14,.12,d,0xf4ecd8,0,0,d/2);
-    if(st.tier==='tower'){B(g,w-1,1.8,.05,0x0b1a33,w/2,.5,.01,true);for(let k=0;k<40;k++)B(g,.08,.08+Math.random()*.6,.02,Math.random()<.5?0xffd977:0x4a7aa8,.8+Math.random()*(w-1.6),.55,.04,true);}
+    if(st.tier==='cinema'){B(g,w-2.4,1.5,.05,0xf4f4f4,w/2,.75,.02,true);B(g,w-2.2,.1,.08,0x111111,w/2,.7,.04);B(g,w-2.2,.1,.08,0x111111,w/2,2.25,.04);
+      B(g,.6,.9,.04,0xe67e22,.6,.9,.05,true);B(g,.6,.9,.04,0x2e86ab,w-.6,.9,.05,true);}
+    else if(st.tier==='club'){B(g,3.6,.25,1.6,0x6b3a2a,w/2,0,.8);B(g,3.6,1.6,.04,0xa8323a,w/2,.9,.02);B(g,1.6,.25,.03,0xffd166,w/2,2.1,.03,true);}
+    else if(st.tier==='tower'){B(g,w-1,1.8,.05,0x0b1a33,w/2,.5,.01,true);for(let k=0;k<40;k++)B(g,.08,.08+Math.random()*.6,.02,Math.random()<.5?0xffd977:0x4a7aa8,.8+Math.random()*(w-1.6),.55,.04,true);}
     else{const n=Math.max(1,Math.floor(w/3));for(let k=0;k<n;k++){const x=(k+.5)*w/n;B(g,1,1,.05,0x9fd3ff,x,1,.01,true);B(g,1.1,.08,.1,0xffffff,x,.95,.05);}}}
   const rot=(it,r)=>{const f=FURN[it];return r%2?[f.d,f.w]:[f.w,f.d];};
   function cells(o){const[w,d]=rot(o.i,o.r||0),out=[];for(let x=0;x<w;x++)for(let z=0;z<d;z++)out.push(`${o.x+x},${o.y+z}`);return out;}
