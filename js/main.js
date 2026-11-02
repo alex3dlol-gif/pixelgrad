@@ -151,7 +151,13 @@ $('ccx').onclick=()=>{chatOpen=false;$('ccin').blur();drawChat();};
 $('ccsend').onclick=sendChat;$('ccin').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();if(e.key==='Escape')$('ccx').onclick();});
 drawChat();
 function homePlot(){const u=me?.home_unit&&props.get(me.home_unit);return u?plots[u.plot]:dormPlot;}
-const villageSpawn=()=>{const p=villagePvz[Math.floor(Math.random()*villagePvz.length)]||dormPlot;return{x:p.x0+1,y:p.y0+3};};
+const villageSpawn=()=>{const p=villagePvz[Math.floor(Math.random()*villagePvz.length)]||dormPlot;return{x:p.x0+1,y:p.y0+3,id:p.id};};
+// «дом» до покупки квартиры — родная деревня (ПВЗ, у которого высадился игрок)
+function homeVillage(){let id=+localStorage.getItem('pg_vil');if(plots[id]&&plots[id].sp==='pvzCity')return plots[id];
+  const m=world.me||{x:me?.last_x||0,y:me?.last_y||0};const p=villagePvz.slice().sort((a,b)=>Math.hypot(a.x-m.x,a.y-m.y)-Math.hypot(b.x-m.x,b.y-m.y))[0];if(p)localStorage.setItem('pg_vil',p.id);return p;}
+function homeSpot(){const u=me?.home_unit&&props.get(me.home_unit);if(u&&plots[u.plot])return plots[u.plot];return homeVillage();}
+const nearPlot=(v,sp)=>plots.filter(p=>p.sp===sp).sort((a,b)=>Math.hypot(a.x-v.x,a.y-v.y)-Math.hypot(b.x-v.x,b.y-v.y))[0];
+const nearStopV=v=>world.STOPS.slice().sort((a,b)=>Math.hypot(a.x-v.x,a.y-v.y)-Math.hypot(b.x-v.x,b.y-v.y))[0];
 
 // ================= РАБОТА / СМЕНЫ =================
 let shiftT=0,shiftBusy=false;
@@ -584,7 +590,7 @@ function renderUI(){
   {const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('htime').textContent=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;}
   if(ob){$('money').textContent='💰 '+ob.money+' уч.';$('hen').textContent='⚡ '+ob.en;const q=Math.floor(ob.inv.wheat||0);$('invn').textContent=q||'';}
   if(me)$('hprof').innerHTML='👤'+(mobile?'':' '+esc(me.nick));
-  $('topbtns').style.display=me&&me.home_unit&&!ob?'':'none';
+  $('topbtns').style.display=me&&!ob&&mode==='city'?'':'none';
   document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
   if(mobile&&ob){$('coach').classList.toggle('mini',coachMin);$('coach').classList.toggle('withsheet',sheetOpen);}
   const T=mode==='room'?(roomCtx&&roomCtx.club?CLUB_TABS:ROOM_TABS):CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile'||tab==='stop')))tab=T[0][0];
@@ -681,7 +687,7 @@ document.addEventListener('click',async e=>{
     case 'redit':if(room.state){room.setEdit(!room.state.edit);sheetOpen=true;tab='furn';}break;
     case 'rwall':room.setDecor('wall',t.dataset.v);break;
     case 'rfloor':room.setDecor('floor',t.dataset.v);break;
-    case 'home':if(!me)break;if(mode==='room')leaveRoom();else await enterRoom({unit:me.home_unit||0,hostUid:me.id,hostNick:me.nick,editable:true});break;
+    case 'home':{if(!me)break;if(mode==='room'){leaveRoom();break;}const h=homeSpot();if(h){world.flyTo(h.x,h.y,mobile?12:16);if(mobile)sheetOpen=false;}break;}
     case 'leave':leaveRoom();break;
     case 'findme':if(mode==='city'&&world.me)world.flyTo(world.me.x,world.me.y);break;
     case 'map':$('mmbox').classList.toggle('show');break;
@@ -706,7 +712,15 @@ const tutFlags={room:false};let tutI=-1;
 const cheapLand=()=>{const m=world.me||marketPlot,sc=p=>p.price+Math.hypot(p.x-m.x,p.y-m.y)*1.2;return[...props.values()].filter(p=>p.kind==='land'&&!p.owner&&(p.reg==='v'||p.reg==='d')).sort((a,b)=>sc(a)-sc(b))[0];};
 let recLand=null;
 let camStart=null;
-const TUT=[];
+const fly=p=>p&&world.flyTo(p.x,p.y,mobile?11:14);
+const TUT=[
+  {t:'Это твоя <b>деревня</b> — здесь твой дом, пока нет квартиры. Покажу, что где.',btn:'Показать',enter(){fly(homeVillage());}},
+  {t:'Здесь <b>работа</b>: ПВЗ «Коробас». Нажми на здание и «Работать» — это первые деньги.',btn:'Дальше',enter(){fly(homeVillage());},arrow:()=>homeVillage()},
+  {t:'<b>«Градус»</b> платит больше. А ещё у входа бывает весело.',btn:'Дальше',enter(){fly(nearPlot(homeVillage(),'alko'));},arrow:()=>nearPlot(homeVillage(),'alko')},
+  {t:'<b>Дом культуры</b>: внутри энергия ⚡ копится втрое быстрее.',btn:'Дальше',enter(){fly(nearPlot(homeVillage(),'dk'));},arrow:()=>nearPlot(homeVillage(),'dk')},
+  {t:'<b>Остановка</b>: автобус до города — бесплатно. Нажми на неё и выбери, куда ехать.',btn:'Дальше',enter(){const s=nearStopV(homeVillage());s&&world.flyTo(s.x,s.y,mobile?11:14);},arrow:()=>{const s=nearStopV(homeVillage());return s&&{x:s.x+.5,y:s.y-.5};}},
+  {t:'Кнопка <b>🏠</b> справа всегда вернёт камеру к дому, а <b>📍</b> — к тебе. Удачи в Пиксельграде!',btn:'Понятно',hl:['topbtns'],enter(){fly(homeVillage());}},
+];
 // ================= ОБУЧЕНИЕ: остров «Учебный» (всё понарошку, только у клиента) =================
 let ob=null;const IS=world.ISLAND,OB_SHIFT=4;
 const OBH={pvz:{x:IS.pvz.x,y:IS.pvz.y},alko:{x:IS.alko.x,y:IS.alko.y},lavka:{x:IS.lavka.x,y:IS.lavka.y},pier:{x:IS.pier.x+.5,y:IS.pier.y},boat:{x:world.FERRY.x,y:world.FERRY.y},
@@ -809,14 +823,14 @@ async function obAction(a,t){
   if(a==='sail'){ob.job=null;sheetOpen=false;$('coach').style.display='none';world.arrow=null;const sp=villageSpawn();
     toast('⛴ Паром отчаливает в Пиксельград…',6000);
     world.ferry({x:171.5,y:170},async()=>{const r=await act('finish_onboarding',{p_x:sp.x,p_y:sp.y});if(!r)return;ob=null;world.tutReset();
-      me.last_x=sp.x;me.last_y=sp.y;enterWorld();toast('🏡 Добро пожаловать в Пиксельград! Начни с работы в ПВЗ или «Градусе» рядом — нажми на здание.',9000);});}
+      me.last_x=sp.x;me.last_y=sp.y;localStorage.setItem('pg_vil',sp.id);localStorage.removeItem('pg_tour');enterWorld();toast('🏡 Добро пожаловать в Пиксельград!',5000);setTimeout(()=>tutGo(0),600);});}
   dirty=true;}
 function tutGo(i){document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));
-  if(i>=TUT.length){tutEnd();return;}tutI=i;if(me&&me.tut!==i){me.tut=i;act('set_tut',{p_n:i},true);}
+  if(i>=TUT.length){tutEnd();return;}tutI=i;
   const s=TUT[i];s.enter&&s.enter();(s.hl||[]).forEach(id=>$(id)?.classList.add('hl'));
   $('coach').style.display='flex';$('coach').classList.remove('mini');$('cwho').textContent=`ПЕТРОВИЧ · ${i+1}/${TUT.length}${mobile?' · нажми, чтобы свернуть':''}`;$('ctxt').innerHTML=s.t;
   $('cbtn').innerHTML=(s.btn?`<span class="btn gold" data-tut="next">${s.btn}</span>`:'<span class="mut">▶ выполни — и продолжим</span>')+(i<TUT.length-1?'<span class="skip" data-tut="skip">пропустить обучение</span>':'');}
-function tutEnd(){tutI=TUT.length;$('coach').style.display='none';world.arrow=null;document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));if(me)act('set_tut',{p_n:TUT.length},true);}
+function tutEnd(){tutI=TUT.length;$('coach').style.display='none';world.arrow=null;document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));localStorage.setItem('pg_tour','1');}
 function tutCheck(){if(!me||tutI<0||tutI>=TUT.length)return;const s=TUT[tutI];s.tick&&s.tick();world.arrow=s.arrow?s.arrow():null;if(s.done&&s.done())tutGo(tutI+1);}
 
 // ================= ЦИКЛ =================
