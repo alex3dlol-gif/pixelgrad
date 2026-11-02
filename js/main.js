@@ -153,7 +153,7 @@ function updateJob(dt){const m=world.me;if(!m||!me)return;if(updateQuest(dt))ret
     if(at&&!document.hidden){shiftT+=dt;if(shiftT>=SHIFT_SEC&&!shiftBusy){shiftBusy=true;const before=me.money;
       act('work_shift',{},true).then(r=>{shiftBusy=false;shiftT=0;if(r){const d=Math.round(me.money-before);if(d>0)world.float(`+${d}💰 смена`,m.x,1.6,m.y);}else{act('settle',{},true);}});}}
     const sb_=$('shiftbar');if(sb_)sb_.style.width=Math.min(100,shiftT/SHIFT_SEC*100)+'%';}
-  else{m.working=false;const h=homePlot();if(m.goal!=='home'){m.goal='home';world.goMe(h.x0+1,h.y0+3);}}}
+  else{m.working=false;m.goal=null;}}
 function jobInfo(p){if(!p)return null;if(p.kind==='npc'){const e=EMP[p.sp];let pay=e.pay;if(p.sp==='bc'&&me)pay=me.shifts>=300?30:me.shifts>=100?20:12;return{n:p.sp==='bc'?'Бизнес-центр':e.n,pay,req:e.req,job:e.job};}
   if(p.building&&p.owner&&(!me||p.owner!==me.id))return{n:`${BLD[p.building].n} (${profiles.get(p.owner)?.nick||'игрок'})`,pay:OWNER_JOB_PAY,req:0,job:BLD[p.building].w.toLowerCase()};return null;}
 
