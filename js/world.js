@@ -638,7 +638,7 @@ export function createWorld(canvas,{mobile}){
     for(let i=0;i<trees.length;i++){const t=trees[i];if(!t.alive){t.grow+=dt/50;if(t.grow>=1){t.alive=true;t.grow=1;}t._d=true;}else if(t.shake&&!t.reserved){t.shake=0;t._d=true;}if(t._d){setTree(i);t._d=false;}}
     for(const c of chunks.values())if(c.dirty){c.trunk.instanceMatrix.needsUpdate=c.pine.instanceMatrix.needsUpdate=c.leaf.instanceMatrix.needsUpdate=true;c.dirty=false;}
     for(const p of plots){for(const c of p.crops)if(c.g<1&&near(p.x,p.y)){c.g=Math.min(1,c.g+dt/(p.sp?12:15));setCrop(c);}else if(p.sp&&c.g>=1&&Math.random()<dt*.05){c.g=0;setCrop(c);}
-      if(p.group&&p.builtAt){const k=Math.min(1,1-(p.builtAt-Date.now())/20000);p.group.scale.y=Math.max(.02,k);if(k<1&&near(p.x,p.y)&&Math.random()<dt*6)puff(p.x0+rand(.5,2.5),.2,p.y0+rand(.5,2.5),0xc8b89a,1,.6,.5);
+      if(p.group&&p.builtAt){const dur=({gather:3,retail:10,proc:15,service:30}[BLD[p.building]?.kind]||3)*60000,k=Math.min(1,1-(p.builtAt-Date.now())/dur);p.group.scale.y=Math.max(.02,k);if(k<1&&near(p.x,p.y)&&Math.random()<dt*6)puff(p.x0+rand(.5,2.5),.2,p.y0+rand(.5,2.5),0xc8b89a,1,.6,.5);
         if(k>=1&&p.wk.length!==p.workers)syncWorkers(p);}}
     for(const u of units){const vis=near(u.x,u.y);u.mesh.visible=vis;if(vis){updateWorker(u,dt);animPerson(u,time);}}
     for(const r of[...residents]){if(!near(r.x,r.y,zoom*3.5)){removeRes(r);continue;}updateResident(r,dt);animPerson(r,time);}

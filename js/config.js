@@ -1,26 +1,26 @@
 // Общие игровые данные. Отсюда же генерится SQL (tools/gen_sql.mjs) — единый источник правды.
 
 export const GOODS={
-  wheat:{n:'Пшеница',ic:'🌾',base:5,target:400,col:0xe8c547},
-  veg:{n:'Овощи',ic:'🥕',base:6,target:300,col:0xe67e22},
-  milk:{n:'Молоко',ic:'🥛',base:7,target:250,col:0xf5f5f5},
-  wood:{n:'Брёвна',ic:'🪵',base:6,target:300,col:0x8b5a2b},
-  stone:{n:'Камень',ic:'🪨',base:8,target:300,col:0x9a9a9a},
-  fish:{n:'Рыба',ic:'🐟',base:7,target:300,col:0x7fb3d5},
-  flour:{n:'Мука',ic:'🥡',base:15,target:150,col:0xf2efe6},
-  bread:{n:'Хлеб',ic:'🍞',base:11,target:200,col:0xc9822b},
-  cheese:{n:'Сыр',ic:'🧀',base:28,target:100,col:0xf4d03f},
-  planks:{n:'Доски',ic:'🟫',base:20,target:150,col:0xd9a066},
-  bricks:{n:'Кирпич',ic:'🧱',base:24,target:150,col:0xb5533c},
-  smoked:{n:'Копчёная рыба',ic:'🍢',base:22,target:120,col:0xa0622d},
-  furniture:{n:'Мебель',ic:'🪑',base:80,target:40,col:0x7a4a2a},
-  honey:{n:'Мёд',ic:'🍯',base:18,target:150,col:0xf0a500},
-  eggs:{n:'Яйца',ic:'🥚',base:6,target:300,col:0xfaf3e0},
-  apples:{n:'Яблоки',ic:'🍎',base:5,target:300,col:0xd63031},
-  wool:{n:'Шерсть',ic:'🧶',base:9,target:200,col:0xe8e2d4},
+  wheat:{n:'Пшеница',ic:'🌾',base:2,target:200,col:0xe8c547},
+  veg:{n:'Овощи',ic:'🥕',base:3,target:200,col:0xe67e22},
+  milk:{n:'Молоко',ic:'🥛',base:3,target:150,col:0xf5f5f5},
+  wood:{n:'Брёвна',ic:'🪵',base:3,target:200,col:0x8b5a2b},
+  stone:{n:'Камень',ic:'🪨',base:4,target:200,col:0x9a9a9a},
+  fish:{n:'Рыба',ic:'🐟',base:3,target:200,col:0x7fb3d5},
+  flour:{n:'Мука',ic:'🥡',base:14,target:150,col:0xf2efe6},
+  bread:{n:'Хлеб',ic:'🍞',base:10,target:200,col:0xc9822b},
+  cheese:{n:'Сыр',ic:'🧀',base:30,target:100,col:0xf4d03f},
+  planks:{n:'Доски',ic:'🟫',base:18,target:150,col:0xd9a066},
+  bricks:{n:'Кирпич',ic:'🧱',base:22,target:150,col:0xb5533c},
+  smoked:{n:'Копчёная рыба',ic:'🍢',base:20,target:120,col:0xa0622d},
+  furniture:{n:'Мебель',ic:'🪑',base:110,target:40,col:0x7a4a2a},
+  honey:{n:'Мёд',ic:'🍯',base:8,target:100,col:0xf0a500},
+  eggs:{n:'Яйца',ic:'🥚',base:2,target:200,col:0xfaf3e0},
+  apples:{n:'Яблоки',ic:'🍎',base:2,target:200,col:0xd63031},
+  wool:{n:'Шерсть',ic:'🧶',base:4,target:150,col:0xe8e2d4},
   juice:{n:'Сок',ic:'🧃',base:14,target:150,col:0xf39c12},
-  cake:{n:'Торт',ic:'🎂',base:90,target:40,col:0xff8fab},
-  clothes:{n:'Одежда',ic:'👕',base:60,target:60,col:0x3d6ea6},
+  cake:{n:'Торт',ic:'🎂',base:95,target:40,col:0xff8fab},
+  clothes:{n:'Одежда',ic:'👕',base:65,target:60,col:0x3d6ea6},
 };
 export const GK=Object.keys(GOODS);
 
@@ -59,7 +59,13 @@ export const BLD={
   cafe:{n:'Кофейня',ic:'☕',w:'Бариста',reg:'B',kind:'service',in:{milk:1,bread:1},pay:34,rate:6,wage:6,cost:900,mat:{furniture:2},ord:3,hat:0x6f4e37,desc:'Для офисного планктона: молоко + хлеб → +34💰.'},
   restaurant:{n:'Ресторан',ic:'🍽️',w:'Шеф',reg:'B',kind:'service',in:{cheese:1,smoked:1,veg:1},pay:120,rate:4,wage:10,cost:3000,mat:{furniture:4},ord:3,hat:0xffffff,desc:'Сыр + копчёная рыба + овощи → +120💰. Топ-бизнес.'},
 };
-export const HIRE_FEE=40, MAX_WORKERS=3, SHIFT_SEC=20, BUILD_SEC=20, START_MONEY=150, OWNER_JOB_PAY=7;
+// ===== Баланс: «охлаждение» экономики — развитие на недели, а не за вечер =====
+export const ECON={rate:.3,svc:.4,wage:.35,cost:2.5,mat:2};
+for(const b of Object.values(BLD)){b.rate=Math.round(b.rate*((b.kind==='service'||b.kind==='retail')?ECON.svc:ECON.rate)*100)/100;
+  b.wage=Math.round(b.wage*ECON.wage*100)/100;b.cost=Math.round(b.cost*(b.kind==='gather'&&b.cost<200?1.2:ECON.cost)/10)*10;for(const k in b.mat)b.mat[k]=Math.ceil(b.mat[k]*ECON.mat);}
+export const BUILD_MIN={gather:3,retail:10,proc:15,service:30,office:60};
+export const ENERGY={max:40,regenMin:6,shift:1,quest:3,refillGems:20};
+export const HIRE_FEE=100, MAX_WORKERS=3, SHIFT_SEC=20, BUILD_SEC=20, START_MONEY=150, OWNER_JOB_PAY=7;
 
 // Городские работодатели (NPC-фирмы). out — что фирма сама производит в склад базы в минуту.
 export const EMP={
@@ -105,8 +111,8 @@ export const FURN={
 };
 
 // ===== Уровни: функции открываются постепенно =====
-export const lvlOf=xp=>Math.floor(Math.sqrt(Math.max(0,xp)/50))+1;
-export const xpFor=l=>50*(l-1)**2;
+export const lvlOf=xp=>Math.floor(Math.sqrt(Math.max(0,xp)/100))+1;
+export const xpFor=l=>100*(l-1)**2;
 export const NEED={land:2,gather:2,furn:2,hire:3,buyMarket:3,proc:4,apt:4,service:5,playerJob:5,vote:6,office:7,run:8};
 export const UNLOCKS={1:'Работа и продажа на базе',2:'Своя земля, ферма/сад/пасека/делянка, мебель, биржа игроков',3:'Найм работников, закупки на базе, свой магазин',4:'Переработка (мельница, пилорама…), покупка квартир',
   5:'Точки в городе (ПВЗ, шаурма), работа у других игроков',6:'Голосование на выборах',7:'Офисы в бизнес-центрах',8:'Можно баллотироваться в мэры и начальники'};
