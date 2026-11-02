@@ -14,7 +14,8 @@ export const BLOCKS=[
 ];
 export const RING={x0:57,y0:27,x1:143,y1:103};
 const SPECIAL={'c,0,7':'market','c,5,8':'pvzCity','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
-const FLOORS={khrush:5,panel9:9,panel16:16,novostroy:25,tower:42,bc:30};
+const FLOORS={khrush:5,panel9:9,panel16:16,novostroy:25,tower:30,bc:30};
+export const SHOP_NAMES=['Продукты 24','Аптека','Цветы','Хозтовары','Гастроном «Ромашка»','Минимаркет','Овощи-фрукты','Шаверма-бар','Ремонт обуви','Зоомагазин'];
 
 export function buildLayout(){
   const plots=[];
@@ -23,19 +24,22 @@ export function buildLayout(){
     let sp=SPECIAL[`${reg},${i},${j}`]||null,rt=null,price=0;
     if(reg==='c'){
       const d=Math.hypot(i-7.5,j-6.5),h=hash(i*7+3,j*13+5);
-      if(!sp){
-        if(d<2.3){if(h<.42)rt='tower';else if(h<.72)sp='bc';}
-        else if(d<4.6){if(h<.38)rt='novostroy';else if(h<.48)sp='bc';else if(h<.6)rt='panel16';}
-        else if(d<7){if(h<.25)rt='panel16';else if(h<.5)rt='panel9';}
-        else{if(h<.3)rt='khrush';else if(h<.48)rt='panel9';}
-        if(rt)sp='res';
+      // центральный парк
+      if(!sp&&(i===7||i===8)&&(j===6||j===7))sp='park';
+      if(!sp){ // меньше бетона: между домами — дворы, скверы, парковки, магазины
+        const pick=(arr)=>{let a=0;for(const[k,w]of arr){a+=w;if(h<a)return k;}return null;};
+        const k=d<2.3?pick([['tower',.32],['bc',.34],['park',.14]]):
+          d<4.6?pick([['novostroy',.18],['bc',.12],['panel16',.08],['yard',.14],['park',.1],['parking',.08],['shop',.07]]):
+          d<7?pick([['panel16',.12],['panel9',.16],['yard',.18],['park',.08],['parking',.08],['shop',.08]]):
+          pick([['khrush',.16],['panel9',.1],['yard',.16],['park',.12],['parking',.06],['shop',.07]]);
+        if(k&&RES[k]){rt=k;sp='res';}else sp=k;
       }
       price=Math.max(400,Math.round((1150-d*85)/10)*10);
     }else if(reg==='v')price=i===0?150:170;
     else if(reg==='d')price=110+(j===2?20:0);
     else if(reg==='p')price=380;
     else price=450;
-    plots.push({id:plots.length,reg,i,j,x0,y0,x:x0+1.5,y:y0+1.5,sp,rt,price,demand:0});
+    plots.push({id:plots.length,reg,i,j,x0,y0,x:x0+1.5,y:y0+1.5,sp,rt,price,demand:0,name:sp==='shop'?SHOP_NAMES[Math.floor(hash(i,j+99)*SHOP_NAMES.length)]:null});
   }
   // спрос на услуги: жители окрестных домов (этажность / расстояние)
   const dens=plots.filter(p=>p.sp==='res'||p.sp==='bc');

@@ -1,7 +1,8 @@
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {SUPABASE_URL,SUPABASE_KEY} from './supabase-config.js';
 
-export const sb=SUPABASE_URL&&SUPABASE_KEY?createClient(SUPABASE_URL,SUPABASE_KEY):null;
+const OFFLINE=new URLSearchParams(location.search).has('offline');
+export const sb=!OFFLINE&&SUPABASE_URL&&SUPABASE_KEY?createClient(SUPABASE_URL,SUPABASE_KEY):null;
 
 export async function rpc(name,args={}){
   const {data,error}=await sb.rpc(name,args);

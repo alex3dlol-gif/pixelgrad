@@ -264,9 +264,10 @@ create or replace function public.take_job(p_id int) returns public.profiles
 language plpgsql security definer set search_path = public as $$
 declare u uuid := _uid(); p props; pr profiles; e employers; nm text;
 begin
-  select * into p from props where id = p_id;
   select * into pr from profiles where id = u;
   if not found then raise exception 'Нет профиля'; end if;
+  select * into p from props where id = p_id;
+  if not found then raise exception 'Нет такого места'; end if;
   if p.kind = 'npc' then
     select * into e from employers where sp = p.sp;
     if pr.shifts < e.req then raise exception 'Нужен опыт: % смен (у тебя %)', e.req, pr.shifts; end if;
@@ -320,7 +321,7 @@ begin
   if pr.money < p.price then raise exception 'Не хватает денег'; end if;
   update profiles set money = money - p.price, home_unit = case when p.kind = 'apt' and home_unit is null then p_id else home_unit end where id = u;
   update props set owner = u where id = p_id;
-  perform _ev(u, 'unit', pr.nick || case when p.kind = 'apt' then ' · купил(а) квартиру на ' || p.floor || ' этаже' else ' · купил(а) офис в бизнес-центре' end, jsonb_build_object('plot', p.plot));
+  perform _ev(u, 'unit', pr.nick || case when p.kind = 'apt' then ' · новая квартира на ' || p.floor || ' этаже' else ' · новый офис в бизнес-центре' end, jsonb_build_object('plot', p.plot));
   return _prof(u);
 end $$;
 
@@ -333,8 +334,7 @@ begin
   if not found or p.owner is distinct from u then raise exception 'Это не твоё'; end if;
   refund := round(p.price * 0.7 + coalesce((select cost from recipes where building = p.building), 0) * 0.4);
   update props set owner = null, building = null, workers = 0, built_at = null, last_tick = null, room = '[]' where id = p_id;
-  update profiles set money = money + refund, home_unit = case when home_unit = p_id then null else home_unit end,
-    job_prop = job_prop where id = u;
+  update profiles set money = money + refund, home_unit = case when home_unit = p_id then null else home_unit end where id = u;
   update profiles set job_prop = null where job_prop = p_id;
   return _prof(u);
 end $$;

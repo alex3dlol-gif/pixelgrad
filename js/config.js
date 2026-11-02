@@ -57,6 +57,7 @@ export const EMP={
   furnFactory:{n:'Мебельная фабрика «Уют»',job:'сборщик',pay:9,req:20,out:{furniture:1.5}},
   port:{n:'Морской порт',job:'докер',pay:8,req:10,out:{fish:16,smoked:2}},
   bc:{n:'Бизнес-центр',job:'офисный клерк',pay:12,req:30,out:{}},
+  shop:{n:'Магазин у дома',job:'кассир',pay:5,req:0,out:{}},
 };
 // Карьерная лестница — по числу отработанных смен
 export const CAREER=[[0,'Стажёр'],[10,'Работник'],[30,'Специалист'],[100,'Менеджер'],[300,'Директор']];
@@ -68,7 +69,7 @@ export const RES={
   panel9:{n:'Панелька 9 эт.',floors:9,units:5,price:900,step:40,room:[5,5]},
   panel16:{n:'Панелька 16 эт.',floors:16,units:5,price:1600,step:60,room:[6,5]},
   novostroy:{n:'Новостройка',floors:25,units:5,price:3500,step:120,room:[7,6]},
-  tower:{n:'Небоскрёб',floors:42,units:4,price:9000,step:400,room:[9,7]},
+  tower:{n:'Небоскрёб',floors:30,units:4,price:9000,step:400,room:[9,7]},
 };
 export const BCT={n:'Бизнес-центр',floors:20,units:5,price:1800,step:80};
 export const DORM_ROOM=[3,3];
