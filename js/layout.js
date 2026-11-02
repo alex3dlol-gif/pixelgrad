@@ -13,7 +13,7 @@ export const BLOCKS=[
   {reg:'o',name:'ПОРТ',x:120,y:115,cols:6,rows:3},
 ];
 export const RING={x0:57,y0:27,x1:143,y1:103};
-const SPECIAL={'c,0,7':'market','c,5,8':'pvzCity','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
+const SPECIAL={'c,9,7':'cityhall','c,0,7':'market','c,5,8':'pvzCity','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
 const FLOORS={khrush:5,panel9:9,panel16:16,novostroy:25,tower:30,bc:30};
 export const SHOP_NAMES=['Продукты 24','Аптека','Цветы','Хозтовары','Гастроном «Ромашка»','Минимаркет','Овощи-фрукты','Шаверма-бар','Ремонт обуви','Зоомагазин'];
 

@@ -2,7 +2,7 @@
 // Экономика считается на сервере — здесь только картинка.
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {GOODS,BLD,EMP,RES,BCT} from './config.js';
+import {GOODS,BLD,EMP,RES,BCT,SKINS} from './config.js';
 import {W,H,STEP,HY,BLOCKS,RING,buildLayout,hash} from './layout.js';
 
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -223,6 +223,10 @@ export function createWorld(canvas,{mobile}){
     case 'shop':{const h=hash(color?1:2,0),cols=[[0xe74c3c,0xffffff],[0x27ae60,0xffffff],[0x2980b9,0xf1c40f],[0x8e44ad,0xffffff],[0xf39c12,0x2c3e50]][Math.floor(Math.random()*5)];
       B(g,2,.85,1.5,0xe8e2d4);B(g,2.1,.1,1.6,0x555555,0,.85,0);B(g,1.6,.28,.05,cols[0],0,.6,.78,true);B(g,1.4,.4,.03,0x9fd3ff,0,.12,.76,true);
       const aw=B(g,1.8,.05,.45,cols[0],0,.55,.95);aw.rotation.x=.35;B(g,.5,.4,.4,0x8b5a2b,.9,0,1.2);for(let k=0;k<3;k++)B(g,.12,.12,.12,pick([0xe74c3c,0xf39c12,0x27ae60]),.75+k*.13,.4,1.2);}break;
+    case 'cityhall':B(g,2.6,1.3,1.8,0xf2ead8);B(g,2.8,.15,2,0xd8cfb8,0,1.3,0);PY(g,2.8,.6,2,0x4f7a5a,0,1.45,0);B(g,1,1.1,.6,0xf2ead8,0,1.45,0);
+      PY(g,1.1,.7,.7,0x4f7a5a,0,2.55,0);B(g,.06,1,.06,0xdddddd,0,3.2,0);B(g,.45,.28,.03,0xe63946,.24,3.85,0);B(g,.45,.1,.031,0x2a6fdb,.24,3.85,0);
+      for(let k=0;k<6;k++)B(g,.14,1.1,.14,0xffffff,-1.1+k*.44,0,1);B(g,2.7,.12,.3,0xd8cfb8,0,1.1,1.05);B(g,1,.12,.6,0xbdb6a6,0,0,1.25);
+      {const c=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.04,12),bmat(0xffffff));c.rotation.x=Math.PI/2;c.position.set(0,2.05,.31);g.add(c);}break;
     case 'kolkhoz':B(g,1.8,1.0,1.4,0x8c3b2e);GR(g,1.95,.75,1.55,0x6b6b6b,0,1,0);B(g,.6,.65,.04,0xe8dcc0,0,0,.71);break;
     case 'port':B(g,2.2,1,1.6,0x7f8c8d);B(g,2.3,.15,1.7,0x34495e,0,1,0);for(let k=0;k<6;k++)B(g,.9,.45,.4,pick([0xc0392b,0x2980b9,0x27ae60,0xf39c12]),-1.2+(k%2)*1,(Math.floor(k/2)%2)*.45,1.3+(k>3?.45:0));break;
     }
@@ -303,10 +307,17 @@ export function createWorld(canvas,{mobile}){
   bake(statics);
 
   // ================= ЛЮДИ И ТРАНСПОРТ =================
-  function makePerson(shirt,hat,pants=0x34495e){const g=new THREE.Group();
+  function makePerson(shirt,hat,pants=0x34495e,skin=null){const g=new THREE.Group();if(skin&&SKINS[skin])hat=null;
     const limb=(x,y,w,h,c)=>{const p=new THREE.Group();p.position.set(x,y,0);const m=new THREE.Mesh(BOX,mat(c));m.scale.set(w,h,w);m.position.y=-h/2;p.add(m);g.add(p);return p;};
     const legL=limb(-.07,.26,.09,.26,pants),legR=limb(.07,.26,.09,.26,pants);B(g,.26,.28,.16,shirt,0,.26,0);
     const armL=limb(-.17,.52,.07,.24,shirt),armR=limb(.17,.52,.07,.24,shirt);B(g,.2,.2,.2,0xf1c27d,0,.54,0);if(hat!=null)B(g,.23,.07,.23,hat,0,.74,0);
+    if(skin&&SKINS[skin]){const c=SKINS[skin].col;
+      if(skin==='cap'){B(g,.23,.08,.23,c,0,.74,0);B(g,.14,.03,.12,c,0,.74,.15);}
+      else if(skin==='ushanka'){B(g,.27,.12,.27,c,0,.72,0);B(g,.05,.14,.16,c,-.14,.6,0);B(g,.05,.14,.16,c,.14,.6,0);}
+      else if(skin==='helmet'){B(g,.25,.1,.25,c,0,.74,0);B(g,.3,.03,.3,c,0,.73,0);}
+      else if(skin==='cowboy'){B(g,.42,.03,.42,c,0,.74,0);B(g,.2,.12,.2,c,0,.76,0);}
+      else if(skin==='tophat'){B(g,.32,.03,.32,c,0,.74,0);B(g,.2,.24,.2,c,0,.76,0);}
+      else if(skin==='crown'){B(g,.24,.08,.24,c,0,.74,0);for(const[x,z]of[[-.09,-.09],[.09,-.09],[-.09,.09],[.09,.09]])B(g,.05,.08,.05,c,x,.82,z);}}
     const carry=B(g,.22,.2,.22,0xffffff,0,.84,0);carry.visible=false;g.userData={legL,legR,armL,armR,carry};return shadow(g);}
   function makeTruck(cab,cargo){const g=new THREE.Group();B(g,.42,.07,.8,0x444444,0,.1,0);B(g,.4,.3,.28,cab,0,.15,.25);B(g,.34,.1,.02,0x9fd3ff,0,.3,.391);
     B(g,.42,.16,.48,0x8b5a2b,0,.17,-.14);const cg=B(g,.3,.16,.32,cargo,0,.33,-.14);wheel(g,-.21,.25);wheel(g,.21,.25);wheel(g,-.21,-.25);wheel(g,.21,-.25);g.userData.cargo=cg;return shadow(g);}
@@ -432,11 +443,11 @@ export function createWorld(canvas,{mobile}){
   // ================= АВАТАРЫ =================
   const avatars=new Map(); // uid -> {x,y,tx,ty,mesh,label,nick}
   let me=null;
-  function setMe(nick,color,x,y){if(me){scene.remove(me.mesh);me.label.el.remove();wlabels.splice(wlabels.indexOf(me.label),1);}
-    me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,mesh:makePerson(new THREE.Color(color).getHex(),0xffd166,0x222222)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
+  function setMe(nick,color,x,y,skin){if(me){scene.remove(me.mesh);me.label.el.remove();wlabels.splice(wlabels.indexOf(me.label),1);}
+    me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,mesh:makePerson(new THREE.Color(color).getHex(),0xffd166,0x222222,skin)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
   function goMe(x,y){if(me)me.path=pathTo(me,x,y);}
-  function setOther(uid,{x,y,nick,color,working}){let a=avatars.get(uid);
-    if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,mesh:makePerson(new THREE.Color(color).getHex(),0xffd166,0x222222),label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
+  function setOther(uid,{x,y,nick,color,working,skin}){let a=avatars.get(uid);if(a&&a.skin!==skin){removeOther(uid);a=null;}
+    if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,mesh:makePerson(new THREE.Color(color).getHex(),0xffd166,0x222222,skin),skin,label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
     a.tx=x;a.ty=y;a.working=working;}
   function removeOther(uid){const a=avatars.get(uid);if(!a)return;scene.remove(a.mesh);a.label.el.remove();wlabels.splice(wlabels.indexOf(a.label),1);avatars.delete(uid);}
 
