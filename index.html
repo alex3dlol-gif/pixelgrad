@@ -73,6 +73,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
 .copts{flex:1;min-width:0}.ctabs{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px}
 #copt{max-height:340px;overflow:auto}.crow{margin:6px 0}.swrow{display:flex;flex-wrap:wrap}.swrow .sw{width:28px;height:28px}
 body.onisland #topbtns,body.onisland #online{display:none!important}
+.mitem{display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:2px solid #3a3148;cursor:pointer}.mitem:hover{background:#2b2438}
+.mic{font-size:24px;width:34px;text-align:center}.mitem>span:nth-child(2){flex:1}.mgo{font-size:24px;color:#a99fb8}
+#hprof{margin-left:auto;color:#fff}body.onisland #hprof{display:none}
 #err{position:fixed;bottom:0;right:0;background:#a00;color:#fff;font:12px monospace;white-space:pre;display:none;z-index:99;padding:6px;max-width:60vw}
 .mobonly{display:none}
 @media (max-width:820px){
@@ -123,7 +126,7 @@ window.addEventListener('unhandledrejection',e=>{const b=document.getElementById
 <div id="top"><div class="hud">
   <div class="lvlb" data-act="levels" id="rank" title="Профиль"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" class="ring-bg"/><circle id="hxp" cx="20" cy="20" r="16" class="ring" stroke-dasharray="0 101"/></svg><span id="hlvl">1</span></div>
   <div class="pill" id="money">💰 —</div><div class="pill" id="hgems" data-act="gems">💎 0</div><div class="pill" id="hen" data-act="energy">⚡ —</div>
-  <div class="pill sm" id="htime"></div><div class="pill sm deskonly" id="online"></div><div class="pill sm deskonly logo">ПИКСЕЛЬГРАД</div>
+  <div class="pill sm" id="htime"></div><div class="pill sm deskonly" id="online"></div><div class="pill" id="hprof" data-act="profile" title="Профиль">👤</div><div class="pill sm deskonly logo">ПИКСЕЛЬГРАД</div>
 </div></div>
 <div id="fabs"><span class="fab" data-act="findme" title="К себе">📍</span><span class="fab" data-act="home" id="topbtns" title="Домой">🏠</span><span class="fab" data-act="inv" id="inv" title="Склад">📦<b id="invn"></b></span></div>
 <div class="box" id="sheet"><div id="tabs"></div><div id="sheetbar" class="mobonly" data-act="closesheet">▾ свернуть</div><div id="tabbody"></div></div>

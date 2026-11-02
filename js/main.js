@@ -222,7 +222,7 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
   return`<h3>👤 Профиль</h3><div class="row"><span style="color:${me.color};font-size:20px;font-weight:700">${esc(me.nick)}</span><br>
     <span class="mut">${careerOf(me.shifts)} · уровень ${l} (${me.xp||0}/${x1} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
-  <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}<span class="btn blue" data-act="psec" data-s="levels">⭐ Уровни</span><span class="btn blue" data-act="psec" data-s="top">🏆 Рейтинг</span></div>
+  <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}</div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
 function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость — ${c} каждого товара (растёт с числом и уровнем бизнесов). Сверх лимита товар пропадает.</div>`;
   if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
@@ -341,8 +341,7 @@ const GOALS=[['Устроиться на работу',()=>me.shifts>0||me.job_p
 function goalsHTML(){if(!me)return'';return`<h3>📋 Цели</h3><div class="mut">Два пути: карьера (смены → бизнес-центр → директор) или своё дело (ферма/карьер → переработка → город → БЦ).</div>`+
   GOALS.map(([t,f])=>{const ok=f();return`<div class="row" style="${ok?'color:#7bd389':''}">${ok?'✔':'▫'} ${t}</div>`;}).join('');}
 function topHTML(){const list=[...profiles.values()].sort((a,b)=>b.money-a.money).slice(0,20);
-  return`<h3>🏆 Самые богатые</h3>`+list.map((p,i)=>`<div class="row" style="${me&&p.id===me.id?'background:#3a3148':''}">${i+1}. <span style="color:${p.color}">■</span> ${esc(p.nick)} — <b>${fmt(p.money)}💰</b> <span class="mut">${careerOf(p.shifts||0)}</span></div>`).join('')+
-  (me?`<div style="margin-top:10px"><span class="btn sm red" data-act="logout">Выйти из аккаунта</span></div>`:'');}
+  return`<h3>🏆 Самые богатые</h3>`+list.map((p,i)=>`<div class="row" style="${me&&p.id===me.id?'background:#3a3148':''}">${i+1}. <span style="color:${p.color}">■</span> ${esc(p.nick)} — <b>${fmt(p.money)}💰</b> <span class="mut">${careerOf(p.shifts||0)}</span></div>`).join('');}
 function feedHTML(){return`<h3>📰 Что происходит</h3>`+events.slice().reverse().map(e=>`<div class="row">${esc(e.txt)}</div>`).join('');}
 function furnHTML(){const st=room.state;if(!st)return'';
   if(!st.editable)return`<h3>🛋 В гостях</h3><div>Нажми на пол — пойдёшь туда, на стул, диван или кровать — сядешь. Пиши в чат сверху.</div>`;
@@ -360,9 +359,12 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
   if(st.editable)h+=`<div>Позови друга по нику:</div><input id="invnick" maxlength="16" placeholder="Ник игрока"><span class="btn gold" data-act="invite">Пригласить</span>`;
   h+=`<div class="row">В комнате: ${[...st.people.keys()].map(nm).join(', ')||'—'}</div><div class="mut">Пиши в чат сверху — сообщения увидят все в комнате.</div>`;return h;}
 let moreSec='goals';
-function moreHTML(){const sec=[['goals','📋 Цели'],['gov','🏛 Мэрия'],...(LV()>=3?[['gear','🦺 Экипировка']]:[]),['look','👤 Персонаж'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
-  return`<div style="margin-bottom:8px">${sec.map(([k,n])=>`<span class="btn sm ${moreSec===k?'on':'blue'}" data-act="moresec" data-s="${k}">${n}</span>`).join('')}</div>`+
-    ({gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,look:()=>{showCreator(false);moreSec='goals';return goalsHTML();},skins:skinsHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]());}
+let moreOpen=false;
+function moreHTML(){const items=[['goals','📋','Цели','Чего добиться в игре'],...(LV()>=3?[['gear','🦺','Экипировка','Бонусы к производству']]:[]),['levels','⭐','Уровни','Что открывается дальше'],
+    ['top','🏆','Рейтинг','Самые богатые игроки'],['feed','📰','Лента','Что происходит в городе'],['gov','🏛','Мэрия','В разработке']];
+  if(!moreOpen)return'<h3>☰ Меню</h3>'+items.map(([k,ic,n,d])=>`<div class="mitem" data-act="moresec" data-s="${k}"><span class="mic">${ic}</span><span><b>${n}</b><br><span class="mut">${d}</span></span><span class="mgo">›</span></div>`).join('');
+  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
+  return'<span class="btn sm blue" data-act="moreback">← Меню</span>'+body();}
 function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=`<h3>🦺 Рабочая экипировка</h3><div class="mut">Даёт бонусы к производству. Получить трудно: за многократные задания, стаж или дорого. Один предмет на слот.</div>`;
   for(const[slot,sn]of Object.entries(SLOTS)){h+=`<div class="row"><b>${sn}:</b> ${eq[slot]&&GEAR[eq[slot]]?GEAR[eq[slot]].ic+' '+GEAR[eq[slot]].n+` <span class="btn sm red" data-act="unequip" data-slot="${slot}">Снять</span>`:'<span class="mut">пусто</span>'}</div>`;}
   for(const[id,G]of Object.entries(GEAR)){const has=own.includes(id),on=eq[G.slot]===id;let how='',can=true;
@@ -463,6 +465,7 @@ function renderUI(){
     const c=CAP(),full=GK.some(g=>inv(me,g)>=c),n=GK.reduce((a,g)=>a+Math.floor(inv(me,g)),0);$('invn').textContent=full?'!':n?(n>999?'999+':n):'';$('invn').style.background=full?'#c0392b':'#3a7d44';}
   {const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('htime').textContent=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;}
   if(ob){$('money').textContent='💰 '+ob.money+' уч.';$('hen').textContent='⚡ '+ob.en;const q=Math.floor(ob.inv.wheat||0);$('invn').textContent=q||'';}
+  if(me)$('hprof').innerHTML='👤'+(mobile?'':' '+esc(me.nick));
   $('topbtns').style.display=me&&me.home_unit&&!ob?'':'none';
   document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
   if(mobile&&ob){$('coach').classList.toggle('mini',sheetOpen||coachMin);}
@@ -486,7 +489,7 @@ document.addEventListener('click',async e=>{
   if(t.dataset.tut)return t.dataset.tut==='next'?tutGo(tutI+1):tutEnd();
   if(t.dataset.visit!=null){$('toast').style.display='none';if(mode==='room')leaveRoom();return enterRoom({unit:+t.dataset.visit,hostUid:t.dataset.host,hostNick:t.dataset.hn,editable:false});}
   if(t.dataset.lock&&t.dataset.tab){toast(`🔒 Откроется на ${t.dataset.lock} уровне`);return;}
-  if(t.dataset.tab){newTabs.delete(t.dataset.tab);if(mobile&&t.dataset.tab===tab&&sheetOpen)sheetOpen=false;else{tab=t.dataset.tab;sheetOpen=true;}lastBody='';return renderUI();}
+  if(t.dataset.tab){newTabs.delete(t.dataset.tab);if(t.dataset.tab==='more')moreOpen=false;if(mobile&&t.dataset.tab===tab&&sheetOpen)sheetOpen=false;else{tab=t.dataset.tab;sheetOpen=true;}lastBody='';return renderUI();}
   const a=t.dataset.act,id=t.dataset.id!=null?+t.dataset.id:null;
   switch(a){
     case 'daily':{const r=await act('claim_daily');if(r){$('auth').style.display='none';toast(`🎁 +${DAILY[Math.min(me.streak,7)-1]}💎 · серия ${me.streak} дн.`);}break;}
@@ -496,11 +499,13 @@ document.addEventListener('click',async e=>{
     case 'vote':if(await act('vote',{p_election:+t.dataset.e,p_cand:t.dataset.c}))toast('🗳 Голос принят');loadGov();break;
     case 'run':{const sl=($('slogan')?.value||'').trim();if(await act('run_for',{p_pos:t.dataset.pos,p_slogan:sl}))toast('Ты в списке кандидатов!');loadGov();break;}
     case 'govset':{const raw=$('gv_'+t.dataset.k)?.value??t.dataset.v??'0';const v=parseFloat(String(raw).replace(',','.'))||0;if(await act('gov_set',{p_key:t.dataset.k,p_val:t.dataset.pct?v/100:v}))toast('Сохранено');break;}
-    case 'moresec':moreSec=t.dataset.s;break;
+    case 'moresec':moreSec=t.dataset.s;moreOpen=true;break;
+    case 'moreback':moreOpen=false;break;
+    case 'profile':if(ob)break;if(tab==='profile'&&sheetOpen)sheetOpen=false;else{tab='profile';sheetOpen=true;}break;
     case 'mksec':mkSec=t.dataset.s;break;
     case 'inv':if(tab==='inv'&&sheetOpen)sheetOpen=false;else{tab='inv';sheetOpen=true;}break;
-    case 'levels':if(ob)break;if(tab==='profile'&&sheetOpen)sheetOpen=false;else{tab='profile';sheetOpen=true;}break;
-    case 'psec':tab='more';moreSec=t.dataset.s;break;
+    case 'levels':if(ob)break;tab='more';moreSec='levels';moreOpen=true;sheetOpen=true;break;
+    case 'psec':tab='more';moreSec=t.dataset.s;moreOpen=true;break;
     case 'plook':showCreator(false);return;
     case 'logout2':if(confirm('Выйти из аккаунта?')){await sb.auth.signOut();location.reload();}return;
     case 'toex':tab='market';mkSec='ex';break;
