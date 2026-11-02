@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GOODS,BLD,EMP,RES,BCT,SKINS,LOOK,DEFAULT_LOOK} from './config.js';
+import {ADS,AD_SEC,drawAd} from './ads.js';
 import {W,H,STEP,HY,BLOCKS,RING,OX,OY,LAKES,POIS,ISLAND,buildLayout,hash} from './layout.js';
 
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -731,6 +732,19 @@ export function createWorld(canvas,{mobile}){
   wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
+  // ===== Реклама: 3 билборда и экран на небоскрёбе =====
+  const adScreens=[];
+  function adScreen(cw,ch,slot,x,y){const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const tx=new THREE.CanvasTexture(cv);
+    tx.magFilter=tx.minFilter=THREE.NearestFilter;tx.colorSpace=THREE.SRGBColorSpace;const s={cv,c:cv.getContext('2d'),tx,mat:new THREE.MeshBasicMaterial({map:tx}),slot,x,y,next:0};adScreens.push(s);return s;}
+  for(const[id,slot]of[[7,0],[216,2],[103,4]]){const p=plots[id];if(!p||p.sp!=='park')continue;const g=new THREE.Group();g.position.set(p.x0+.9,0,p.y0+.9);g.rotation.y=Math.PI/4;g.scale.setScalar(1.6);
+    B(g,.1,1.5,.1,0x555555,-.6,0,0);B(g,.1,1.5,.1,0x555555,.6,0,0);B(g,2,1.1,.1,0x222222,0,1.4,-.06);
+    const sc=adScreen(64,32,slot,p.x0+.7,p.y0+.7),m=new THREE.Mesh(new THREE.PlaneGeometry(1.84,.92),sc.mat);m.position.set(0,1.95,0);g.add(m);scene.add(g);
+    for(let y=p.y0;y<=p.y0+1;y++)for(let x=p.x0;x<=p.x0+1;x++)walk[I(x,y)]=0;}
+  {const p=plots[71];if(p&&p.rt==='tower'){const sc=adScreen(40,64,1,p.x+.0,p.y+.0),y=30*.36*.62;
+    const a=new THREE.Mesh(new THREE.PlaneGeometry(2.1,3.4),sc.mat);a.position.set(p.x0+1.5,y,p.y0+2.72);scene.add(a);
+    const b=new THREE.Mesh(new THREE.PlaneGeometry(2.1,3.4),sc.mat);b.position.set(p.x0+2.72,y,p.y0+1.5);b.rotation.y=Math.PI/2;scene.add(b);}}
+  function updateAds(time){for(const s of adScreens){if(time<s.next||!near(s.x,s.y,zoom*3))continue;s.next=time+.1;
+    drawAd(s.c,s.cv.width,s.cv.height,ADS[(Math.floor(time/AD_SEC)+s.slot)%ADS.length],time);s.tx.needsUpdate=true;}}
   for(const s of STOPS){const L=wlabel('🚌 '+s.name,s.x+.5,1.7,s.y-.5,'emp','#9fd3ff');L.zMax=mobile?9:13;}
   for(const p of plots)if(p.sp==='dk'||p.sp==='cinema'){const L=wlabel(p.sp==='dk'?'🎭 Дом культуры':'🎬 Кинотеатр «Мир»',p.x,2.6,p.y,'emp','#ffd166');L.zMax=mobile?11:15;}
   for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];const L=wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');L.zMax=mobile?11:15;}
@@ -835,7 +849,7 @@ export function createWorld(canvas,{mobile}){
     if(me){if(stepMove(me,dt)){}animPerson(me,time);me.label.p.set(me.x,1.2,me.y);}
     for(const[,a]of avatars){const dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);a.moving=d>.05;if(d>12){a.x=a.tx;a.y=a.ty;}else if(a.moving){const s=Math.min(d,3.2*dt);a.x+=dx/d*s;a.y+=dy/d*s;a.face=Math.atan2(dx,dy);}
       animPerson(a,time);a.label.p.set(a.x,1.2,a.y);}
-    updateVignettes(time,dt);
+    updateVignettes(time,dt);updateAds(time);
     for(const p of plots){const a=p.anim;if(!a)continue;if(!near(p.x,p.y))continue;const busy=p.wk.some(w=>w.working)||p.sp;
       if(a.blades&&(p.workers||p.sp))a.blades.rotation.z+=dt*1.5;if(a.spin&&busy)a.spin.rotation.y+=dt*15;
       if(a.smoke&&(p.workers||p.sp)&&Math.random()<dt*3)puff(p.x0+1.5+a.smoke[0],a.smoke[1],p.y0+1.5+a.smoke[2],0xcfcfcf,1,.5,.08);
