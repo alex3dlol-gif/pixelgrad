@@ -2,7 +2,7 @@
 // Экономика считается на сервере — здесь только картинка.
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {GOODS,BLD,EMP,RES,BCT,SKINS} from './config.js';
+import {GOODS,BLD,EMP,RES,BCT,SKINS,LOOK,DEFAULT_LOOK} from './config.js';
 import {W,H,STEP,HY,BLOCKS,RING,OX,OY,LAKES,POIS,buildLayout,hash} from './layout.js';
 
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -28,8 +28,8 @@ export function createWorld(canvas,{mobile}){
     if(t===T.FOREST&&n2>.78)t=T.GRASS;                       // полянки
     if(y<160){const rx=44+Math.round(Math.sin(y*.11)*2.5);if(x===rx||x===rx+1)t=T.WATER;else if((x===rx-1||x===rx+2)&&t!==T.FOREST)t=T.SAND;}
     for(const L of LAKES){if(inLake(L,x,y))t=T.WATER;else if(inLake(L,x,y,1.3)&&t!==T.WATER)t=T.SAND;}
-    const c=coast(x);if(x>=131){if(y>=c)t=T.SEA;else if(y>=c-2)t=T.SAND;}
-    if(y>=65&&x>=256+Math.round(Math.sin(y*.1)*2))t=T.SEA;else if(y>=65&&x>=254+Math.round(Math.sin(y*.1)*2)&&t!==T.SEA)t=T.SAND;
+    const c=coast(x),bay=300+Math.round(Math.sin(y*.07)*6);if(x>=131&&x<bay){if(y>=c)t=T.SEA;else if(y>=c-2)t=T.SAND;}else if(x>=131&&x<bay+2&&y>=c)t=T.SAND;
+    if(x>=262&&y<160&&n>.55)t=T.FOREST;if(x>=300&&y>=225&&y<238&&n2>.4)t=T.FIELD;
     grid[I(x,y)]=t;
   }
   const clearRect=(x0,y0,x1,y1,t=T.GRASS)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(inb(x,y)&&grid[I(x,y)]!==T.WATER&&grid[I(x,y)]!==T.SEA)grid[I(x,y)]=t;};
@@ -49,6 +49,7 @@ export function createWorld(canvas,{mobile}){
   carve(POIS.mush.x,POIS.mush.y,53,POIS.mush.y);carve(POIS.forester.x,POIS.forester.y,53,POIS.forester.y);carve(POIS.pier.x+1,POIS.pier.y,53,POIS.pier.y);carve(53,POIS.pier.y,53,70);
   carve(POIS.camp.x,POIS.camp.y,63,POIS.camp.y);carve(63,POIS.camp.y,63,152);carve(POIS.spring.x,POIS.spring.y,POIS.spring.x,70);
   carve(POIS.lighthouse.x,POIS.lighthouse.y,200,POIS.lighthouse.y);carve(200,POIS.lighthouse.y,200,140);carve(POIS.fire.x,POIS.fire.y,POIS.fire.x,HY);
+  for(const b of BLOCKS)if(b.link){const cx=b.x+STEP*Math.floor(b.cols/2);if(b.link<b.y)carve(cx,b.y,cx,b.link);else carve(cx,b.y+b.rows*STEP,cx,b.link);}
   for(let x=RING.x0;x<=RING.x1;x++){grid[I(x,RING.y0)]=T.RING;grid[I(x,RING.y1)]=T.RING;}
   for(let y=RING.y0;y<=RING.y1;y++){grid[I(RING.x0,y)]=T.RING;grid[I(RING.x1,y)]=T.RING;}
   const PIERS=[159,171,183];
@@ -114,24 +115,25 @@ export function createWorld(canvas,{mobile}){
     // вода чуть ниже — тёмная подложка по краям для глубины
     const wm=new THREE.Mesh(new THREE.PlaneGeometry(W+400,H+400),new THREE.MeshLambertMaterial({color:0x2f6fae}));wm.rotation.x=-Math.PI/2;wm.position.set(W/2,-.2,H/2);scene.add(wm);}
   // --- деревья ---
-  const trees=[];
+  const trees=[],CH=40,chunks=new Map();
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const t=grid[I(x,y)],inPlot=plotIdx[I(x,y)]>=0;
-    if((t===T.FOREST&&srnd()<.66)||(t===T.GRASS&&!inPlot&&srnd()<.025))
-      trees.push({x,y,px:x+(srnd()-.5)*.35,pz:y+(srnd()-.5)*.35,s:.8+srnd()*.45,rot:srnd()*6.28,pine:srnd()<(x<60?.65:.4),alive:true,grow:1,reserved:null,shake:0});}
+    if((t===T.FOREST&&srnd()<.55)||(t===T.GRASS&&!inPlot&&srnd()<.02)){
+      const ck=Math.floor(x/CH)+','+Math.floor(y/CH);if(!chunks.has(ck))chunks.set(ck,{n:0,dirty:true});const c=chunks.get(ck);
+      trees.push({x,y,px:x+(srnd()-.5)*.35,pz:y+(srnd()-.5)*.35,s:.8+srnd()*.45,rot:srnd()*6.28,pine:srnd()<(x<60?.65:.4),alive:true,grow:1,reserved:null,shake:0,c,ci:c.n++});}}
   const trunkGeo=new THREE.CylinderGeometry(.07,.1,.5,5);trunkGeo.translate(0,.25,0);
   const pineGeo=new THREE.ConeGeometry(.42,1.05,6);pineGeo.translate(0,.88,0);
   const leafGeo=new THREE.IcosahedronGeometry(.42,0);leafGeo.translate(0,.82,0);
-  const trunkIM=new THREE.InstancedMesh(trunkGeo,mat(0x6b4226),trees.length);
-  const pineIM=new THREE.InstancedMesh(pineGeo,new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}),trees.length);
-  const leafIM=new THREE.InstancedMesh(leafGeo,new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}),trees.length);
-  for(const im of[trunkIM,pineIM,leafIM]){im.castShadow=!mobile;im.receiveShadow=true;scene.add(im);}
+  const treeMat=new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true});
+  for(const c of chunks.values()){c.trunk=new THREE.InstancedMesh(trunkGeo,mat(0x6b4226),c.n);c.pine=new THREE.InstancedMesh(pineGeo,treeMat,c.n);c.leaf=new THREE.InstancedMesh(leafGeo,treeMat,c.n);
+    for(const im of[c.trunk,c.pine,c.leaf]){im.castShadow=!mobile;im.receiveShadow=true;scene.add(im);}}
   const _m=new THREE.Matrix4(),_m0=new THREE.Matrix4(),_q=new THREE.Quaternion(),_e=new THREE.Euler(),_p=new THREE.Vector3(),_s=new THREE.Vector3(),ZERO=new THREE.Vector3();
-  function setTree(i){const t=trees[i];_e.set(t.shake,t.rot,t.shake*.5);_q.setFromEuler(_e);_p.set(t.px,0,t.pz);const gr=t.alive?1:t.grow;
-    _s.set(t.s,t.s*(t.alive?1:Math.max(.35,gr)),t.s);_m.compose(_p,_q,_s);trunkIM.setMatrixAt(i,_m);
+  function setTree(i){const t=trees[i],c=t.c;_e.set(t.shake,t.rot,t.shake*.5);_q.setFromEuler(_e);_p.set(t.px,0,t.pz);const gr=t.alive?1:t.grow;
+    _s.set(t.s,t.s*(t.alive?1:Math.max(.35,gr)),t.s);_m.compose(_p,_q,_s);c.trunk.setMatrixAt(t.ci,_m);
     const cs=t.alive?t.s:(gr>.15?t.s*gr:0);_s.set(cs,cs,cs);_m.compose(_p,_q,_s);_m0.compose(_p,_q,ZERO);
-    if(t.pine){pineIM.setMatrixAt(i,_m);leafIM.setMatrixAt(i,_m0);}else{leafIM.setMatrixAt(i,_m);pineIM.setMatrixAt(i,_m0);}}
-  {const col=new THREE.Color();trees.forEach((t,i)=>{setTree(i);col.setHex(t.pine?[0x2f6b3a,0x3a7d44,0x2d5e34][i%3]:[0x5fa548,0x4f9a3c,0x79b04a][i%3]);pineIM.setColorAt(i,col);leafIM.setColorAt(i,col);});}
-  let treesDirty=true;
+    if(t.pine){c.pine.setMatrixAt(t.ci,_m);c.leaf.setMatrixAt(t.ci,_m0);}else{c.leaf.setMatrixAt(t.ci,_m);c.pine.setMatrixAt(t.ci,_m0);}c.dirty=true;}
+  {const col=new THREE.Color();trees.forEach((t,i)=>{setTree(i);col.setHex(t.pine?[0x2f6b3a,0x3a7d44,0x2d5e34][i%3]:[0x5fa548,0x4f9a3c,0x79b04a][i%3]);t.c.pine.setColorAt(t.ci,col);t.c.leaf.setColorAt(t.ci,col);});
+    for(const c of chunks.values())for(const im of[c.trunk,c.pine,c.leaf]){im.computeBoundingSphere();im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true;}}
+  let treesDirty=false;
 
   // --- скалы, берега ---
   const rockFaces=[],shoreFaces=[];
@@ -231,6 +233,14 @@ export function createWorld(canvas,{mobile}){
       PY(g,1.1,.7,.7,0x4f7a5a,0,2.55,0);B(g,.06,1,.06,0xdddddd,0,3.2,0);B(g,.45,.28,.03,0xe63946,.24,3.85,0);B(g,.45,.1,.031,0x2a6fdb,.24,3.85,0);
       for(let k=0;k<6;k++)B(g,.14,1.1,.14,0xffffff,-1.1+k*.44,0,1);B(g,2.7,.12,.3,0xd8cfb8,0,1.1,1.05);B(g,1,.12,.6,0xbdb6a6,0,0,1.25);
       {const c=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.04,12),bmat(0xffffff));c.rotation.x=Math.PI/2;c.position.set(0,2.05,.31);g.add(c);}break;
+    case 'apiary':B(g,1.2,.7,1,0xc8a26b);PY(g,1.4,.5,1.2,0x8b5a2b,0,.7,0);for(let k=0;k<6;k++){const x=-1.2+(k%3)*1.2,z=k<3?1.1:-1.2;B(g,.35,.35,.35,[0xf1c40f,0xe67e22,0xffffff][k%3],x,0,z);B(g,.4,.06,.4,0x8b5a2b,x,.35,z);}break;
+    case 'henhouse':B(g,1.3,.6,1,0xd9c49a);GR(g,1.45,.5,1.15,0xa83a32,0,.6,0);B(g,1.8,.3,.04,0xdddddd,0,0,1.3);for(let k=0;k<5;k++){const c=new THREE.Group();B(c,.16,.14,.12,k%2?0xffffff:0xc9822b,0,.06,0);B(c,.06,.06,.04,0xe74c3c,.08,.2,0);c.position.set(-.8+k*.4,0,.9);g.add(c);}break;
+    case 'orchard':B(g,1,.6,.8,0x9c6b3e);GR(g,1.1,.4,.9,0x3d6b35,0,.6,0);for(const[x,z]of[[-1.2,-1.2],[1.2,-1.2],[-1.2,1.2],[1.2,1.2],[0,1.3]]){B(g,.12,.5,.12,0x6b4226,x,0,z);const c=new THREE.Mesh(new THREE.IcosahedronGeometry(.42,0),mat(0x4f9a3c));c.position.set(x,.8,z);g.add(c);for(let a=0;a<3;a++)B(g,.08,.08,.08,0xd63031,x+Math.cos(a*2)*.3,.75,z+Math.sin(a*2)*.3);}break;
+    case 'sheepfold':B(g,1.6,.7,1.1,0x8b5a2b);GR(g,1.75,.5,1.25,0x5b2d2a,0,.7,0);for(let k=0;k<4;k++){const c=new THREE.Group();B(c,.36,.24,.22,0xf4f1e8,0,.14,0);B(c,.12,.14,.12,0x333333,.22,.24,0);c.position.set(-.9+k*.6,0,1.1+(k%2)*.2);c.rotation.y=k;g.add(c);}break;
+    case 'juicery':B(g,1.5,.9,1.3,0xf5e6c8);B(g,1.6,.12,1.4,0xe67e22,0,.9,0);CY(g,.3,.3,1.1,8,0xbdc3c7,.75,0,-.5);B(g,.6,.25,.05,0xf39c12,0,.55,.66,true);break;
+    case 'confectionery':B(g,1.6,.9,1.3,0xffe4ec);PY(g,1.8,.7,1.5,0xff8fab,0,.9,0);B(g,1.2,.4,.03,0xfff1b0,0,.2,.66,true);B(g,.7,.22,.05,0xff6b9a,0,.68,.67,true);B(g,.25,.6,.25,0xeeeeee,.5,.95,-.3);a.smoke=[.5,1.6,-.3];break;
+    case 'tailor':B(g,1.6,.95,1.3,0xd6e4f0);GR(g,1.75,.6,1.45,0x5e4b8b,0,.95,0);B(g,1,.4,.03,0x9fd3ff,0,.25,.66,true);B(g,.12,.6,.12,0x555555,-.9,0,.9);B(g,.3,.4,.2,0x3d6ea6,-.9,.35,.9);break;
+    case 'store':{const c=new THREE.Color(color||0xffffff).getHex();B(g,1.8,.85,1.3,0xf2efe6);B(g,1.9,.1,1.4,0x555555,0,.85,0);B(g,1.6,.26,.05,c,0,.6,.67,true);B(g,1.4,.4,.03,0x9fd3ff,0,.12,.66,true);const aw=B(g,1.8,.05,.45,c,0,.55,.85);aw.rotation.x=.35;}break;
     case 'kolkhoz':B(g,1.8,1.0,1.4,0x8c3b2e);GR(g,1.95,.75,1.55,0x6b6b6b,0,1,0);B(g,.6,.65,.04,0xe8dcc0,0,0,.71);break;
     case 'port':B(g,2.2,1,1.6,0x7f8c8d);B(g,2.3,.15,1.7,0x34495e,0,1,0);for(let k=0;k<6;k++)B(g,.9,.45,.4,pick([0xc0392b,0x2980b9,0x27ae60,0xf39c12]),-1.2+(k%2)*1,(Math.floor(k/2)%2)*.45,1.3+(k>3?.45:0));break;
     }
@@ -241,7 +251,10 @@ export function createWorld(canvas,{mobile}){
     B(g,x1-x0,.06,.06,c,(x0+x1)/2,.18,z0);B(g,x1-x0,.06,.06,c,(x0+x1)/2,.18,z1);B(g,.06,.06,z1-z0,c,x0,.18,(z0+z1)/2);B(g,.06,.06,z1-z0,c,x1,.18,(z0+z1)/2);
     for(const[x,z]of[[x0,z0],[x1,z0],[x0,z1],[x1,z1]])B(g,.1,.3,.1,0xe8e0d0,x,0,z);
     B(g,.05,1.3,.05,0xdddddd,x1-.15,0,z0+.15);const fl=B(g,.36,.22,.03,c,x1-.33,1.05,z0+.15);g.userData.flag=fl;return shadow(g);}
-  function makeSign(p){const g=new THREE.Group();B(g,.06,.6,.06,0x6b4a2f);B(g,.6,.34,.05,0xf4ecd8,0,.45,0);B(g,.6,.07,.06,0xc0392b,0,.62,0);g.position.set(p.x0+1.5,0,p.y0+2.2);scene.add(shadow(g));return g;}
+  const landPlots=plots.filter(p=>!p.sp);landPlots.forEach((p,i)=>p.si=i);
+  const SIGNP=[[.06,.6,.06,0x6b4a2f,.3],[.6,.34,.05,0xf4ecd8,.62],[.6,.07,.06,0xc0392b,.655]];
+  const signIM=SIGNP.map(([w,h,d,c])=>{const im=new THREE.InstancedMesh(BOX,mat(c),landPlots.length);im.castShadow=true;scene.add(im);return im;});
+  function setSign(p,on){SIGNP.forEach(([w,h,d,,y],k)=>{_m.makeScale(on?w:0,on?h:0,on?d:0).setPosition(p.x0+1.5,y,p.y0+2.2);signIM[k].setMatrixAt(p.si,_m);signIM[k].instanceMatrix.needsUpdate=true;});}
   const CROPC={wheat:[0x5c8f2e,0x6fae3a,0x8fbf3f,0xb9c84a,0xe3c04a],veg:[0x3e7b27,0x4f9a3c,0x5fa548,0x6ab04c,0xe67e22]};
   function makeCrops(p,kind){for(let dy=0;dy<4;dy++)for(let dx=0;dx<4;dx++){if(dx>=1&&dx<=2&&dy>=1&&dy<=2)continue;if(dy===3&&(dx===1||dx===2))continue;
     const x=p.x0+dx,y=p.y0+dy,g=new THREE.Group();g.position.set(x,0,y);B(g,.9,.04,.9,0x6b4a2b);const rows=[];for(let r=0;r<3;r++)rows.push(B(g,.18,1,.8,0x6fae3a,-.28+r*.28,.04,0));
@@ -282,7 +295,7 @@ export function createWorld(canvas,{mobile}){
     else if(p.sp==='res'){makeResidential(p);blockFoot(p,true);}
     else if(p.sp==='bc'){makeBC(p);blockFoot(p,true);}
     else if(p.sp){const b=makeBuilding(p.sp,0);b.g.position.set(p.x0+1.5,0,p.y0+1.5);(p.sp==='pvzCity'?scene:statics).add(b.g);p.anim=b.a;blockFoot(p);if(p.sp==='kolkhoz')makeCrops(p,'wheat');}
-    else p.sign=makeSign(p);
+    else setSign(p,true);
   }
   for(const[bx,by,fl]of BG){const m=tower(fl>12?'panel16':'panel9',bx%2,fl,.42,4.6,1.8);m.position.x=bx+2.5;m.position.z=by+.5;statics.add(m);}
   // фонари
@@ -327,23 +340,53 @@ export function createWorld(canvas,{mobile}){
     case 'cat':{const c=new THREE.Group();B(c,.3,.15,.15,0xf39c12,0,.12,0);B(c,.14,.14,.14,0xf39c12,.18,.22,0);B(c,.04,.06,.04,0xf39c12,.15,.32,-.04);B(c,.04,.06,.04,0xf39c12,.21,.32,.04);B(c,.04,.2,.04,0xf39c12,-.16,.18,0);c.position.set(.6,0,-.6);g.add(c);}break;
     }
     g.position.set(P.x,0,P.y);return shadow(g);}
+  for(const b of BLOCKS){if(!b.link)continue;for(let k=0;k<b.cols*2;k++){const side=k%2,x=b.x+Math.floor(k/2)*STEP+2,y=side?b.y-2:b.y+b.rows*STEP+2;
+      if(!inb(x,y)||grid[I(x,y)]!==T.GRASS||plotAt(x,y)||hash(x,y)<.35)continue;const g=new THREE.Group();
+      B(g,.9,.55,.8,[0x8b5a2b,0x7a4a24,0x9c6b3e,0xc9a26b][k%4]);GR(g,1.05,.45,.95,[0x3d6b35,0x8a3a2a,0x5a6a7a,0x2e5e8c][(k+1)%4],0,.55,0);B(g,.2,.18,.03,0x2e86ab,0,.25,.41);
+      decoTree(g,1,.3,.8);g.position.set(x,0,y);statics.add(g);walk[I(x,y)]=0;}}
   for(const k in POIS)if(k!=='harvest')(k==='cat'?scene:statics).add(makePOI(k,POIS[k]));
   // утки и лебеди на озёрах
   const birds=[];for(const L of LAKES)for(let i=0;i<5;i++){const b=new THREE.Group();const c=L.name.startsWith('ЛЕБ')?0xffffff:0x8d6e4b;B(b,.3,.16,.18,c,0,0,0);B(b,.08,.2,.08,c,.14,.1,0);B(b,.08,.05,.06,0xf39c12,.2,.2,0);scene.add(b);birds.push({b,L,a:Math.random()*6,r:.3+Math.random()*.4,s:.05+Math.random()*.08});}
+  for(const im of signIM)im.computeBoundingSphere();
   bake(statics);
 
   // ================= ЛЮДИ И ТРАНСПОРТ =================
-  function makePerson(shirt,hat,pants=0x34495e,skin=null){const g=new THREE.Group();if(skin&&SKINS[skin])hat=null;
-    const limb=(x,y,w,h,c)=>{const p=new THREE.Group();p.position.set(x,y,0);const m=new THREE.Mesh(BOX,mat(c));m.scale.set(w,h,w);m.position.y=-h/2;p.add(m);g.add(p);return p;};
-    const legL=limb(-.07,.26,.09,.26,pants),legR=limb(.07,.26,.09,.26,pants);B(g,.26,.28,.16,shirt,0,.26,0);
-    const armL=limb(-.17,.52,.07,.24,shirt),armR=limb(.17,.52,.07,.24,shirt);B(g,.2,.2,.2,0xf1c27d,0,.54,0);if(hat!=null)B(g,.23,.07,.23,hat,0,.74,0);
-    if(skin&&SKINS[skin]){const c=SKINS[skin].col;
+  function drawHat(g,skin){if(skin&&SKINS[skin]){const c=SKINS[skin].col;
       if(skin==='cap'){B(g,.23,.08,.23,c,0,.74,0);B(g,.14,.03,.12,c,0,.74,.15);}
       else if(skin==='ushanka'){B(g,.27,.12,.27,c,0,.72,0);B(g,.05,.14,.16,c,-.14,.6,0);B(g,.05,.14,.16,c,.14,.6,0);}
       else if(skin==='helmet'){B(g,.25,.1,.25,c,0,.74,0);B(g,.3,.03,.3,c,0,.73,0);}
       else if(skin==='cowboy'){B(g,.42,.03,.42,c,0,.74,0);B(g,.2,.12,.2,c,0,.76,0);}
       else if(skin==='tophat'){B(g,.32,.03,.32,c,0,.74,0);B(g,.2,.24,.2,c,0,.76,0);}
-      else if(skin==='crown'){B(g,.24,.08,.24,c,0,.74,0);for(const[x,z]of[[-.09,-.09],[.09,-.09],[-.09,.09],[.09,.09]])B(g,.05,.08,.05,c,x,.82,z);}}
+      else if(skin==='crown'){B(g,.24,.08,.24,c,0,.74,0);for(const[x,z]of[[-.09,-.09],[.09,-.09],[-.09,.09],[.09,.09]])B(g,.05,.08,.05,c,x,.82,z);}}}
+  function makePerson(shirt,hat,pants=0x34495e,skin=null){const g=new THREE.Group();if(skin&&SKINS[skin])hat=null;
+    const limb=(x,y,w,h,c)=>{const p=new THREE.Group();p.position.set(x,y,0);const m=new THREE.Mesh(BOX,mat(c));m.scale.set(w,h,w);m.position.y=-h/2;p.add(m);g.add(p);return p;};
+    const legL=limb(-.07,.26,.09,.26,pants),legR=limb(.07,.26,.09,.26,pants);B(g,.26,.28,.16,shirt,0,.26,0);
+    const armL=limb(-.17,.52,.07,.24,shirt),armR=limb(.17,.52,.07,.24,shirt);B(g,.2,.2,.2,0xf1c27d,0,.54,0);if(hat!=null)B(g,.23,.07,.23,hat,0,.74,0);
+    drawHat(g,skin);
+    const carry=B(g,.22,.2,.22,0xffffff,0,.84,0);carry.visible=false;g.userData={legL,legR,armL,armR,carry};return shadow(g);}
+
+  // аватар игрока: пол, кожа, причёска, одежда
+  function makeAvatar(look,skin){look={...DEFAULT_LOOK,...(look||{})};const g=new THREE.Group(),hx=c=>new THREE.Color(c).getHex();
+    const sk=hx(LOOK.skin[look.skin]||LOOK.skin[0]),top=hx(look.top),bot=hx(look.bottom),hc=hx(look.hc),f=look.g==='f';
+    const limb=(x,y,w,h,c)=>{const p=new THREE.Group();p.position.set(x,y,0);const m=new THREE.Mesh(BOX,mat(c));m.scale.set(w,h,w);m.position.y=-h/2;p.add(m);g.add(p);return p;};
+    const legC=look.bk==='shorts'?sk:bot;const legL=limb(-.07,.26,.09,.26,legC),legR=limb(.07,.26,.09,.26,legC);
+    if(look.bk==='shorts')B(g,.24,.1,.15,bot,0,.18,0);
+    if(look.bk==='skirt')B(g,.32,.16,.22,bot,0,.14,0);
+    const tw=f?.24:.27;B(g,tw,.28,.16,top,0,.26,0);
+    if(look.tk==='hoodie'){B(g,tw+.02,.06,.17,top,0,.5,0);B(g,.14,.05,.02,0xffffff,0,.36,.085);}
+    if(look.tk==='shirt')B(g,.06,.2,.01,0xffffff,0,.32,.083);
+    const armC=look.tk==='tee'?sk:top;const armL=limb(-(tw/2+.035),.52,.07,.24,armC),armR=limb(tw/2+.035,.52,.07,.24,armC);
+    B(g,.2,.2,.2,sk,0,.54,0);B(g,.03,.03,.01,0x222222,-.05,.64,.1);B(g,.03,.03,.01,0x222222,.05,.64,.1);
+    if(!(skin&&SKINS[skin]))switch(look.hair){
+      case 'short':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);break;
+      case 'buzz':B(g,.21,.03,.21,hc,0,.735,0);break;
+      case 'curly':B(g,.25,.09,.25,hc,0,.72,0);B(g,.06,.06,.06,hc,-.1,.79,.06);B(g,.06,.06,.06,hc,.09,.79,-.05);break;
+      case 'long':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.3,.06,hc,0,.45,-.1);B(g,.04,.22,.18,hc,-.11,.52,0);B(g,.04,.22,.18,hc,.11,.52,0);break;
+      case 'bob':B(g,.24,.07,.24,hc,0,.72,0);B(g,.24,.14,.05,hc,0,.6,-.1);B(g,.04,.14,.2,hc,-.12,.6,0);B(g,.04,.14,.2,hc,.12,.6,0);break;
+      case 'tail':B(g,.22,.06,.22,hc,0,.73,0);B(g,.07,.2,.07,hc,0,.52,-.14);break;
+      case 'buns':B(g,.22,.05,.22,hc,0,.73,0);B(g,.09,.09,.09,hc,-.09,.79,0);B(g,.09,.09,.09,hc,.09,.79,0);break;
+    }
+    drawHat(g,skin);
     const carry=B(g,.22,.2,.22,0xffffff,0,.84,0);carry.visible=false;g.userData={legL,legR,armL,armR,carry};return shadow(g);}
   function makeTruck(cab,cargo){const g=new THREE.Group();B(g,.42,.07,.8,0x444444,0,.1,0);B(g,.4,.3,.28,cab,0,.15,.25);B(g,.34,.1,.02,0x9fd3ff,0,.3,.391);
     B(g,.42,.16,.48,0x8b5a2b,0,.17,-.14);const cg=B(g,.3,.16,.32,cargo,0,.33,-.14);wheel(g,-.21,.25);wheel(g,.21,.25);wheel(g,-.21,-.25);wheel(g,.21,-.25);g.userData.cargo=cg;return shadow(g);}
@@ -378,17 +421,23 @@ export function createWorld(canvas,{mobile}){
   const units=[],vehicles=[],residents=[],ships=[];
   function setPlotState(id,st){
     const p=plots[id];if(!p||p.sp)return;
-    const changedOwner=p.owner!==st.owner||p.color!==st.color,changedB=p.building!==st.building;
-    if(changedOwner){if(p.fence){scene.remove(p.fence);p.fence=null;}
-      if(st.owner){if(p.sign){scene.remove(p.sign);p.sign=null;}p.fence=makeFence(p,st.color);scene.add(p.fence);}else if(!p.sign)p.sign=makeSign(p);}
-    if(changedB||changedOwner&&st.building){if(p.group){scene.remove(p.group);p.group=null;p.anim=null;}for(const c of p.crops)scene.remove(c.grp);p.crops=[];
-      if(st.building){const b=makeBuilding(st.building,new THREE.Color(st.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);scene.add(b.g);p.group=b.g;p.anim=b.a;blockFoot(p);
-        if(st.building==='farm')makeCrops(p,'wheat');if(st.building==='garden')makeCrops(p,'veg');}
-      else for(let y=p.y0+1;y<=p.y0+2;y++)for(let x=p.x0+1;x<=p.x0+2;x++)walk[I(x,y)]=1;}
+    const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0);
+    if(p.building&&!st.building)for(let y=p.y0+1;y<=p.y0+2;y++)for(let x=p.x0+1;x<=p.x0+2;x++)walk[I(x,y)]=1;
     Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0});
-    syncWorkers(p);
+    setSign(p,!p.owner);if(p.building)blockFoot(p);
+    if(changed&&p.mat){dematerialize(p);materialize(p);}else if(p.mat)syncWorkers(p);
   }
-  function syncWorkers(p){const want=p.building&&p.builtAt<=Date.now()?p.workers:0;
+  function materialize(p){if(p.mat||!p.owner)return;p.mat=true;
+    p.fence=makeFence(p,p.color);scene.add(p.fence);
+    if(p.building){const b=makeBuilding(p.building,new THREE.Color(p.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);scene.add(b.g);p.group=b.g;p.anim=b.a;
+      if(p.building==='farm')makeCrops(p,'wheat');if(p.building==='garden')makeCrops(p,'veg');}
+    syncWorkers(p);}
+  function dematerialize(p){if(!p.mat)return;p.mat=false;
+    if(p.fence){scene.remove(p.fence);p.fence=null;}if(p.group){scene.remove(p.group);p.group=null;p.anim=null;}
+    for(const c of p.crops)scene.remove(c.grp);p.crops=[];syncWorkers(p);}
+  function cullPlots(){const R=zoom*3+12;for(const p of landPlots){if(!p.owner){if(p.mat)dematerialize(p);continue;}
+    const want=Math.abs(p.x-camT.x)+Math.abs(p.y-camT.z)<R;if(want&&!p.mat)materialize(p);else if(!want&&p.mat)dematerialize(p);}}
+  function syncWorkers(p){const want=p.mat&&p.building&&p.builtAt<=Date.now()?p.workers:0;
     while(p.wk.length>want){const u=p.wk.pop();if(u.target&&u.target.reserved===u)u.target.reserved=null;if(u.crop)u.crop.res=null;scene.remove(u.mesh);units.splice(units.indexOf(u),1);if(u.boat){scene.remove(u.boat.mesh);ships.splice(ships.indexOf(u.boat),1);}}
     while(p.wk.length<want){const d=BLD[p.building];const u={owner:p.owner,plot:p,type:p.building,x:p.door.x,y:p.door.y,path:[],state:'idle',timer:Math.random()*2,carry:null,speed:2.6,
       ox:(Math.random()-.5)*.3,oy:(Math.random()-.5)*.3,face:0,mesh:makePerson(new THREE.Color(p.color).getHex(),d.hat)};scene.add(u.mesh);p.wk.push(u);units.push(u);}}
@@ -469,11 +518,11 @@ export function createWorld(canvas,{mobile}){
   // ================= АВАТАРЫ =================
   const avatars=new Map(); // uid -> {x,y,tx,ty,mesh,label,nick}
   let me=null;
-  function setMe(nick,color,x,y,skin){if(me){scene.remove(me.mesh);me.label.el.remove();wlabels.splice(wlabels.indexOf(me.label),1);}
-    me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,mesh:makePerson(new THREE.Color(color).getHex(),0xffd166,0x222222,skin)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
+  function setMe(nick,color,x,y,skin,look){if(me){scene.remove(me.mesh);me.label.el.remove();wlabels.splice(wlabels.indexOf(me.label),1);}
+    me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,mesh:makeAvatar(look,skin)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
   function goMe(x,y){if(me)me.path=pathTo(me,x,y);}
-  function setOther(uid,{x,y,nick,color,working,skin}){let a=avatars.get(uid);if(a&&a.skin!==skin){removeOther(uid);a=null;}
-    if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,mesh:makePerson(new THREE.Color(color).getHex(),0xffd166,0x222222,skin),skin,label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
+  function setOther(uid,{x,y,nick,color,working,skin,look}){let a=avatars.get(uid);const lk=JSON.stringify(look||null);if(a&&(a.skin!==skin||a.lk!==lk)){removeOther(uid);a=null;}
+    if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,mesh:makeAvatar(look,skin),skin,lk,label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
     a.tx=x;a.ty=y;a.working=working;}
   function removeOther(uid){const a=avatars.get(uid);if(!a)return;scene.remove(a.mesh);a.label.el.remove();wlabels.splice(wlabels.indexOf(a.label),1);avatars.delete(uid);}
 
@@ -537,13 +586,14 @@ export function createWorld(canvas,{mobile}){
     if(cs.every(Boolean)){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1;ctx.beginPath();cs.forEach((c,i)=>i?ctx.lineTo(c.x,c.z):ctx.moveTo(c.x,c.z));ctx.closePath();ctx.stroke();}}
 
   // ================= КАДР =================
-  let vanT=2,resT=1,cargoT=3,fishT=1;const _v=new THREE.Vector3();
+  let vanT=2,resT=1,cargoT=3,fishT=1,cullT=0;const _v=new THREE.Vector3();
   function project(p,el){_v.copy(p).project(cam);if(_v.z>1||Math.abs(_v.x)>1.05||Math.abs(_v.y)>1.05){el.style.display='none';return;}el.style.display='';el.style.left=(_v.x+1)/2*innerWidth+'px';el.style.top=(1-_v.y)/2*innerHeight+'px';}
   const near=(x,y,r=zoom*2.5)=>Math.abs(x-camT.x)+Math.abs(y-camT.z)<r;
   function frameUpdate(dt){
     time+=dt;
-    for(let i=0;i<trees.length;i++){const t=trees[i];if(!t.alive){t.grow+=dt/50;if(t.grow>=1){t.alive=true;t.grow=1;}t._d=true;}else if(t.shake&&!t.reserved){t.shake=0;t._d=true;}if(t._d){setTree(i);t._d=false;treesDirty=true;}}
-    if(treesDirty){trunkIM.instanceMatrix.needsUpdate=pineIM.instanceMatrix.needsUpdate=leafIM.instanceMatrix.needsUpdate=true;treesDirty=false;}
+    if((cullT-=dt)<=0){cullT=.5;cullPlots();}
+    for(let i=0;i<trees.length;i++){const t=trees[i];if(!t.alive){t.grow+=dt/50;if(t.grow>=1){t.alive=true;t.grow=1;}t._d=true;}else if(t.shake&&!t.reserved){t.shake=0;t._d=true;}if(t._d){setTree(i);t._d=false;}}
+    for(const c of chunks.values())if(c.dirty){c.trunk.instanceMatrix.needsUpdate=c.pine.instanceMatrix.needsUpdate=c.leaf.instanceMatrix.needsUpdate=true;c.dirty=false;}
     for(const p of plots){for(const c of p.crops)if(c.g<1&&near(p.x,p.y)){c.g=Math.min(1,c.g+dt/(p.sp?12:15));setCrop(c);}else if(p.sp&&c.g>=1&&Math.random()<dt*.05){c.g=0;setCrop(c);}
       if(p.group&&p.builtAt){const k=Math.min(1,1-(p.builtAt-Date.now())/20000);p.group.scale.y=Math.max(.02,k);if(k<1&&near(p.x,p.y)&&Math.random()<dt*6)puff(p.x0+rand(.5,2.5),.2,p.y0+rand(.5,2.5),0xc8b89a,1,.6,.5);
         if(k>=1&&p.wk.length!==p.workers)syncWorkers(p);}}

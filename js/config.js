@@ -14,6 +14,13 @@ export const GOODS={
   bricks:{n:'Кирпич',ic:'🧱',base:24,target:150,col:0xb5533c},
   smoked:{n:'Копчёная рыба',ic:'🍢',base:22,target:120,col:0xa0622d},
   furniture:{n:'Мебель',ic:'🪑',base:80,target:40,col:0x7a4a2a},
+  honey:{n:'Мёд',ic:'🍯',base:18,target:150,col:0xf0a500},
+  eggs:{n:'Яйца',ic:'🥚',base:6,target:300,col:0xfaf3e0},
+  apples:{n:'Яблоки',ic:'🍎',base:5,target:300,col:0xd63031},
+  wool:{n:'Шерсть',ic:'🧶',base:9,target:200,col:0xe8e2d4},
+  juice:{n:'Сок',ic:'🧃',base:14,target:150,col:0xf39c12},
+  cake:{n:'Торт',ic:'🎂',base:90,target:40,col:0xff8fab},
+  clothes:{n:'Одежда',ic:'👕',base:60,target:60,col:0x3d6ea6},
 };
 export const GK=Object.keys(GOODS);
 
@@ -30,11 +37,19 @@ export const BLD={
   quarry:{n:'Карьер',ic:'⛏️',w:'Каменотёс',reg:'vdp',kind:'gather',res:'rock',out:{stone:1},rate:5,wage:4,cost:160,mat:{},ord:0,hat:0xf2c14e,desc:'Камень из гор на севере.'},
   fishery:{n:'Рыбацкая будка',ic:'🎣',w:'Рыбак',reg:'vdo',kind:'gather',res:'water',out:{fish:1},rate:4,wage:3,cost:110,mat:{},ord:0,hat:0x2e86ab,desc:'Рыбалка на реке, озере или море.'},
   trawler:{n:'Рыболовное судно',ic:'🚢',w:'Матрос',reg:'o',kind:'gather',res:'boat',out:{fish:1},rate:12,wage:8,cost:900,mat:{planks:10},ord:0,hat:0x1b3a5c,desc:'Своё судно в порту: выходит в море за уловом.'},
+  apiary:{n:'Пасека',ic:'🐝',w:'Пасечник',reg:'vd',kind:'gather',out:{honey:1},rate:2,wage:3,cost:180,mat:{planks:3},ord:0,hat:0xf1c40f,desc:'Мёд — для кондитерских и магазинов.'},
+  henhouse:{n:'Птичник',ic:'🐔',w:'Птичница',reg:'vd',kind:'gather',out:{eggs:1},rate:6,wage:3,cost:140,mat:{planks:2},ord:0,hat:0xffffff,desc:'Яйца — для кондитерских.'},
+  orchard:{n:'Сад',ic:'🍎',w:'Садовник',reg:'vd',kind:'gather',out:{apples:1},rate:7,wage:3,cost:130,mat:{},ord:0,hat:0x6ab04c,desc:'Яблоки → соковый цех.'},
+  sheepfold:{n:'Овчарня',ic:'🐑',w:'Чабан',reg:'vd',kind:'gather',out:{wool:1},rate:3,wage:4,cost:200,mat:{planks:4},ord:0,hat:0x8b5a2b,desc:'Шерсть → швейный цех.'},
   mill:{n:'Мельница',ic:'🌀',w:'Мельник',reg:'vd',kind:'proc',in:{wheat:2},out:{flour:1},rate:4,wage:4,cost:250,mat:{stone:6},ord:1,hat:0xffffff,desc:'2 пшеницы → 1 мука.'},
   sawmill:{n:'Пилорама',ic:'🪚',w:'Пильщик',reg:'vdp',kind:'proc',in:{wood:2},out:{planks:1},rate:4,wage:4,cost:250,mat:{stone:6},ord:1,hat:0x6b4226,desc:'2 бревна → 1 доска.'},
   brickworks:{n:'Кирпичный завод',ic:'🧱',w:'Формовщик',reg:'p',kind:'proc',in:{stone:2},out:{bricks:1},rate:4,wage:5,cost:400,mat:{planks:6},ord:1,hat:0xf2c14e,desc:'2 камня → 1 кирпич.'},
   smokehouse:{n:'Коптильня',ic:'🔥',w:'Коптильщик',reg:'vdpo',kind:'proc',in:{fish:2},out:{smoked:1},rate:3,wage:4,cost:220,mat:{planks:4},ord:1,hat:0x444444,desc:'2 рыбы → 1 копчёная.'},
   dairy:{n:'Сыроварня',ic:'🧀',w:'Сыровар',reg:'vdp',kind:'proc',in:{milk:3},out:{cheese:1},rate:3,wage:5,cost:400,mat:{bricks:4},ord:1,hat:0xffffff,desc:'3 молока → 1 сыр.'},
+  juicery:{n:'Соковый цех',ic:'🧃',w:'Технолог',reg:'vdp',kind:'proc',in:{apples:3},out:{juice:2},rate:3,wage:4,cost:300,mat:{bricks:3},ord:1,hat:0xf39c12,desc:'3 яблока → 2 сока.'},
+  confectionery:{n:'Кондитерская',ic:'🎂',w:'Кондитер',reg:'cp',kind:'proc',in:{flour:1,eggs:2,honey:1},out:{cake:1},rate:2,wage:7,cost:600,mat:{bricks:6},ord:2,hat:0xffffff,desc:'Мука + 2 яйца + мёд → торт. Дорогой товар.'},
+  tailor:{n:'Швейный цех',ic:'🧵',w:'Швея',reg:'cp',kind:'proc',in:{wool:3},out:{clothes:1},rate:2,wage:6,cost:550,mat:{bricks:5},ord:2,hat:0x8e44ad,desc:'3 шерсти → 1 одежда.'},
+  store:{n:'Магазин',ic:'🏪',w:'Продавец',reg:'cvd',kind:'retail',in:{},rate:6,wage:5,cost:400,mat:{planks:4},ord:3,hat:0x2e86ab,desc:'Продаёт жителям твой товар со склада в розницу (×1.6 к базовой цене): торты, одежду, сыр, сок, хлеб, мёд…'},
   bakery:{n:'Пекарня',ic:'🥖',w:'Пекарь',reg:'cp',kind:'proc',in:{flour:1},out:{bread:2},rate:4,wage:5,cost:350,mat:{bricks:4},ord:2,hat:0xffffff,desc:'1 мука → 2 хлеба.'},
   workshop:{n:'Мебельный цех',ic:'🔨',w:'Столяр',reg:'cp',kind:'proc',in:{planks:3},out:{furniture:1},rate:2,wage:7,cost:500,mat:{planks:6,bricks:6},ord:2,hat:0x355070,desc:'3 доски → 1 мебель. Мебель нужна всем для квартир.'},
   pvz:{n:'ПВЗ',ic:'📦',w:'Сотрудник ПВЗ',reg:'c',kind:'service',in:{},pay:12,rate:6,wage:5,cost:650,mat:{bricks:5},ord:3,hat:0xff8c1a,desc:'Выдаёт посылки жителям: +12💰 за клиента.'},
@@ -93,9 +108,9 @@ export const FURN={
 export const lvlOf=xp=>Math.floor(Math.sqrt(Math.max(0,xp)/50))+1;
 export const xpFor=l=>50*(l-1)**2;
 export const NEED={land:2,gather:2,furn:2,hire:3,buyMarket:3,proc:4,apt:4,service:5,playerJob:5,vote:6,office:7,run:8};
-export const UNLOCKS={1:'Работа и продажа на базе',2:'Своя земля, ферма/огород/делянка, мебель в комнату',3:'Найм работников, закупки на базе',4:'Переработка (мельница, пилорама…), покупка квартир',
+export const UNLOCKS={1:'Работа и продажа на базе',2:'Своя земля, ферма/сад/пасека/делянка, мебель, биржа игроков',3:'Найм работников, закупки на базе, свой магазин',4:'Переработка (мельница, пилорама…), покупка квартир',
   5:'Точки в городе (ПВЗ, шаурма), работа у других игроков',6:'Голосование на выборах',7:'Офисы в бизнес-центрах',8:'Можно баллотироваться в мэры и начальники'};
-export const needFor=b=>b.reg==='B'?NEED.office:b.kind==='service'?NEED.service:b.kind==='proc'?NEED.proc:NEED.gather;
+export const needFor=b=>b.reg==='B'?NEED.office:b.kind==='service'?NEED.service:b.kind==='proc'?NEED.proc:b.kind==='retail'?3:NEED.gather;
 
 // ===== Ежедневная награда и скины (кристаллы 💎) =====
 export const DAILY=[5,5,10,10,15,20,40];
@@ -121,3 +136,31 @@ export const QUESTS={
   fire:{poi:'fire',n:'Посидеть у костра с туристами',act:'греется у костра',dur:15,gems:2,xp:30,cd:240,lvl:2},
   lighthouse:{poi:'lighthouse',n:'Помочь смотрителю маяка',act:'чинит фонарь',dur:15,money:60,xp:25,cd:180,lvl:3},
 };
+
+// ===== Внешность персонажа =====
+export const LOOK={
+  skin:['#f1c27d','#e0ac69','#c68642','#8d5524'],
+  hairM:[['short','Короткая'],['buzz','Ёжик'],['curly','Кудри'],['bald','Лысый']],
+  hairF:[['long','Длинные'],['bob','Каре'],['tail','Хвост'],['buns','Пучки']],
+  hairCol:['#2b1d14','#5a3a22','#a0522d','#e6c27a','#d9d9d9','#c0392b'],
+  top:['#3d6ea6','#c0392b','#2e7d32','#f1c40f','#8e44ad','#ecf0f1','#222222','#ff8c1a'],
+  topKind:[['tee','Футболка'],['hoodie','Худи'],['shirt','Рубашка']],
+  bottom:['#2c3e50','#34495e','#1e3a5f','#5d4037','#222222','#7f8c8d'],
+  bottomKindM:[['pants','Брюки'],['shorts','Шорты']],
+  bottomKindF:[['pants','Брюки'],['skirt','Юбка'],['shorts','Шорты']],
+};
+export const DEFAULT_LOOK={g:'m',skin:0,hair:'short',hc:'#2b1d14',top:'#3d6ea6',tk:'tee',bottom:'#2c3e50',bk:'pants'};
+
+// ===== Рабочая экипировка: бонусы к производству. Получить трудно: сложные задания или дорого =====
+export const GEAR={
+  gloves:{n:'Рабочие перчатки',ic:'🧤',slot:'hands',eff:'+10% ко всем твоим бизнесам',money:3000},
+  apron:{n:'Фартук мастера',ic:'🥼',slot:'body',eff:'+25% к переработке',gems:150},
+  vest:{n:'Жилет лесника',ic:'🦺',slot:'body',eff:'+20% к добыче (лес, камень, рыба…)',req:{quest:'forester',count:10}},
+  boots:{n:'Сапоги рыбака',ic:'🥾',slot:'feet',eff:'+30% к рыбалке',req:{quest:'pier',count:15}},
+  belt:{n:'Пояс фермера',ic:'🎗',slot:'acc',eff:'+25% к фермам, садам, пасекам',req:{quest:'harvest',count:10}},
+  jacket:{n:'Пиджак директора',ic:'🧥',slot:'body',eff:'+20% к услугам и магазинам',req:{shifts:200}},
+  watch:{n:'Золотые часы',ic:'⌚',slot:'acc',eff:'+50% к оплате смен',money:15000},
+  lighthouse_cap:{n:'Фуражка смотрителя',ic:'⚓',slot:'feet',eff:'+15% ко всем бизнесам',req:{quest:'lighthouse',count:20}},
+};
+export const SLOTS={hands:'Руки',body:'Тело',feet:'Ноги',acc:'Аксессуар'};
+export const OFFLINE_RATE=0.25;

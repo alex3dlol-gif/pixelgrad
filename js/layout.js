@@ -6,13 +6,25 @@ export function hash(x,y){let h=(Math.imul(x|0,374761393)+Math.imul(y|0,66826526
 
 // карта стала больше: вокруг города — бор, озёра, горы, побережье
 export const OX=35,OY=25;
-export const W=280,H=220,STEP=5,HY=65+OY;
+export const W=400,H=320,STEP=5,HY=65+OY;
 export const BLOCKS=[
   {reg:'c',name:'ГОРОД',x:60+OX,y:30+OY,cols:16,rows:14},
   {reg:'v',name:'Д. СОСНОВКА',x:18+OX,y:45+OY,cols:5,rows:6},
   {reg:'d',name:'СНТ «РОМАШКА»',x:14+OX,y:112+OY,cols:6,rows:3},
   {reg:'p',name:'ПРОМЗОНА',x:155+OX,y:40+OY,cols:4,rows:6},
   {reg:'o',name:'ПОРТ',x:120+OX,y:115+OY,cols:6,rows:3},
+  // загородные посёлки (добавлены под 1000 игроков; id старых участков не меняются)
+  {reg:'v',name:'Д. ЗАРЕЧЬЕ',x:52,y:12,cols:5,rows:6,link:HY},
+  {reg:'v',name:'Д. ЛЕСНОЕ',x:2,y:105,cols:7,rows:6,link:HY},
+  {reg:'d',name:'СНТ «ЮЖНОЕ»',x:5,y:200,cols:18,rows:5,link:HY},
+  {reg:'v',name:'С. КЛЮЧИ',x:20,y:245,cols:14,rows:6,link:225},
+  {reg:'d',name:'СНТ «ГРИБНОЕ»',x:5,y:282,cols:22,rows:6,link:275},
+  {reg:'v',name:'Д. СЕВЕРНОЕ',x:200,y:5,cols:10,rows:5,link:HY},
+  {reg:'d',name:'СНТ «ОЗЁРКИ»',x:320,y:10,cols:12,rows:8,link:HY},
+  {reg:'v',name:'С. ВОСТОЧНОЕ',x:262,y:55,cols:12,rows:6,link:HY},
+  {reg:'d',name:'СНТ «СОСНОВЫЙ БОР»',x:262,y:110,cols:12,rows:8,link:HY},
+  {reg:'v',name:'Д. ДАЛЬНЕЕ',x:310,y:170,cols:14,rows:10,link:150},
+  {reg:'v',name:'С. ЛУГОВОЕ',x:330,y:240,cols:12,rows:12,link:220},
 ];
 export const RING={x0:57+OX,y0:27+OY,x1:143+OX,y1:103+OY};
 const SPECIAL={'c,9,7':'cityhall','c,0,7':'market','c,5,8':'pvzCity','v,4,5':'kolkhoz','v,0,0':'lesxoz','p,0,0':'zbi','p,1,1':'furnFactory','p,2,5':'sortCenter','o,0,0':'port'};
@@ -32,23 +44,24 @@ export function zoneOf(i,j){
 }
 const ZONE_MIX={
   cbd:[['park',.35],['parking',.1]],
-  novo:[['novostroy',.28],['yard',.24],['park',.16],['shop',.07],['parking',.05]],
-  sleep:[['panel16',.13],['panel9',.17],['yard',.24],['park',.13],['shop',.07],['parking',.06]],
-  old:[['khrush',.26],['park',.2],['yard',.12],['shop',.09]],
-  trade:[['shop',.14],['parking',.1],['park',.12]],
-  mid:[['park',.32],['parking',.08],['shop',.06]],
+  novo:[['novostroy',.28],['yard',.24],['park',.16],['parking',.05]],
+  sleep:[['panel16',.13],['panel9',.17],['yard',.24],['park',.13],['shop',.03],['parking',.06]],
+  old:[['khrush',.26],['park',.2],['yard',.12],['shop',.04]],
+  trade:[['shop',.07],['parking',.1],['park',.12]],
+  mid:[['park',.32],['parking',.08]],
 };
 
 // озёра и природа (используются миром)
-export const LAKES=[{x:22,y:58,rx:11,ry:7,name:'БЕЛОЕ ОЗЕРО'},{x:69,y:167,rx:21,ry:7,name:'ОЗЕРО'},{x:240,y:42,rx:14,ry:8,name:'ЛЕБЕДИНОЕ ОЗЕРО'}];
+export const LAKES=[{x:22,y:58,rx:11,ry:7,name:'БЕЛОЕ ОЗЕРО'},{x:69,y:167,rx:21,ry:7,name:'ОЗЕРО'},{x:240,y:42,rx:14,ry:8,name:'ЛЕБЕДИНОЕ ОЗЕРО'},
+  {x:385,y:150,rx:10,ry:14,name:'ТИХОЕ ОЗЕРО'},{x:115,y:225,rx:9,ry:6,name:'КРУГЛОЕ ОЗЕРО'}];
 
 // места для локальных заданий
 export const POIS={
   mush:{n:'Грибная поляна',ic:'🍄',x:20,y:96},
   pier:{n:'Мостки на Белом озере',ic:'🎣',x:34,y:58},
   forester:{n:'Дом лесника',ic:'🪓',x:12,y:78},
-  camp:{n:'Лагерь «Солнышко»',ic:'🏕',x:24,y:196},
-  spring:{n:'Родник',ic:'⛲',x:62,y:40},
+  camp:{n:'Лагерь «Солнышко»',ic:'🏕',x:110,y:205},
+  spring:{n:'Родник',ic:'⛲',x:40,y:30},
   lighthouse:{n:'Маяк',ic:'🗼',x:226,y:157},
   lookout:{n:'Смотровая вышка',ic:'🔭',x:135,y:6},
   fire:{n:'Костёр у Лебединого',ic:'🔥',x:224,y:42},
@@ -67,8 +80,8 @@ export function buildLayout(){
       if(!sp){let a=0,k=null;for(const[t,w]of ZONE_MIX[zone]){a+=w;if(h<a){k=t;break;}}
         if(k&&RES[k]){rt=k;sp='res';}else sp=k;}
       price=Math.max(400,Math.round((1150-d*85)/10)*10);
-    }else if(reg==='v')price=i===0?150:170;
-    else if(reg==='d')price=110+(j===2?20:0);
+    }else if(reg==='v')price=b.link?140:(i===0?150:170);
+    else if(reg==='d')price=b.link?100:110+(j===2?20:0);
     else if(reg==='p')price=380;
     else price=450;
     plots.push({id:plots.length,reg,i,j,x0,y0,x:x0+1.5,y:y0+1.5,sp,rt,price,demand:0,zone,name:sp==='shop'?SHOP_NAMES[Math.floor(hash(i,j+99)*SHOP_NAMES.length)]:null});
