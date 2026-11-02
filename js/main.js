@@ -9,22 +9,16 @@ const $=id=>document.getElementById(id);
 const fmt=n=>Math.floor(n).toLocaleString('ru-RU');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mobile=matchMedia('(pointer:coarse)').matches||innerWidth<820;
-// встроенный браузер Instagram/TikTok/Facebook: уводим в обычный браузер (там не теряется вход и всё быстрее)
-// iPhone (iOS 17+): ссылка x-safari-https:// открывает Safari; Android: intent:// открывает Chrome. Не сработало — инструкция со стрелкой к меню.
-{const ua=navigator.userAgent,inApp=/Instagram|FBAN|FBAV|musical_ly|BytedanceWebview|TikTok/i.test(ua),android=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua);
+// встроенный браузер Instagram/TikTok/Facebook: сразу просим открыть игру в стороннем браузере (там не теряется вход и всё быстрее)
+{const ua=navigator.userAgent,inApp=/Instagram|FBAN|FBAV|musical_ly|BytedanceWebview|TikTok/i.test(ua),android=/Android/i.test(ua);
   if(inApp&&!sessionStorage.getItem('pg_inapp')){
-    const url=location.host+location.pathname+location.search;
-    const go=android?`intent://${url}#Intent;scheme=https;package=com.android.chrome;end`:ios?`x-safari-https://${url}`:null;
     const d=document.createElement('div');d.id='inapp';
-    d.innerHTML=`<div class="ia-arrow" style="display:none">⬈</div><div class="ia-box"><b style="font-size:20px">Пиксельград</b>
-      ${go?`<a class="btn gold ia-go" href="${go}" style="font-size:20px;padding:12px">▶ Играть</a>`:''}
-      <div class="ia-help" style="${go?'display:none':''}"><div class="ia-step">Нажми <span class="ia-dots">${android?'⋮':'⋯'}</span> вверху справа → <b>«Открыть в стороннем браузере»</b></div></div>
-      <span class="ia-stay">остаться здесь</span></div>`;
-    document.body.appendChild(d);
-    const help=()=>{d.querySelector('.ia-help').style.display='';d.querySelector('.ia-arrow').style.display='';};
-    if(!go)help();
-    const btn=d.querySelector('.ia-go');if(btn)btn.addEventListener('click',()=>{setTimeout(()=>{if(!document.hidden)help();},1500);});
-    d.querySelector('.ia-stay').onclick=()=>{sessionStorage.setItem('pg_inapp','1');d.remove();};}}
+    d.innerHTML=`<div class="ia-arrow"></div><div class="ia-box"><div class="ia-logo">ПИКСЕЛЬГРАД</div>
+      <div class="ia-t">Открой игру в браузере</div>
+      <div class="ia-row"><span class="ia-n">1</span><span>Нажми <span class="ia-dots">${android?'⋮':'•••'}</span> вверху справа</span></div>
+      <div class="ia-row"><span class="ia-n">2</span><span>Выбери <b>«Открыть в стороннем браузере»</b></span></div>
+      <div class="ia-stay">остаться здесь</div></div>`;
+    document.body.appendChild(d);d.querySelector('.ia-stay').onclick=()=>{sessionStorage.setItem('pg_inapp','1');d.remove();};}}
 const world=createWorld($('c'),{mobile});
 const room=createRoom(world.renderer);
 const plots=world.plots;
