@@ -64,6 +64,12 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
 .sw{display:inline-block;width:32px;height:32px;border:3px solid #0e0b14;margin:3px;cursor:pointer}.sw.on{outline:3px solid #fff}
 #roomui{position:fixed;left:6px;top:66px;z-index:5;display:none;flex-direction:column;align-items:flex-start;gap:6px;max-width:300px}
 #hand{display:none}
+#clubhud{display:none;background:linear-gradient(135deg,rgba(46,34,70,.82),rgba(20,15,30,.72));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,209,102,.45);border-radius:14px;padding:8px 12px;color:#fff;min-width:230px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+body.inclub #clubhud{display:block}body.inclub #roomtitlebox{display:none}body.inclub #sheet{display:none!important}
+.ch-top{display:flex;gap:8px;align-items:center;font-size:15px}.ch-top b{flex:1}#chppl{font-size:13px;opacity:.85}
+.ch-en{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:13px}.ch-bar{flex:1;height:8px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden}
+.ch-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd166,#ff9f1c);border-radius:6px;box-shadow:0 0 8px #ffd166;transition:width .6s}
+.ch-x3{background:#ffd166;color:#1a1622;border-radius:8px;padding:1px 6px;font-weight:bold;font-size:12px;animation:chp 1.6s infinite}@keyframes chp{50%{transform:scale(1.15)}}
 #chat{position:fixed;left:6px;bottom:6px;z-index:5;display:none;width:min(420px,calc(100vw - 420px))}
 #chat input{margin:0}
 #cchat{position:fixed;left:280px;bottom:8px;width:360px;z-index:6;display:none;font-size:13px}
@@ -148,7 +154,7 @@ window.addEventListener('unhandledrejection',e=>{const b=document.getElementById
 <div class="box" id="coach"><div class="face" data-act="coachmin">👷</div><div style="flex:1"><div class="who" id="cwho"></div><div class="txt" id="ctxt"></div><div id="cbtn" style="margin-top:6px"></div></div></div>
 <div class="box" id="toast"></div>
 <div class="box" id="tip"></div>
-<div id="roomui"><div class="box"><b id="roomTitle"></b></div><span class="btn red" data-act="leave">← В город</span><span class="btn blue" data-act="redit" id="reditbtn">🛠 Ремонт</span><span id="hand"><span class="btn blue" data-act="rot">↻ Повернуть</span><span class="btn" data-act="drop">✖ В запас</span></span></div>
+<div id="roomui"><div class="box" id="roomtitlebox"><b id="roomTitle"></b></div><div id="clubhud"><div class="ch-top"><span id="chic">🎭</span><b id="chn"></b><span id="chppl"></span></div><div class="ch-en"><span>⚡</span><div class="ch-bar"><i id="chbar"></i></div><b id="chval"></b><span class="ch-x3">×3</span></div></div><span class="btn red" data-act="leave">← В город</span><span class="btn blue" data-act="redit" id="reditbtn">🛠 Ремонт</span><span id="hand"><span class="btn blue" data-act="rot">↻ Повернуть</span><span class="btn" data-act="drop">✖ В запас</span></span></div>
 <div id="cchat"><div id="cchead"><span>💬 Чат города</span><span id="ccx">✕</span></div><div id="cclist"></div><div id="ccrow"><input id="ccin" maxlength="140" placeholder="Сообщение…" autocomplete="off"><span class="btn sm gold" id="ccsend">➤</span></div></div>
 <div id="chat"><input id="chatin" maxlength="120" placeholder="Сообщение…"></div>
 <div id="auth"><div class="box" id="authbox"></div></div>

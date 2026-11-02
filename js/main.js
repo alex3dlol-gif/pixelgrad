@@ -19,7 +19,7 @@ const props=new Map(),profiles=new Map(),goods=new Map(),events=[],unitsByPlot=n
 let city=null;const qlog=new Map();let quest=null;const listings=new Map(),auctions=new Map();let mkSec='base',aucDraft=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
 const LV=()=>me?lvlOf(me.xp||0):1;
 const EMAX=()=>Math.min(ENERGY.cap,ENERGY.base+ENERGY.perLvl*(LV()-1));
-const EN=()=>me?Math.min(EMAX(),Number(me.energy??EMAX())+(Date.now()-Date.parse(me.energy_at||Date.now()))/60000/ENERGY.regenMin):0;
+const EN=()=>me?Math.min(EMAX(),Number(me.energy??EMAX())+(Date.now()-Date.parse(me.energy_at||Date.now()))/60000/ENERGY.regenMin*(roomCtx&&roomCtx.club?3:1)):0;
 const CAP=()=>100+50*myProps().filter(p=>p.building).length;const lock=n=>`<span class="mut">🔒 откроется на ${n} уровне</span>`;
 const DECOR={park:'🌳 Сквер — тут гуляют жители',yard:'🛝 Двор с детской площадкой',parking:'🚗 Парковка'};
 const inv=(p,g)=>Number(p?.inv?.[g]||0);
@@ -177,6 +177,7 @@ function jobInfo(p){if(!p)return null;if(p.kind==='npc'){const e=EMP[p.sp];let p
 
 // ================= КВАРТИРА =================
 let roomCh=null,roomCtx=null,saveT=null,clubT=null;
+setInterval(()=>{if(roomCtx&&roomCtx.club)dirty=true;},2000);
 // Клубы: ДК в деревнях и кинотеатр в городе. Мебель общая, двигать нельзя; пока ты внутри — ⚡ копится втрое быстрее
 const CLUBS={
   dk:{n:'Дом культуры',ic:'🎭',size:[9,7],tier:'club',layout:[
@@ -218,14 +219,14 @@ async function enterRoom({unit,hostUid,hostNick,editable,club}){
   tab='furn';}
   mode='room';document.body.classList.add('inroom');$('roomui').style.display='flex';$('chat').style.display='block';
   $('reditbtn').style.display=editable?'':'none';$('chatin').placeholder=club?'Сообщение…':'Сообщение…';
-  sheetOpen=!mobile||!!club;dirty=true;
+  sheetOpen=!club&&!mobile;document.body.classList.toggle('inclub',!!club);dirty=true;
   roomCh=sb.channel('room:'+unit,{config:{presence:{key:me.id}}});
   roomCh.on('presence',{event:'sync'},()=>{const st=roomCh.presenceState();room.setPeople(Object.entries(st).map(([uid,a])=>({uid,...a[a.length-1]})));dirty=true;})
     .on('broadcast',{event:'chat'},({payload})=>room.say(payload.uid,clean(payload.text)))
     .on('broadcast',{event:'move'},({payload})=>room.moveOther(payload.uid,payload))
     .subscribe(s2=>{if(s2==='SUBSCRIBED')roomCh.track({nick:me.nick,color:me.color,look:me.look||null,skin:me.skin||null});});
 }
-function leaveRoom(){if(clubT){clearInterval(clubT);clubT=null;act('club_leave',{},true);}room.close();if(roomCh){roomCh.unsubscribe();roomCh=null;}mode='city';roomCtx=null;document.body.classList.remove('inroom');
+function leaveRoom(){document.body.classList.remove('inclub');if(clubT){clearInterval(clubT);clubT=null;act('club_leave',{},true);}room.close();if(roomCh){roomCh.unsubscribe();roomCh=null;}mode='city';roomCtx=null;document.body.classList.remove('inroom');
   $('roomui').style.display='none';$('chat').style.display='none';tab='home';dirty=true;}
 function onInvite(inv){if(!inv.unit)return;toast(`🔔 <b>${esc(inv.from_nick)}</b> зовёт в гости! <span class="btn gold" data-visit="${inv.unit}" data-host="${inv.from_uid}" data-hn="${esc(inv.from_nick)}">Пойти</span>`,12000);}
 $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;const t=e.target.value.trim().slice(0,120);if(!t)return;
@@ -545,6 +546,8 @@ function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10
   <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 восполняют энергию и ускоряют стройку.</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
 let lastBody='',lastTabs='';
 function renderUI(){
+  if(roomCtx&&roomCtx.club&&room.state){const C=roomCtx.club,e=EN(),mx=EMAX();$('chic').textContent=C.ic;$('chn').textContent=C.n;$('chppl').textContent='👥 '+Math.max(1,room.state.people.size);
+    $('chbar').style.width=(e/mx*100).toFixed(1)+'%';$('chval').textContent=`${Math.floor(e)}/${mx}`;}
   document.body.classList.toggle('chaton',!!me&&!ob&&mode==='city');
   if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1),fr=Math.max(0,Math.min(1,((me.xp||0)-x0)/(x1-x0)));
     $('hlvl').textContent=l;$('hxp').setAttribute('stroke-dasharray',`${(fr*100.5).toFixed(1)} 101`);
