@@ -1,6 +1,6 @@
 // Съёмочный режим для рекламных роликов: ?offline&film=1|2|3
 // Камера, персонажи и подписи идут по сценарию; время задаёт рендер-скрипт (window.__step), поэтому кадры ровные.
-import {hash} from './layout.js';
+import {hash,LAKES} from './layout.js';
 export function run({world,room,CLUBS,setMode,$}){
   const N=+new URLSearchParams(location.search).get('film')||1;
   document.body.classList.add('film');
@@ -86,6 +86,53 @@ export function run({world,room,CLUBS,setMode,$}){
     2:[SH.hook(12,'С НУЛЯ<br>ДО <b>МАГНАТА</b>'),SH.pvz(),SH.farm(),SH.hire(),SH.truck(),SH.biz(),SH.upgrade(),SH.market(),SH.end()],
     3:[SH.hook(19,'ОНЛАЙН-ГОРОД<br>ИЗ <b>ПИКСЕЛЕЙ</b>'),SH.walk(),SH.bus(),SH.dk(),SH.apt(),SH.friends(),SH.crows(),SH.night(),SH.end()],
   };
+  // ===== Режим под озвучку: window.FILM_PLAN=[[сек, 'кадр'], ...], подписи и звук накладывает batch/pg_post.py =====
+  const KSU=look({g:'f',hair:'tail',hc:'#8b5a2b',tk:'jacket',top:'#ff8fab',bk:'jeans',bottom:'#3d5a80',acc:'bag'});
+  const LEX=look({hair:'buzz',hc:'#1a1410',beard:'stubble',tk:'track',top:'#1e3a5f',top2:'#ffffff',bk:'track',bottom:'#1e3a5f',build:'strong'});
+  const IGN=['ksu.sha','lexa_47','dimon.pro','marisha','sanya_vrn','kotik228','olya.mua','bro_tima','vika_m','zhenya','max.fit','nastya_k','artyom.ok','liza','gosha_99','den4ik'];
+  // несколько ракурсов внутри кадра: жёсткая смена каждые 1.6 с, внутри — медленный наезд
+  const multi=(L,iv=1.6)=>el=>{const k=Math.floor(el/iv),q=L[k%L.length],lt=(el%iv)/iv;world.setCam(q[0]+(q[4]||0)*lt,q[1]+(q[5]||0)*lt,q[2]*(1-.1*lt),q[3]+.06*lt);return k;};
+  let wand=[],wandT=0;
+  function people(cx,cy,n,sp=3){clearCrowd();wand=[];for(let k=0;k<n;k++){const id='w'+k,x=cx+(hash(k,1)-.5)*sp*2,y=cy+(hash(k,2)-.5)*sp*2;
+      world.setOther(id,{x,y,nick:IGN[k%IGN.length],color:['#ff8fab','#7bd389','#9fd3ff','#ffd166','#c3b1e1','#ff7f11'][k%6],look:LOOKS[k%LOOKS.length]});others.push(id);wand.push({id,cx,cy,sp,k});}}
+  function wander(el){if(el<wandT)return;wandT=el+.9;for(const w of wand){if(hash(w.k,Math.floor(el*3))<.5)continue;const a=world.avatars.get(w.id);if(!a)continue;
+      a.tx=w.cx+(hash(w.k,Math.floor(el*7)+3)-.5)*w.sp*2;a.ty=w.cy+(hash(w.k+9,Math.floor(el*7))-.5)*w.sp*2;}}
+  const park=P[103],lake=LAKES[1];
+  const PL={
+    hook:{hour:19,on(){toCity();people(park.x,park.y+2,14,3.5);},step:el=>{wander(el);const e=ease(Math.min(1,el/2.6));world.setCam(lerp(park.x-30,park.x,e),lerp(park.y-26,park.y+2,e),lerp(42,9,e),lerp(Q-1.2,Q+.2,e));}},
+    crowd:{hour:19,on(){toCity();people(park.x,park.y+2,14,3.5);},step:el=>{wander(el);multi([[park.x,park.y+2,6,Q-.3],[park.x+1,park.y+3,4.2,Q+.4],[park.x-1,park.y+1,7,Q+.9]])(el);}},
+    ksu:{hour:10,on(){toCity();clearCrowd();world.setMe('Ксюша','#ff8fab',pvz.x0+1,pvz.y0+6,null,KSU);world.goMe(pvz.x0+1,pvz.y0+3);},step:multi([[pvz.x0+1,pvz.y0+5,3.4,Q],[pvz.x0+1.5,pvz.y0+4.5,4.6,Q+.6]])},
+    pvz:{hour:11,on(){toCity();world.setMe('Ксюша','#ff8fab',pvz.x0+1,pvz.y0+3,null,KSU);const m=world.me;m.working=true;m.face=Math.PI;},
+      step:el=>{multi([[pvz.x0+1.2,pvz.y0+3,3.2,Q+.2],[pvz.x+.5,pvz.y+1.5,5,Q-.4]])(el);if(Math.floor(el*1.6)!==Math.floor((el-1/60)*1.6))world.float('+8💰',pvz.x0+1,1.5,pvz.y0+3,'#c8ffb0');}},
+    save:{hour:15,on(){toCity();world.setMe('Ксюша','#ff8fab',pvz.x0+1,pvz.y0+3,null,KSU);world.me.working=true;},
+      step:el=>{world.setCam(pvz.x0+1,pvz.y0+3,lerp(3.6,2.6,Math.min(1,el/1.6)),Q+.3);if(Math.floor(el*5)!==Math.floor((el-1/60)*5))world.float('+'+(8+Math.floor(el*5)*8)+'💰',pvz.x0+1,1.4+el*.2,pvz.y0+3,'#ffd166');}},
+    plot:{hour:9,on(){toCity();world.setPlotState(farm.id,{owner:null});world.setMe('Ксюша','#ff8fab',farm.x0+1,farm.y0+4,null,KSU);},
+      step:el=>{multi([[farm.x+1,farm.y+2,5,Q-.2]])(el);if(el>.55&&!PL.plot.done){PL.plot.done=1;world.setPlotState(farm.id,{owner:'film',nick:'Ксюша',color:'#ff8fab',building:null,workers:0,builtAt:0,level:1});world.float('🌱 Участок твой!',farm.x,2,farm.y,'#ffd166');}}},
+    farm:{hour:9,on(){toCity();world.setPlotState(farm.id,{owner:'film',nick:'Ксюша',color:'#ff8fab',building:'farm',workers:1,builtAt:0,level:3});world.setMe('Ксюша','#ff8fab',farm.x0+1,farm.y0+4,null,KSU);},
+      step:el=>{const k=multi([[farm.x+4,farm.y+5,7,Q-.6],[farm.x+1,farm.y+1,4.4,Q+.3]],1.1)(el);if(el>.9&&!PL.farm.w){PL.farm.w=1;world.setPlotState(farm.id,{owner:'film',nick:'Ксюша',color:'#ff8fab',building:'farm',workers:3,builtAt:0,level:3});}}},
+    truck:{hour:10,on(){toCity();world.setPlotState(farm.id,{owner:'film',nick:'Ксюша',color:'#ff8fab',building:'farm',workers:3,builtAt:0,level:3});world.spawnTruck(farm.id,'wheat','#ff8fab');for(let k=0;k<25;k++)world.frameUpdate(.04);},
+      step:el=>{const v=world.vehicles[world.vehicles.length-1];if(v)world.setCam(v.x,v.y,lerp(4.2,5.6,Math.min(1,el/2)),Q+el*.2);}},
+    lexa:{hour:19,on(){toCity();world.setMe('Лёха','#7bd389',alko.x0+1,alko.y0+6,null,LEX);world.goMe(alko.x0+1,alko.y0+3);},step:multi([[alko.x0+1,alko.y0+5,3.4,Q+.1],[alko.x+.5,alko.y+2,6,Q-.5]])},
+    alko:{hour:20,on(){toCity();world.setMe('Лёха','#7bd389',alko.x0+1,alko.y0+3,null,LEX);world.me.working=true;world.me.face=Math.PI;},step:multi([[alko.x0+1.2,alko.y0+3,3,Q-.3],[alko.x+.6,alko.y+1.6,5,Q+.5]])},
+    fight:{hour:21,on(){toCity();},step:multi([[alko.x0+3.1,alko.y0+3.4,2.5,Q-.2],[alko.x0+3,alko.y0+3.2,3.6,Q+.6]],1.2)},
+    tower:{hour:21,on(){toCity();clearCrowd();},step:el=>{const e=ease(Math.min(1,el/2.3));world.setCam(tower.x,tower.y+lerp(3,0,e),lerp(5,16,e),lerp(Q-.6,Q+.4,e));}},
+    city:{hour:17,on(){toCity();},step:el=>{world.setCam(lerp(100,125,el/1.2),lerp(70,90,el/1.2),18,Q-.5+el*.2);}},
+    bus:{hour:17,on(){toCity();world.setMe('Ты','#ffd166',S[stopC].x,S[stopC].y,null,ME);world.busRide(stopC,S.findIndex(s=>s.name==='Деловой квартал'),()=>{});for(let k=0;k<6;k++)world.frameUpdate(.05);},step:()=>{}},
+    lights:{hour:18,on(){toCity();},step:el=>{const c=world.STOPS[stopC];world.setCam(c.x+2.5,c.y+2.5,lerp(5.5,4.5,el),Q+.3);}},
+    cinema:{on(){inRoom({...CLUBS.cinema,title:''},ppl(4));},step:()=>{}},
+    crows:{hour:8,on(){toCity();},step:el=>{world.setCam(bc.x0+1.5,bc.y0+1.2,lerp(2.6,2.2,el),Q+.2);}},
+    market:{hour:15,on(){toCity();people(market.x+1,market.y+3.5,9,2.5);for(let k=0;k<3;k++)world.spawnTruck(farm.id,['milk','wheat','eggs'][k],'#7bd389');},step:el=>{wander(el);multi([[market.x+1,market.y+3,5.5,Q+.3],[market.x+3,market.y+5,8,Q-.4]])(el);}},
+    lake:{hour:17,on(){toCity();clearCrowd();},step:el=>{const e=ease(Math.min(1,el/3.4));world.setCam(lerp(lake.x-16,lake.x+6,e),lerp(lake.y-10,lake.y-4,e),lerp(16,11,e),lerp(Q-.8,Q+.4,e));}},
+    end:{hour:21,on(){toCity();people(park.x,park.y+2,12,3.5);},step:el=>{wander(el);world.setCam(park.x,park.y+2,lerp(12,8,Math.min(1,el/5)),Q+el*.05);}},
+  };
+  if(window.FILM_PLAN){const plan=window.FILM_PLAN;window.FILM_LEN=window.FILM_END;head.style.display=cap.style.display=hook.style.display=end.style.display='none';
+    let t0=null,cur=-1;
+    function tickP(){requestAnimationFrame(tickP);if(!window.FILM_GO)return;const now=performance.now()/1000;if(t0==null)t0=now;const t=now-t0;
+      if(t>=window.FILM_END){window.FILM_DONE=true;return;}
+      let i=0;while(i+1<plan.length&&plan[i+1][0]<=t)i++;const sh=PL[plan[i][1]],el=t-plan[i][0];
+      if(i!==cur){cur=i;sh.done=sh.w=0;if(sh.hour!=null)world.setHour(sh.hour);sh.on&&sh.on();}
+      sh.step&&sh.step(el);flash.style.opacity=Math.max(0,.3-el/.1*.3);}
+    setTimeout(()=>{window.FILM_READY=true;},0);requestAnimationFrame(tickP);return;}
   const shots=SCRIPTS[N]||SCRIPTS[1];let t0=null,cur=-1;
   window.FILM_LEN=shots.reduce((a,s)=>a+s.d,0);
   function tick(){requestAnimationFrame(tick);if(!window.FILM_GO)return;const now=performance.now()/1000;if(t0==null)t0=now;let t=now-t0,acc=0,i=0;

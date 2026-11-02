@@ -54,8 +54,8 @@ export function createWorld(canvas,{mobile}){
   carve(POIS.mush.x,POIS.mush.y,53,POIS.mush.y);carve(POIS.forester.x,POIS.forester.y,53,POIS.forester.y);carve(POIS.pier.x+1,POIS.pier.y,53,POIS.pier.y);carve(53,POIS.pier.y,53,70);
   carve(POIS.camp.x,POIS.camp.y,63,POIS.camp.y);carve(63,POIS.camp.y,63,152);carve(POIS.spring.x,POIS.spring.y,POIS.spring.x,70);
   carve(POIS.lighthouse.x,POIS.lighthouse.y,200,POIS.lighthouse.y);carve(200,POIS.lighthouse.y,200,140);carve(POIS.fire.x,POIS.fire.y,POIS.fire.x,HY);
-  {const I_=ISLAND;for(const k of['spawn','pvz','alko','lavka'])clearRect(I_[k].x-2,I_[k].y-2,I_[k].x+2,I_[k].y+2);clearRect(I_.plot.x0-1,I_.plot.y0-1,I_.plot.x0+4,I_.plot.y0+4);
-    carve(I_.spawn.x,I_.spawn.y+2,I_.lavka.x,I_.spawn.y+2);carve(I_.pvz.x,I_.pvz.y+2,I_.alko.x,I_.pvz.y+2);carve(I_.pier.x,I_.pier.y,I_.pier.x,I_.spawn.y+2);
+  {const I_=ISLAND;for(const k of['spawn','pvz','alko','lavka','mill'])clearRect(I_[k].x-2,I_[k].y-2,I_[k].x+2,I_[k].y+2);clearRect(I_.plot.x0-1,I_.plot.y0-1,I_.plot.x0+4,I_.plot.y0+4);
+    carve(I_.spawn.x,I_.spawn.y+2,I_.lavka.x,I_.spawn.y+2);carve(I_.pvz.x,I_.pvz.y+2,I_.mill.x,I_.pvz.y+2);clearRect(I_.board.x-1,I_.board.y-1,I_.board.x+1,I_.board.y+1);carve(I_.pier.x,I_.pier.y,I_.pier.x,I_.spawn.y+2);
     for(let y=I_.pier.y-7;y<=I_.pier.y;y++)for(let x=I_.pier.x;x<=I_.pier.x+1;x++)grid[I(x,y)]=grid[I(x,y)]===T.SEA||grid[I(x,y)]===T.SAND?T.BRIDGE:grid[I(x,y)];}
   for(const b of BLOCKS)if(b.link){const cx=b.x+STEP*Math.floor(b.cols/2);if(b.link<b.y)carve(cx,b.y,cx,b.link);else carve(cx,b.y+b.rows*STEP,cx,b.link);}
   for(let x=RING.x0;x<=RING.x1;x++){grid[I(x,RING.y0)]=T.RING;grid[I(x,RING.y1)]=T.RING;}
@@ -385,8 +385,11 @@ export function createWorld(canvas,{mobile}){
     for(const s of STOPS){const g=new THREE.Group();B(g,.06,.9,.06,0x555555,-.45,0,.3);B(g,.06,.9,.06,0x555555,.45,0,.3);B(g,1.1,.05,.6,0x2e86ab,0,.9,.1);B(g,1,.6,.04,0x9fd3ff,0,.25,-.18,true);
       B(g,.8,.06,.25,0x8b5a2b,0,.25,0);B(g,.04,1.2,.04,0x333333,.7,0,.35);B(g,.3,.3,.04,0xf1c40f,.7,1.1,.35,true);B(g,.14,.14,.041,0x2c3e50,.7,1.18,.36,true);
       g.position.set(s.x+.5,0,s.y-.5);statics.add(g);}}
-  {const I_=ISLAND;for(const[k,type]of[['spawn','guesthouse'],['pvz','pvzCity'],['alko','alko'],['lavka','lavka']]){const b=makeBuilding(type,0);b.g.position.set(I_[k].x,0,I_[k].y);statics.add(b.g);
+  {const I_=ISLAND;for(const[k,type]of[['spawn','guesthouse'],['pvz','pvzCity'],['alko','alko'],['lavka','lavka'],['mill','mill']]){const b=makeBuilding(type,0);b.g.position.set(I_[k].x,0,I_[k].y);statics.add(b.g);
       for(let y=I_[k].y-1;y<=I_[k].y;y++)for(let x=I_[k].x-1;x<=I_[k].x;x++)walk[I(x,y)]=0;}
+    {const bg=new THREE.Group();B(bg,.08,1,.08,0x6b4a2f,-.5,0,0);B(bg,.08,1,.08,0x6b4a2f,.5,0,0);B(bg,1.2,.7,.06,0x8b5a2b,0,.6,0);
+      for(const[x,y,c]of[[-.3,.75,0xffffff],[.05,.85,0xffe9a8],[.32,.7,0xffffff],[-.1,.65,0xff8fab]])B(bg,.22,.26,.02,c,x,y,.04);B(bg,.9,.1,.02,0xc0392b,0,1.15,.04,true);
+      bg.position.set(I_.board.x,0,I_.board.y);bg.rotation.y=-Math.PI/4;statics.add(bg);walk[I(I_.board.x,I_.board.y)]=0;walk[I(I_.board.x+1,I_.board.y)]=0;}
     const pg=new THREE.Group();for(let k=0;k<4;k++){B(pg,.08,.5,.08,0x6b4a2f,I_.pier.x-.4,-.3,I_.pier.y-2-k*1.6);B(pg,.08,.5,.08,0x6b4a2f,I_.pier.x+1.4,-.3,I_.pier.y-2-k*1.6);}statics.add(pg);
     for(let k=0;k<8;k++){const x=I_.x0+6+Math.floor(hash(k,3)*(I_.x1-I_.x0-12)),y=I_.y0+5+Math.floor(hash(k,5)*(I_.y1-I_.y0-10));if(grid[I(x,y)]===T.GRASS&&walk[I(x,y)]){const g=new THREE.Group();decoTree(g,0,0,1);bush(g,.6,.4);g.position.set(x,0,y);statics.add(g);}}}
   // утки и лебеди на озёрах
@@ -755,7 +758,7 @@ export function createWorld(canvas,{mobile}){
   function float(text,x,y,z,color='#ffd166'){const el=document.createElement('div');el.className='float';el.textContent=text;el.style.color=color;floatsEl.appendChild(el);floats.push({el,p:new THREE.Vector3(x,y,z),t:0});}
   for(const b of BLOCKS)wlabel(b.name,b.x+b.cols*STEP/2,0,b.y-3,'big');
   wlabel('ОСТРОВ «УЧЕБНЫЙ»',(ISLAND.x0+ISLAND.x1)/2,0,ISLAND.y1+3,'big');wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');
-  for(const[k,n]of[['pvz','ПВЗ «Коробас»'],['alko','Алкомаркет «Градус»'],['lavka','Лавка скупщика'],['spawn','Гостевой домик'],['pier','Пристань']]){wlabel(n,ISLAND[k].x,2.2,ISLAND[k].y,'emp','#ffe9a8');}
+  for(const[k,n]of[['pvz','ПВЗ «Коробас»'],['alko','Алкомаркет «Градус»'],['lavka','Лавка скупщика'],['spawn','Гостевой домик'],['pier','Пристань'],['mill','Мельница'],['board','Доска аукционов']]){wlabel(n,ISLAND[k].x,2.2,ISLAND[k].y,'emp','#ffe9a8');}
   wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}

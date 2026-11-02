@@ -709,55 +709,103 @@ let camStart=null;
 const TUT=[];
 // ================= ОБУЧЕНИЕ: остров «Учебный» (всё понарошку, только у клиента) =================
 let ob=null;const IS=world.ISLAND,OB_SHIFT=4;
-const OBH={pvz:{x:IS.pvz.x,y:IS.pvz.y},alko:{x:IS.alko.x,y:IS.alko.y},lavka:{x:IS.lavka.x,y:IS.lavka.y},pier:{x:IS.pier.x+.5,y:IS.pier.y},boat:{x:world.FERRY.x,y:world.FERRY.y},plot:{x:IS.plot.x0+1.5,y:IS.plot.y0+1.5}};
+const OBH={pvz:{x:IS.pvz.x,y:IS.pvz.y},alko:{x:IS.alko.x,y:IS.alko.y},lavka:{x:IS.lavka.x,y:IS.lavka.y},pier:{x:IS.pier.x+.5,y:IS.pier.y},boat:{x:world.FERRY.x,y:world.FERRY.y},
+  plot:{x:IS.plot.x0+1.5,y:IS.plot.y0+1.5},house:{x:IS.spawn.x,y:IS.spawn.y},mill:{x:IS.mill.x,y:IS.mill.y},board:{x:IS.board.x,y:IS.board.y}};
+// где встать у каждой точки (персонаж сам идёт туда, а по приходу открывается нужная карточка)
+const OBSTAND={pvz:[IS.pvz.x,IS.pvz.y+1],alko:[IS.alko.x,IS.alko.y+1],lavka:[IS.lavka.x,IS.lavka.y+1],house:[IS.spawn.x,IS.spawn.y+1],mill:[IS.mill.x,IS.mill.y+2],
+  plot:[IS.plot.x0+1,IS.plot.y0+4],board:[IS.pier.x,IS.board.y],pier:[IS.pier.x,IS.pier.y+1]};
 const OB=[
-  {t:'Добро пожаловать на остров «Учебный»! Я Петрович. Тут всё понарошку: научу работать, строить и торговать, а потом паром отвезёт тебя в Пиксельград.',btn:'Начнём'},
+  {t:'Добро пожаловать на остров «Учебный»! Я Петрович. Тут всё понарошку: научу работать, отдыхать, строить, перерабатывать и торговать — а потом паром отвезёт тебя в Пиксельград.',btn:'Начнём'},
   {t:mobile?'Проведи пальцем по экрану, чтобы двигать карту. Двумя пальцами — приблизить или отдалить.':'Потяни карту мышкой. Колесо — приблизить или отдалить.',enter(){camStart={x:world.camT.x,z:world.camT.z};},done:()=>Math.hypot(world.camT.x-camStart.x,world.camT.z-camStart.z)>5},
-  {t:'Первая работа — <b>ПВЗ «Коробас»</b> (стрелка). Нажми на здание и «Работать». Каждая смена — деньги и минус ⚡ энергии.',arrow:'pvz',done:()=>ob.shifts.pvz>=3},
-  {t:'В <b>Алкомаркете «Градус»</b> платят больше. Отработай там 2 смены.',arrow:'alko',done:()=>ob.shifts.alko>=2},
-  {t:'Энергия ⚡ сверху тратится на смены и сама восстанавливается. Теперь купи <b>учебный участок</b> за 40💰 (он за деревянным забором) — своя земля, свой бизнес.',arrow:'plot',done:()=>ob.plot},
-  {t:'Построй на участке <b>ферму</b> (20💰). Стройка займёт пару секунд (в настоящем мире — минуты).',arrow:'plot',done:()=>ob.farm},
+  {t:'Первая работа — <b>ПВЗ «Коробас»</b>. Я довёл тебя до двери: жми «Работать». Каждая смена — деньги и минус ⚡ энергии.',go:'pvz',done:()=>ob.shifts.pvz>=3},
+  {t:'В <b>«Градусе»</b> платят больше. Отработай там 2 смены.',go:'alko',done:()=>ob.shifts.alko>=2},
+  {t:'Энергия ⚡ почти кончилась. Быстрее всего она копится в <b>Доме культуры</b> и <b>кинотеатре</b> — втрое быстрее. Тут на острове их заменяет <b>Гостевой домик</b>: зайди и отдохни.',go:'house',done:()=>ob.rested},
+  {t:'Отдохнул(а)! Ещё ⚡: <b>ежедневная награда</b> заряжает полностью, а 💎 кристаллы — мгновенно. Теперь купи <b>учебный участок</b> за 40💰.',go:'plot',done:()=>ob.plot},
+  {t:'Построй на участке <b>ферму</b> (20💰). Стройка займёт пару секунд (в настоящем мире — минуты).',go:'plot',done:()=>ob.farm},
   {t:'Работник сам собирает урожай. Загляни на склад — нажми на подсвеченную кнопку <b>📦</b>.',hl:'inv',done:()=>tab==='inv'&&sheetOpen&&(ob.inv.wheat||0)>=3},
-  {t:'Отнеси урожай в <b>Лавку скупщика</b> и продай. Совет: в большом мире сырьё дешёвое, а переработка (мука, хлеб) приносит в разы больше.',arrow:'lavka',done:()=>ob.sold},
-  {t:'Ты готов(а)! Паром у <b>пристани</b> отвезёт тебя в Пиксельград. Начни с работы в ПВЗ или «Градусе» в своей деревне. Удачи!',arrow:'pier'},
+  {t:'Сырьё дешёвое. Отнеси пшеницу на <b>Мельницу</b>: из 3🌾 выйдет 1 мешок муки — а он стоит почти в 5 раз дороже. Это <b>переработка</b>.',go:'mill',done:()=>ob.milled},
+  {t:'Продай муку в <b>Лавке скупщика</b> и сравни цену с сырьём.',go:'lavka',done:()=>ob.sold},
+  {t:'Лучшие участки, квартиры и бизнесы в городе продаются на <b>аукционе</b>. Попробуй на <b>доске аукционов</b>: сделай ставку, а если перебьют — ставь ещё.',go:'board',done:()=>ob.aucWon},
+  {t:'Ты готов(а)! Паром у <b>пристани</b> отвезёт тебя в Пиксельград. Начни с работы в ПВЗ или «Градусе» в своей деревне. Удачи!',go:'pier'},
 ];
-function startOnboarding(){ob={i:-1,money:0,en:20,inv:{},shifts:{pvz:0,alko:0},job:null,shiftT:0,plot:false,farm:false,farmT:0,sold:false,sel:null};
+const OBS={pvz:2,alko:3,rest:4,plot:5,farm:6,mill:8,sell:9,auc:10};const OBNEED={pvz:3,alko:2};
+const FLOUR=14,WHEAT=3;
+function startOnboarding(){ob={i:-1,money:0,en:12,inv:{},shifts:{pvz:0,alko:0},job:null,shiftT:0,plot:false,farm:false,farmT:0,sold:false,sel:null,walkTo:null};
   world.tutReset();world.setFog(true);world.setMe(me.nick,me.color,IS.spawn.x,IS.spawn.y+2,me.skin,me.look);world.jump(IS.spawn.x,IS.spawn.y+2);tab='ob';sheetOpen=false;obGo(0);}
-function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter();document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));if(st.hl)$(st.hl).classList.add('hl');$('coach').style.display='flex';$('coach').classList.remove('mini');coachMin=false;
+// новый шаг: закрыть все окна, подсветить что нужно и самим довести персонажа до места
+function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter();
+  ob.sel=null;sheetOpen=false;tab='ob';ob.walkTo=null;
+  document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));if(st.hl)$(st.hl).classList.add('hl');
+  $('coach').style.display='flex';$('coach').classList.remove('mini');coachMin=false;
   $('cwho').textContent=`ОСТРОВ «УЧЕБНЫЙ» · ${i+1}/${OB.length}`;$('ctxt').innerHTML=st.t;$('cbtn').innerHTML=st.btn?`<span class="btn gold" data-ob="next">${st.btn}</span>`:'<span class="mut">▶ выполни — и продолжим</span>';
-  if(st.arrow){const h=OBH[st.arrow];world.flyTo(h.x,h.y,mobile?11:13);}dirty=true;}
-function obUpdate(dt){if(!ob)return;const st=OB[ob.i];world.arrow=st&&st.arrow?OBH[st.arrow]:null;if(st&&st.done&&st.done())obGo(ob.i+1);
-  if(ob.toPier&&ob.i>=OB.length-1&&world.me&&!world.me.path.length){ob.toPier=false;ob.sel='pier';tab='ob';sheetOpen=true;dirty=true;}
-  const m=world.me;if(ob.job&&m){const h=OBH[ob.job],tx=Math.round(h.x),ty=Math.round(h.y)+1;if(m.goal!==ob.job){m.goal=ob.job;world.goMe(tx,ty);ob.shiftT=0;}
+  if(st.go){const h=OBH[st.go],sd=OBSTAND[st.go],m=world.me;world.flyTo(h.x,h.y,mobile?10:12);ob.walkTo=st.go;if(m){m.goal=null;world.goMe(sd[0],sd[1]);}}
+  dirty=true;}
+function obOpen(k){ob.sel=k;tab='ob';sheetOpen=true;dirty=true;}
+function obUpdate(dt){if(!ob)return;const st=OB[ob.i];world.arrow=st&&st.go&&!sheetOpen?OBH[st.go]:null;if(st&&st.done&&st.done()){obGo(ob.i+1);return;}
+  const m=world.me;
+  // дошёл до места — сразу открываем нужную карточку
+  if(ob.walkTo&&m&&!m.path.length&&!ob.job){const sd=OBSTAND[ob.walkTo];if(Math.hypot(m.x-sd[0],m.y-sd[1])<1.6){const k=ob.walkTo;ob.walkTo=null;obOpen(k);}}
+  if(ob.job&&m){const h=OBH[ob.job],tx=Math.round(h.x),ty=Math.round(h.y)+1;if(m.goal!==ob.job){m.goal=ob.job;world.goMe(tx,ty);ob.shiftT=0;}
     const at=!m.path.length&&Math.hypot(m.x-tx,m.y-ty)<1.3;m.working=at;
     if(at){ob.shiftT+=dt;if(ob.shiftT>=OB_SHIFT){ob.shiftT=0;const pay=ob.job==='pvz'?10:15;ob.money+=pay;ob.en=Math.max(1,ob.en-1);ob.shifts[ob.job]++;world.float(`+${pay}💰  −1⚡`,m.x,1.6,m.y);dirty=true;
-      if((ob.job==='pvz'&&ob.shifts.pvz>=3)||(ob.job==='alko'&&ob.shifts.alko>=2)){ob.job=null;m.goal=null;m.working=false;toast('✅ Смена окончена — хватит на сегодня!');}}}
+      if((ob.job==='pvz'&&ob.shifts.pvz>=3)||(ob.job==='alko'&&ob.shifts.alko>=2)){ob.job=null;m.goal=null;m.working=false;toast('✅ Смена окончена!');}}}
     const b=$('obbar');if(b)b.style.width=Math.min(100,ob.shiftT/OB_SHIFT*100)+'%';}
-  if(ob.farm&&Date.now()>ob.farmReady){ob.farmT+=dt;if(ob.farmT>=2.5){ob.farmT=0;if((ob.inv.wheat||0)<12){ob.inv.wheat=(ob.inv.wheat||0)+1;dirty=true;}}}}
+  if(ob.farm&&Date.now()>ob.farmReady){ob.farmT+=dt;if(ob.farmT>=2.5){ob.farmT=0;if((ob.inv.wheat||0)<12){ob.inv.wheat=(ob.inv.wheat||0)+1;dirty=true;}}}
+  // отдых в гостевом домике: энергия бежит втрое быстрее, полная — выходим сами
+  if(ob.resting){ob.restT=(ob.restT||0)+dt;if(ob.restT>=.3){ob.restT=0;ob.en=Math.min(20,ob.en+1);dirty=true;}if(ob.en>=20)obRestOut();}
+  // мельница мелет
+  if(ob.grind!=null){ob.grind+=dt;const b=$('obgr');if(b)b.style.width=Math.min(100,ob.grind/3*100)+'%';
+    if(ob.grind>=3){const q=Math.floor((ob.inv.wheat||0)/3);ob.inv.wheat-=q*3;ob.inv.flour=(ob.inv.flour||0)+q;ob.grind=null;ob.milled=true;toast(`🌾→🥖 Готово: ${q} мешк. муки`);}}
+  // учебный аукцион: Петрович один раз перебивает ставку
+  const A=ob.auc;if(A&&!A.done){const now=Date.now();
+    if(A.lead==='me'&&!A.botDone&&now>A.myAt+1500){A.botDone=true;A.bid+=5;A.lead='bot';A.end=Math.max(A.end,now+6000);toast('🔨 Петрович перебил твою ставку! Ставь ещё');}
+    if(now>=A.end){if(A.lead==='me'){A.done=true;ob.aucWon=true;ob.money-=A.bid;toast(`🎉 Лот твой за ${A.bid}💰! Так же в городе продаются участки, квартиры и бизнесы`,6000);}else{A.end=now+10000;A.bid=10;A.lead='bot';A.botDone=false;}}
+    if(ob.sel==='board')dirty=true;}}
+function obRestIn(){ob.resting=true;setMode('room');room.open({...CLUBS.dk,title:'Гостевой домик',editable:false,owned:{},elsewhere:{},makeAvatar:world.makeAvatar,meId:me.id,onSave:()=>{},onMove:()=>{}});
+  room.setPeople([{uid:me.id,nick:me.nick,color:me.color,look:me.look,skin:me.skin}]);document.body.classList.add('inroom');sheetOpen=true;dirty=true;}
+function obRestOut(){ob.resting=false;ob.rested=true;room.close();setMode('city');document.body.classList.remove('inroom');toast('⚡ Энергия полная!');dirty=true;}
+function setMode(v){mode=v;}
 function obHotspot(g){if(!g)return null;let best=null,bd=3.2;for(const[k,h]of Object.entries(OBH)){const d=Math.hypot(g.x-h.x,g.z-h.y);if(d<bd){bd=d;best=k;}}return best==='boat'?'pier':best;}
-const OBS={pvz:2,alko:3,plot:4,farm:5,sell:7};const OBNEED={pvz:3,alko:2};
 function obCan(k){if(k==='pvz'||k==='alko')return ob.i===OBS[k]&&ob.shifts[k]<OBNEED[k];return true;}
 function obTopUp(cost,what){if(ob.money<cost){toast(`👷 Петрович подкинул ${cost-ob.money}💰 на ${what}`);ob.money=cost;}}
+const obWait='<div class="mut" style="margin-top:6px">⏳ Сначала выполни задание Петровича сверху.</div>';
 function obHTML(){const k=ob.sel,mny=n=>`<b>${n}💰</b>`;
   if(k==='pvz'||k==='alko'){const n=k==='pvz'?'ПВЗ «Коробас»':'Алкомаркет «Градус»',pay=k==='pvz'?10:15;
-    return`<h3>${k==='pvz'?'📦':'🍾'} ${n}</h3><div>Работа: ${k==='pvz'?'выдача посылок':'грузчик-кассир'} · ${mny(pay)} за смену · ⚡1</div>`+
+    return`<h3>${k==='pvz'?'📦':'🍾'} ${n}</h3><div>${mny(pay)} за смену · ⚡1</div>`+
       (ob.job===k?`<div style="margin-top:6px">✅ Ты работаешь здесь (${ob.shifts[k]}/${OBNEED[k]} смен)<div class="bar"><i id="obbar" style="width:0"></i></div></div>`:
        obCan(k)?`<span class="btn gold" data-ob="job" data-k="${k}">Работать</span>`:
-       `<div class="mut" style="margin-top:6px">${ob.shifts[k]>=OBNEED[k]?'✅ Тут ты уже поработал(а) — следуй подсказке Петровича.':'⏳ Сначала выполни текущее задание Петровича.'}</div>`);}
-  if(k==='plot'){if(!ob.plot)return`<h3>🌱 Учебный участок</h3><div>Своя земля — свой бизнес. Цена ${mny(40)}, у тебя ${mny(ob.money)}.</div>`+(ob.i>=OBS.plot?`<span class="btn gold" data-ob="buy">Купить участок</span>`:'<div class="mut">⏳ Сначала заработай — следуй подсказке Петровича.</div>');
-    if(!ob.farm)return`<h3>🌱 Твой участок</h3><div>Построй ферму: пшеница растёт сама, работник собирает урожай. Цена ${mny(20)}.</div><span class="btn gold" data-ob="build">Построить ферму</span>`;
-    return`<h3>🌾 Ферма</h3><div>Работник собирает урожай → склад (кнопка 📦). Пшеницы: <b>${Math.floor(ob.inv.wheat||0)}</b></div>`;}
-  if(k==='lavka')return`<h3>🧺 Лавка скупщика</h3><div>Пшеница по ${mny(3)} за штуку. У тебя: ${Math.floor(ob.inv.wheat||0)}🌾</div>`+(ob.i>=OBS.sell?`<span class="btn gold ${(ob.inv.wheat||0)>=1?'':'dis'}" data-ob="sell">Продать всё</span>`:'<div class="mut">⏳ Сначала вырасти урожай — следуй подсказке Петровича.</div>')+`<div class="mut">В большом мире есть оптовая база, биржа игроков и свои магазины.</div>`;
+       `<div class="mut" style="margin-top:6px">${ob.shifts[k]>=OBNEED[k]?'✅ Тут ты уже поработал(а).':'⏳ Сначала выполни задание Петровича сверху.'}</div>`);}
+  if(k==='house'){if(ob.resting)return`<h3>🏠 Гостевой домик</h3><div>⚡ Энергия копится <b>×3</b></div><div style="font-size:24px;margin:6px 0">⚡ ${ob.en}/20</div><div class="bar"><i style="width:${ob.en/20*100}%"></i></div>`;
+    return`<h3>🏠 Гостевой домик</h3><div>Внутри энергия копится втрое быстрее — как в Доме культуры и кинотеатре в городе.</div>`+(ob.i===OBS.rest?`<span class="btn gold" data-ob="rest">Зайти отдохнуть</span>`:obWait);}
+  if(k==='plot'){if(!ob.plot)return`<h3>🌱 Учебный участок</h3><div>Цена ${mny(40)}, у тебя ${mny(ob.money)}.</div>`+(ob.i>=OBS.plot?`<span class="btn gold" data-ob="buy">Купить участок</span>`:obWait);
+    if(!ob.farm)return`<h3>🌱 Твой участок</h3><div>Пшеница растёт сама, работник собирает урожай. Цена ${mny(20)}.</div><span class="btn gold" data-ob="build">Построить ферму</span>`;
+    return`<h3>🌾 Ферма</h3><div>Пшеницы на складе: <b>${Math.floor(ob.inv.wheat||0)}</b></div>`;}
+  if(k==='mill'){const w=Math.floor(ob.inv.wheat||0),q=Math.floor(w/3);
+    if(ob.grind!=null)return`<h3>🏭 Мельница</h3><div>Мелем ${q*3}🌾 → ${q} мешк. муки…</div><div class="bar"><i id="obgr" style="width:0"></i></div>`;
+    if(ob.i!==OBS.mill)return`<h3>🏭 Мельница</h3>${ob.milled?'<div>✅ Мука готова.</div>':obWait}`;
+    return`<h3>🏭 Мельница</h3><div>3🌾 → 1 мешок муки. Пшеница ${mny(WHEAT)}/шт, мука ${mny(FLOUR)}/шт.</div><div>У тебя ${w}🌾 → выйдет <b>${q}</b> мешк.: ${q*3}🌾 стоили бы ${mny(q*3*WHEAT)}, а мука — ${mny(q*FLOUR)}</div>`+
+      (q>0?`<span class="btn gold" data-ob="grind">Смолоть</span>`:`<div class="mut">Урожай ещё растёт: ${w}/3🌾</div>`);}
+  if(k==='lavka'){const w=Math.floor(ob.inv.wheat||0),f=Math.floor(ob.inv.flour||0);
+    return`<h3>🧺 Лавка скупщика</h3><div>🌾 пшеница ${mny(WHEAT)} · 🥖 мука ${mny(FLOUR)}</div><div>У тебя: ${f} муки, ${w} пшеницы → <b>${f*FLOUR+w*WHEAT}💰</b></div>`+
+      (ob.i===OBS.sell?`<span class="btn gold ${f+w>0?'':'dis'}" data-ob="sell">Продать всё</span>`:ob.sold?'<div>✅ Продано.</div>':obWait);}
+  if(k==='board'){if(ob.i!==OBS.auc)return`<h3>🔨 Доска аукционов</h3>${ob.aucWon?'<div>✅ Лот выигран.</div>':obWait}`;
+    const A=ob.auc||(ob.auc={bid:10,lead:'bot',end:Date.now()+15000,botDone:false,myAt:0}),left=Math.max(0,Math.ceil((A.end-Date.now())/1000)),nb=A.bid+5;
+    return`<h3>🔨 Аукцион</h3><div>Лот: <b>🎣 Удочка рыбака</b></div><div>Ставка: ${mny(A.bid)} · лидирует: <b>${A.lead==='me'?'ты ✅':'Петрович'}</b></div><div>⏱ До конца: <b>${left} с</b> (новая ставка продлевает торги)</div>`+
+      (A.lead==='me'?'<div class="mut" style="margin-top:6px">Ты лидируешь — жди конца торгов.</div>':`<span class="btn gold" data-ob="bid">Поставить ${nb}💰</span>`)+
+      `<div class="mut" style="margin-top:6px">В городе: «Рынок → Аукцион». Если тебя перебили — деньги возвращаются.</div>`;}
   if(k==='pier')return`<h3>⛴ Пристань</h3>`+(ob.i>=OB.length-1?`<div>Паром в Пиксельград готов. Учебные деньги останутся тут, а в городе тебя ждут 150💰 и работа в деревне.</div><span class="btn gold" data-ob="sail">Отплыть в Пиксельград →</span>`:'<div>Паром ждёт, пока ты закончишь обучение.</div>');
-  return`<h3>🏝 Остров «Учебный»</h3><div>Нажимай на здания — следуй подсказкам Петровича сверху.</div>`;}
-function obInvHTML(){const q=Math.floor(ob.inv.wheat||0);return`<h3>📦 Склад</h3><div class="row">🌾 Пшеница — ${q}/100<div class="bar"><i style="width:${q}%"></i></div></div>`;}
+  return`<h3>🏝 Остров «Учебный»</h3><div>Следуй подсказкам Петровича сверху.</div>`;}
+function obInvHTML(){const q=Math.floor(ob.inv.wheat||0),f=Math.floor(ob.inv.flour||0);return`<h3>📦 Склад</h3><div class="row">🌾 Пшеница — ${q}<div class="bar"><i style="width:${Math.min(100,q/12*100)}%"></i></div></div>`+(f?`<div class="row">🥖 Мука — ${f}</div>`:'');}
 async function obAction(a,t){
   if(a==='next')obGo(ob.i+1);
-  if(a==='job'&&obCan(t.dataset.k)){if(ob.en<1){ob.en=20;toast('👷 Петрович угостил чаем — ⚡ восстановлена');}ob.job=t.dataset.k;if(mobile)sheetOpen=false;}
-  if(a==='quit'){ob.job=null;if(world.me)world.me.goal=null;}
-  if(a==='buy'&&!ob.plot&&ob.i>=OBS.plot){obTopUp(40,'участок');ob.money-=40;ob.plot=true;world.tutPlotState({owner:'me',color:me.color,nick:me.nick});toast('🌱 Участок твой!');}
-  if(a==='build'&&ob.plot&&!ob.farm){obTopUp(20,'ферму');ob.money-=20;ob.farm=true;ob.farmReady=Date.now()+5000;ob.job=null;world.tutPlotState({owner:'me',color:me.color,nick:me.nick,building:'farm',workers:1,builtAt:Date.now()+5000});toast('🏗 Стройка пошла!');}
-  if(a==='sell'&&ob.i>=OBS.sell&&(ob.inv.wheat||0)>=1){const q=Math.floor(ob.inv.wheat||0);ob.money+=q*3;ob.inv.wheat=0;ob.sold=true;toast(`🧺 Продано ${q}🌾 за ${q*3}💰`);ob.sel=null;sheetOpen=false;ob.toPier=true;const h=OBH.pier;world.goMe(Math.round(h.x),Math.round(h.y)+1);}
+  if(a==='job'&&obCan(t.dataset.k)){if(ob.en<1){ob.en=20;toast('👷 Петрович угостил чаем — ⚡ восстановлена');}ob.job=t.dataset.k;ob.sel=null;sheetOpen=false;}
+  if(a==='rest'&&ob.i===OBS.rest&&!ob.resting){obRestIn();}
+  if(a==='buy'&&!ob.plot&&ob.i===OBS.plot){obTopUp(40,'участок');ob.money-=40;ob.plot=true;world.tutPlotState({owner:'me',color:me.color,nick:me.nick});toast('🌱 Участок твой!');}
+  if(a==='build'&&ob.plot&&!ob.farm&&ob.i===OBS.farm){obTopUp(20,'ферму');ob.money-=20;ob.farm=true;ob.farmReady=Date.now()+5000;ob.job=null;world.tutPlotState({owner:'me',color:me.color,nick:me.nick,building:'farm',workers:1,builtAt:Date.now()+5000});toast('🏗 Стройка пошла!');}
+  if(a==='grind'&&ob.i===OBS.mill&&ob.grind==null&&(ob.inv.wheat||0)>=3){ob.grind=0;}
+  if(a==='sell'&&ob.i===OBS.sell){const w=Math.floor(ob.inv.wheat||0),f=Math.floor(ob.inv.flour||0),sum=f*FLOUR+w*WHEAT;if(sum>0){ob.money+=sum;ob.inv.wheat=0;ob.inv.flour=0;ob.sold=true;
+    toast(`🧺 +${sum}💰 · ${f} муки дали ${f*FLOUR}💰, а то же зерно сырьём — ${f*3*WHEAT}💰`,6000);}}
+  if(a==='bid'&&ob.i===OBS.auc&&ob.auc&&ob.auc.lead!=='me'){const A=ob.auc,nb=A.bid+5;obTopUp(nb,'ставку');A.bid=nb;A.lead='me';A.myAt=Date.now();A.end=Math.max(A.end,Date.now()+5000);}
   if(a==='sail'){ob.job=null;sheetOpen=false;$('coach').style.display='none';world.arrow=null;const sp=villageSpawn();
     toast('⛴ Паром отчаливает в Пиксельград…',6000);
     world.ferry({x:171.5,y:170},async()=>{const r=await act('finish_onboarding',{p_x:sp.x,p_y:sp.y});if(!r)return;ob=null;world.tutReset();
@@ -779,6 +827,8 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
   if((uiT-=dt)<=0||dirty){uiT=.5;renderUI();}}
 requestAnimationFrame(loop);
 renderUI();
+// отладка обучения без сервера: ?offline&obtest
+if(!sb&&new URLSearchParams(location.search).has('obtest')){me={id:'t',nick:'Тест',color:'#ffd166',look:null,skin:null,xp:0,money:0,gems:0,energy:60,energy_at:new Date().toISOString(),shifts:0,inv:{},furn:{}};startOnboarding();setTimeout(()=>{$('auth').style.display='none';},0);}
 if(new URLSearchParams(location.search).has('film'))import('./film.js').then(f=>f.run({world,room,CLUBS,setMode:v=>{mode=v;},$}));
 if(new URLSearchParams(location.search).has('fog'))setTimeout(()=>{world.setFog(true);world.jump(215,245);},60);
 {const c=new URLSearchParams(location.search).get('cam');if(c){const[x,y]=c.split(',').map(Number);setTimeout(()=>world.jump(x,y),50);}}

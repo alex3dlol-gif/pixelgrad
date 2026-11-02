@@ -106,5 +106,5 @@ export function buildLayout(){
 export const isEmployer=sp=>!!(sp&&EMP[sp]);
 
 // учебный остров в морском заливе — отдельный мир для новичков (только у клиента)
-export const ISLAND={x0:193,y0:229,x1:237,y1:261,
+export const ISLAND={x0:193,y0:229,x1:237,y1:261,mill:{x:226,y:238},board:{x:217,y:233},
   spawn:{x:203,y:246},pvz:{x:212,y:238},alko:{x:220,y:238},plot:{x0:208,y0:249},lavka:{x:228,y:249},pier:{x:215,y:230}};
