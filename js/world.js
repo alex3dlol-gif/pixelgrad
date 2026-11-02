@@ -736,7 +736,14 @@ export function createWorld(canvas,{mobile}){
   let me=null;
   function setMe(nick,color,x,y,skin,look){if(me){scene.remove(me.mesh);me.label.el.remove();wlabels.splice(wlabels.indexOf(me.label),1);}
     me={x,y,path:[],speed:3,ox:0,oy:0,face:0,carry:null,working:false,idle:true,mesh:makeAvatar(look,skin)};scene.add(me.mesh);me.label=wlabel(nick,0,1.2,0,'me');}
-  function goMe(x,y){if(me)me.path=pathTo(me,x,y);}
+  // далеко идти — персонаж сам дойдёт до остановки и поедет на автобусе, если так быстрее
+  let busPlan=null,worldApi=null;
+  function goMe(x,y){if(!me||me.riding)return;if(busPlan&&busPlan.tx===x&&busPlan.ty===y)return;busPlan=null;
+    const direct=pathTo(me,x,y);me.path=direct;if(direct.length<45||!STOPS.length)return;
+    const ns=(px,py)=>{let b=-1,bd=1e9;STOPS.forEach((st,i)=>{const d=Math.abs(st.x-px)+Math.abs(st.y-py);if(d<bd){bd=d;b=i;}});return b;};
+    const a=ns(me.x,me.y),b=ns(x,y);if(a<0||b<0||a===b)return;const A=STOPS[a],Bs=STOPS[b];
+    const pa=(Math.round(me.x)===A.x&&Math.round(me.y)===A.y)?[]:pathTo(me,A.x,A.y),pb=pathTo({x:Bs.x,y:Bs.y},x,y);
+    if((pa.length||Math.round(me.x)===A.x)&&(pb.length||(Bs.x===x&&Bs.y===y))&&pa.length+pb.length+24<direct.length*.75){me.path=pa;busPlan={a,b,tx:x,ty:y};}}
   function setOther(uid,{x,y,nick,color,working,skin,look}){let a=avatars.get(uid);const lk=JSON.stringify(look||null);if(a&&(a.skin!==skin||a.lk!==lk)){removeOther(uid);a=null;}
     if(!a){a={x,y,tx:x,ty:y,path:[],ox:0,oy:0,face:0,carry:null,idle:true,mesh:makeAvatar(look,skin),skin,lk,label:wlabel(nick,0,1.2,0,'other',color)};scene.add(a.mesh);avatars.set(uid,a);}
     a.tx=x;a.ty=y;a.working=working;}
@@ -900,7 +907,9 @@ export function createWorld(canvas,{mobile}){
     if((resT-=dt)<=0){resT=rand(.3,.7);if(residents.length<(mobile?35:60)*(dayState.night>.5?.3:1))spawnResident();}
     if((cargoT-=dt)<=0){cargoT=rand(35,60);if(ships.filter(s=>s.kind==='cargo').length<3)spawnCargo();}
     if((fishT-=dt)<=0){fishT=rand(6,12);if(ships.filter(s=>s.kind==='fishing').length<6)spawnFishing();}
-    if(me){if(stepMove(me,dt)){}animPerson(me,time);me.label.p.set(me.x,1.2,me.y);}
+    if(me){if(stepMove(me,dt)&&busPlan&&!me.riding){const bp=busPlan;me.riding=true;float('🚌',me.x,1.6,me.y,'#ffd166');
+        worldApi.busRide(bp.a,bp.b,()=>{me.riding=false;busPlan=null;me.path=pathTo(me,bp.tx,bp.ty);});}
+      animPerson(me,time);me.label.p.set(me.x,1.2,me.y);}
     for(const[,a]of avatars){const dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);a.moving=d>.05;if(d>12){a.x=a.tx;a.y=a.ty;}else if(a.moving){const s=Math.min(d,3.2*dt);a.x+=dx/d*s;a.y+=dy/d*s;a.face=Math.atan2(dx,dy);}
       animPerson(a,time);a.label.p.set(a.x,1.2,a.y);}
     updateVignettes(time,dt);updateAds(time);updateLights(time);updateCars(dt);updateStopMarks(time);updateCrows(time,dt);
@@ -922,7 +931,7 @@ export function createWorld(canvas,{mobile}){
     for(const L of wlabels){if(L.zMax&&zoom>L.zMax){L.el.style.display='none';continue;}project(L.p,L.el);}
   }
 
-  return {renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,
+  return worldApi={renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,
     get camT(){return camT;},get zoom(){return zoom;},set onTap(f){onTap=f;},set onHover(f){onHover=f;},
     select(p){if(p){selF.visible=true;selF.position.set(p.x,0,p.y);}else selF.visible=false;},
     set arrow(p){arrowTarget=p;},
