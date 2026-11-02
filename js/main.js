@@ -254,11 +254,30 @@ function stopHTML(){const s=world.STOPS[stopSel];if(!s)return'';const m=world.me
   (d<=3?`<span class="btn gold" data-act="busmap">🗺 Куда едем?</span>`:`<div class="mut" style="margin-top:6px">Подойди ближе к остановке.</div><span class="btn blue" data-act="gostop">Идти к остановке</span>`);}
 function showBusMap(){const S=world.STOPS,from=stopSel;$('auth').style.display='flex';
   $('authbox').innerHTML=`<h3 style="font-size:14px">🚌 Куда едем?</h3>
-  <canvas id="buscv" width="800" height="640" style="width:100%;image-rendering:pixelated;border:3px solid #0e0b14;cursor:pointer;touch-action:manipulation"></canvas>
+  <div style="position:relative"><canvas id="buscv" width="800" height="640" style="width:100%;display:block;image-rendering:pixelated;border:3px solid #0e0b14;cursor:grab;touch-action:none"></canvas>
+  <div style="position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px"><span class="btn sm" id="busin">＋</span><span class="btn sm" id="busout">－</span></div></div>
   <div style="max-height:22vh;overflow:auto;margin-top:6px">${S.map((s,i)=>i===from?'':`<span class="btn sm ${s.reg==='c'?'blue':''}" data-act="busgo" data-i="${i}">${s.reg==='c'?'🏙':'🏡'} ${esc(s.name)}</span>`).join('')}</div>
   <span class="btn" data-act="closemodal">Отмена</span>`;
-  const cv=$('buscv');world.busMap(cv,from);
-  cv.onclick=e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*world.W,y=(e.clientY-r.top)/r.height*world.H;const i=nearStop(x,y,14);if(i!=null&&i!==from)busGo(i);};}
+  // своя камера карты: палец — двигать, два пальца — приблизить, тап по остановке — ехать; страница не зумится
+  const cv=$('buscv'),W=world.W,H=world.H,v={s:1,cx:W/2,cy:H/2,px:1};
+  const fit=()=>{v.px=cv.width/Math.max(1,cv.clientWidth);const half=W/2/v.s,halfH=H/2/v.s;v.cx=Math.max(half,Math.min(W-half,v.cx));v.cy=Math.max(halfH,Math.min(H-halfH,v.cy));world.busMap(cv,from,v);};
+  const toMap=(cx,cy)=>{const r=cv.getBoundingClientRect(),k=r.width/W*v.s;return{x:v.cx+(cx-r.left-r.width/2)/k,y:v.cy+(cy-r.top-r.height/2)/k};};
+  const zoomAt=(f,cx,cy)=>{const a=toMap(cx,cy);v.s=Math.max(1,Math.min(6,v.s*f));const b=toMap(cx,cy);v.cx+=a.x-b.x;v.cy+=a.y-b.y;fit();};
+  const ptr=new Map();let moved=0,pd=0;
+  cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=ptr.size>1?99:0;
+    if(ptr.size===2){const[a,b]=[...ptr.values()];pd=Math.hypot(a.x-b.x,a.y-b.y);}};
+  cv.onpointermove=e=>{const p=ptr.get(e.pointerId);if(!p)return;const r=cv.getBoundingClientRect(),k=r.width/W*v.s;
+    if(ptr.size===1){const dx=e.clientX-p.x,dy=e.clientY-p.y;moved+=Math.abs(dx)+Math.abs(dy);v.cx-=dx/k;v.cy-=dy/k;p.x=e.clientX;p.y=e.clientY;fit();}
+    else{p.x=e.clientX;p.y=e.clientY;const[a,b]=[...ptr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(pd>0)zoomAt(d/pd,(a.x+b.x)/2,(a.y+b.y)/2);pd=d;}};
+  cv.onpointerup=cv.onpointercancel=e=>{const had=ptr.has(e.pointerId);ptr.delete(e.pointerId);if(ptr.size<2)pd=0;
+    if(had&&ptr.size===0&&moved<8){const m=toMap(e.clientX,e.clientY),i=nearStop(m.x,m.y,14/v.s);if(i!=null&&i!==from)busGo(i);}};
+  cv.onwheel=e=>{e.preventDefault();zoomAt(e.deltaY>0?1/1.2:1.2,e.clientX,e.clientY);};
+  $('busin').onclick=()=>{const r=cv.getBoundingClientRect();zoomAt(1.5,r.left+r.width/2,r.top+r.height/2);};
+  $('busout').onclick=()=>{const r=cv.getBoundingClientRect();zoomAt(1/1.5,r.left+r.width/2,r.top+r.height/2);};
+  const s0=S[from];if(s0){v.s=2;v.cx=s0.x;v.cy=s0.y;}requestAnimationFrame(fit);}
+// браузер на телефоне не должен масштабировать страницу целиком (iOS игнорирует user-scalable=no)
+for(const ev of['gesturestart','gesturechange','gestureend'])document.addEventListener(ev,e=>e.preventDefault(),{passive:false});
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
 function busGo(i){const s=world.STOPS[i],f=world.STOPS[stopSel];if(!s)return;
   $('authbox').innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:48px" id="busic">🚌</div><div>${esc(f?f.name:'')} → <b>${esc(s.name)}</b></div></div>`;
   setTimeout(()=>{$('auth').style.display='none';sheetOpen=false;dirty=true;const m=world.me;if(m){m.goal=null;m.hold=true;}

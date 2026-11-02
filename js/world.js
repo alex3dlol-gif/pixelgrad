@@ -861,7 +861,7 @@ export function createWorld(canvas,{mobile}){
     fog.visible=false;scene.add(fog);}
 
   // ================= МИНИКАРТА =================
-  const mmBase=new ImageData(W,H);
+  const mmBase=new ImageData(W,H);let mmTmp=null;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){let c=tileColor(x,y);if(grid[I(x,y)]===T.FOREST)c=0x3f7a35;const k=(y*W+x)*4;mmBase.data[k]=c>>16&255;mmBase.data[k+1]=c>>8&255;mmBase.data[k+2]=c&255;mmBase.data[k+3]=255;}
   function drawMini(ctx,t){ctx.putImageData(mmBase,0,0);
     for(const p of plots){if(p.owner)ctx.fillStyle=p.color;else if(p.sp==='res')ctx.fillStyle='#e8e2d4';else if(p.sp==='bc')ctx.fillStyle='#5aa39b';else if(p.sp)ctx.fillStyle='#ffd166';else continue;ctx.fillRect(p.x0,p.y0,4,4);}
@@ -954,12 +954,17 @@ export function createWorld(canvas,{mobile}){
         else{scene.remove(bus);me.x=Bs.x;me.y=Bs.y;me.path=[];me.moving=false;me.mesh.visible=true;if(me.label)me.label.el.style.display='';onDone&&onDone();}};
       requestAnimationFrame(step);},
     teleport(x,y){if(!me)return;me.x=x;me.y=y;me.path=[];me.moving=false;camFly=null;camT.set(x,0,y);clampCam();updateCam();},
-    busMap(cv,hi){const k=cv.width/W,c=cv.getContext('2d'),tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;tmp.getContext('2d').putImageData(mmBase,0,0);
-      c.imageSmoothingEnabled=false;c.drawImage(tmp,0,0,cv.width,cv.height);c.fillStyle='rgba(10,8,16,.25)';c.fillRect(0,0,cv.width,cv.height);
-      if(me){c.fillStyle='#ffd166';c.beginPath();c.arc(me.x*k,me.y*k,5,0,7);c.fill();}
-      c.font='bold 12px sans-serif';c.textAlign='center';
-      STOPS.forEach((s,i)=>{c.fillStyle=i===hi?'#ffd166':'#2e86ab';c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.arc(s.x*k,s.y*k,i===hi?8:6,0,7);c.fill();c.stroke();
-        c.lineWidth=3;c.strokeStyle='#0e0b14';c.strokeText(s.name,s.x*k,s.y*k-10);c.fillStyle='#fff';c.fillText(s.name,s.x*k,s.y*k-10);});},
+    // карта автобусов: v={s:масштаб,cx,cy:центр в клетках,px:пикселей канваса на CSS-пиксель}
+    busMap(cv,hi,v={s:1,cx:W/2,cy:H/2,px:1}){const c=cv.getContext('2d'),k=cv.width/W*v.s,ox=v.cx-cv.width/2/k,oy=v.cy-cv.height/2/k,X=x=>(x-ox)*k,Y=y=>(y-oy)*k,u=v.px;
+      if(!mmTmp){mmTmp=document.createElement('canvas');mmTmp.width=W;mmTmp.height=H;mmTmp.getContext('2d').putImageData(mmBase,0,0);}
+      c.imageSmoothingEnabled=false;c.fillStyle='#14101c';c.fillRect(0,0,cv.width,cv.height);c.drawImage(mmTmp,ox,oy,cv.width/k,cv.height/k,0,0,cv.width,cv.height);
+      c.fillStyle='rgba(10,8,16,.2)';c.fillRect(0,0,cv.width,cv.height);
+      if(me){c.fillStyle='#ffd166';c.strokeStyle='#0e0b14';c.lineWidth=2*u;c.beginPath();c.arc(X(me.x),Y(me.y),5*u,0,7);c.fill();c.stroke();}
+      c.font=`bold ${Math.round(12*u)}px sans-serif`;c.textAlign='center';c.lineJoin='round';
+      STOPS.forEach((s,i)=>{const x=X(s.x),y=Y(s.y);if(x<-40||y<-40||x>cv.width+40||y>cv.height+40)return;
+        c.fillStyle=i===hi?'#ffd166':'#2e86ab';c.strokeStyle='#fff';c.lineWidth=2*u;c.beginPath();c.arc(x,y,(i===hi?8:6)*u,0,7);c.fill();c.stroke();
+        if(v.s<1.7&&s.reg==='c'&&s.name!=='Центр'&&i!==hi)return;   // издалека городские подписи слипаются
+        c.lineWidth=3*u;c.strokeStyle='#0e0b14';c.strokeText(s.name,x,y-10*u);c.fillStyle='#fff';c.fillText(s.name,x,y-10*u);});},
     marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
     // съёмочный режим: камера и время суток задаются сценарием
     setCam(x,z,zm,a){camFly=null;camBounds=null;camT.set(x,0,z);if(zm){zoom=zoomT=zm;}if(a!=null)camA=camAT=a;updateCam();},setHour(h){HOV=h;},get vehicles(){return vehicles;},
