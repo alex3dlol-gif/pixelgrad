@@ -66,6 +66,7 @@ async function loadWorld(){
   const A=await sb.from('auctions').select('*').eq('status','open');(A.data||[]).forEach(a=>auctions.set(a.id,a));
   const L=await sb.from('listings').select('*').gt('qty',0).order('price');(L.data||[]).forEach(l=>listings.set(l.id,l));for(const l of listings.values())if(!profiles.has(l.seller))await fetchProfile(l.seller);
   sb.channel('db')
+    .on('postgres_changes',{event:'*',schema:'public',table:'shipments'},p=>onShip(p.new))
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat'},p=>onChat(p.new))
     .on('postgres_changes',{event:'*',schema:'public',table:'props'},p=>p.new&&p.new.id!=null&&applyProp(p.new))
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'goods'},p=>{goods.set(p.new.good,p.new);dirty=true;})
@@ -131,7 +132,7 @@ async function afterLogin(){
 function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);loadQuestLog();loadChat();
+  joinPresence();act('settle',{},true);loadQuestLog();loadChat();loadShips();
   if(longOn()&&longLeft()<=0)toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);tab='work';
   if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
   dirty=true;
@@ -162,7 +163,7 @@ function updateQuest(dt){const m=world.me;if(!quest||!m)return false;const Q=QUE
   if(quest&&quest.phase==='do'){m.working=true;quest.t+=dt;const b=$('questbar');if(b)b.style.width=Math.min(100,quest.t/Q.dur*100)+'%';
     if(quest.t>=Q.dur&&!quest.busy){quest.busy=true;const id=quest.id;act('finish_quest',{p_id:id}).then(r=>{if(r){const rw=[Q.money&&`+${Q.money}💰`,Q.gems&&`+${Q.gems}💎`,Q.good&&`+${Q.qty}${GOODS[Q.good].ic}`,`+${Q.xp} XP`].filter(Boolean).join(' ');world.float(rw,m.x,1.7,m.y,'#c8ffb0');toast(`✅ ${Q.n}: ${rw}`);}quest=null;m.goal=null;loadQuestLog();});}}
   return true;}
-function updateJob(dt){const m=world.me;if(!m||!me)return;if(updateQuest(dt))return;const t=jobTarget();
+function updateJob(dt){const m=world.me;if(!m||!me)return;if(m.hold){m.working=false;return;}if(updateQuest(dt))return;const t=jobTarget();
   if(t){const key=t.x+','+t.y;if(m.goal!==key){m.goal=key;world.goMe(t.x,t.y);shiftT=0;}
     const at=!m.path.length&&Math.round(m.x)===t.x&&Math.round(m.y)===t.y;m.working=at;
     if(longOn())return;
@@ -250,11 +251,10 @@ function showBusMap(){const S=world.STOPS,from=stopSel;$('auth').style.display='
   const cv=$('buscv');world.busMap(cv,from);
   cv.onclick=e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*world.W,y=(e.clientY-r.top)/r.height*world.H;const i=nearStop(x,y,14);if(i!=null&&i!==from)busGo(i);};}
 function busGo(i){const s=world.STOPS[i],f=world.STOPS[stopSel];if(!s)return;
-  $('authbox').innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:48px" id="busic">🚌</div><div>${esc(f?f.name:'')} → <b>${esc(s.name)}</b></div><div class="bar" style="margin-top:10px"><i id="busbar" style="width:0;transition:width 1.6s linear"></i></div></div>`;
-  requestAnimationFrame(()=>{const b=$('busbar');if(b)b.style.width='100%';});
-  setTimeout(()=>{$('auth').style.display='none';const m=world.me;if(m){m.goal=null;}world.teleport(s.x,s.y);stopSel=i;sheetOpen=false;trackPos(true);
-    rpc('set_pos',{p_x:s.x,p_y:s.y}).catch(()=>{});toast(`🚌 Приехали: ${esc(s.name)}`);dirty=true;},1700);}
-world.onTap=(p,g)=>{if(mode!=='city')return;if(!ob&&g){const si=nearStop(g.x,g.z,1.6);if(si!=null){stopSel=si;tab='stop';sheetOpen=true;sel=null;world.select(null);dirty=true;return;}}if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
+  $('authbox').innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:48px" id="busic">🚌</div><div>${esc(f?f.name:'')} → <b>${esc(s.name)}</b></div></div>`;
+  setTimeout(()=>{$('auth').style.display='none';sheetOpen=false;dirty=true;const m=world.me;if(m){m.goal=null;m.hold=true;}
+    world.busRide(stopSel,i,()=>{stopSel=i;const m=world.me;if(m){m.goal=null;m.hold=true;}trackPos(true);rpc('set_pos',{p_x:s.x,p_y:s.y}).catch(()=>{});toast(`🚌 ${esc(s.name)}`);dirty=true;});},400);}
+world.onTap=(p,g)=>{if(mode!=='city')return;if(world.me)world.me.hold=false;if(!ob&&g){const si=nearStop(g.x,g.z,1.6);if(si!=null){stopSel=si;tab='stop';sheetOpen=true;sel=null;world.select(null);dirty=true;return;}}if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
 world.onHover=(p,e)=>{const t=$('tip');if(!p||!e){t.style.display='none';return;}t.style.display='block';t.style.left=e.clientX+16+'px';t.style.top=e.clientY+12+'px';t.innerHTML=tipHTML(p);};
 function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(CLUBS[p.sp])return`${CLUBS[p.sp].ic} ${CLUBS[p.sp].n} · ⚡×3, пока ты внутри`;if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
@@ -288,7 +288,14 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
   <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}</div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
-function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость: ${c} на товар</div>`;
+// ===== Грузы в пути: товар едет на базу несколько минут, деньги — по прибытии =====
+const shipm=new Map();
+async function loadShips(){if(!sb||!me)return;const{data}=await sb.from('shipments').select('*').eq('uid',me.id).eq('done',false);shipm.clear();for(const r of data||[])shipm.set(r.id,r);dirty=true;}
+function onShip(r){if(!me||!r||r.uid!==me.id)return;if(r.done){if(shipm.delete(r.id)){const d=Math.round(r.rev-r.tax);toast(`🚚 Груз на базе: +${fmt(d)}💰`);world.me&&world.float(`+${fmt(d)}💰`,world.me.x,1.7,world.me.y,'#c8ffb0');}}else shipm.set(r.id,r);dirty=true;}
+function shipsHTML(){if(!shipm.size)return'';return`<h3 style="margin-top:4px">🚚 В пути</h3>`+[...shipm.values()].map(r=>{const left=new Date(r.arrive_at)-Date.now();
+  return`<div class="row">${r.q}${GOODS[r.good]?.ic||''} → <b>${fmt(r.rev-r.tax)}💰</b> <span class="mut">${left>0?'через '+hm(left):'разгрузка…'}</span></div>`;}).join('');}
+setInterval(()=>{if(shipm.size)dirty=true;},15000);
+function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=shipsHTML()+`<h3>📦 Склад</h3><div class="mut">Вместимость: ${c} на товар</div>`;
   if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
   for(const g of gs){const q=Math.floor(inv(me,g)),pc=Math.min(100,q/c*100);h+=`<div class="row">${GOODS[g].ic} <b>${GOODS[g].n}</b> — ${q}/${c} <span class="mut">≈${Math.round(q*price(g,q/2))}💰 на базе</span><div class="bar"><i style="width:${pc}%;background:${pc>=100?'#c0392b':pc>80?'#e67e22':'#ffd166'}"></i></div>
     <span class="btn sm" data-act="sell" data-g="${g}">Продать на базу</span>${LV()>=2?`<span class="btn sm blue" data-act="toex">На биржу</span>`:''}</div>`;}
@@ -354,7 +361,7 @@ function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>На�
     ${pr.premium?`<div>👑 <b>Элитный участок</b> — продаётся только на аукционе.</div>${aucOf(pr.id)?'<span class="btn gold" data-act="openauc">Перейти к торгам</span>':'<div class="mut">Город выставляет такие лоты по очереди — загляни в «Рынок → Аукцион».</div>'}`:LV()<NEED.land?lock(NEED.land):`<span class="btn gold ${can?'':'dis'}" data-act="buyland" data-id="${pr.id}">Купить участок</span>`}${me&&!can?`<div class="mut">Не хватает ${fmt(pr.price-me.money)}💰</div>`:''}`;}
   if(me&&pr.owner===me.id)return pr.building?bizHTML(pr):`<h3>Твой участок #${p.id+1}</h3>`+(LV()>=2?aucBtn(pr):'')+buildListHTML(pr);
   return`<h3>Участок #${p.id+1}</h3><div>Владелец: ${nm(pr.owner)}</div><div>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n+' · работников: '+pr.workers:'пока пусто'}</div>${jobBtn(pr)}`;}
-function marketHTML(){const tabs=`<div style="margin-bottom:6px"><span class="btn sm ${mkSec==='base'?'on':'blue'}" data-act="mksec" data-s="base">🏭 Оптовая база</span>${LV()>=2?`<span class="btn sm ${mkSec==='ex'?'on':'blue'}" data-act="mksec" data-s="ex">🤝 Биржа игроков</span><span class="btn sm ${mkSec==='auc'?'on':'blue'}" data-act="mksec" data-s="auc">🔨 Аукцион${auctions.size?' ('+auctions.size+')':''}</span>`:''}</div>`;if(LV()<2)mkSec='base';
+function marketHTML(){const tabs=shipsHTML()+`<div style="margin-bottom:6px"><span class="btn sm ${mkSec==='base'?'on':'blue'}" data-act="mksec" data-s="base">🏭 Оптовая база</span>${LV()>=2?`<span class="btn sm ${mkSec==='ex'?'on':'blue'}" data-act="mksec" data-s="ex">🤝 Биржа игроков</span><span class="btn sm ${mkSec==='auc'?'on':'blue'}" data-act="mksec" data-s="auc">🔨 Аукцион${auctions.size?' ('+auctions.size+')':''}</span>`:''}</div>`;if(LV()<2)mkSec='base';
   return tabs+(mkSec==='ex'?exchangeHTML():mkSec==='auc'?auctionHTML():baseHTML());}
 const propName=pr=>{if(!pr)return'?';if(pr.kind==='apt')return`🚪 Квартира · ${RES[pr.tier]?.n||''}, ${pr.floor} эт.`;if(pr.kind==='office')return`🏢 Офис в БЦ, ${pr.floor} эт.`;
   return`🌱 Участок #${pr.plot+1} · ${REGN[pr.reg]}${pr.building?' · '+BLD[pr.building].ic+' '+BLD[pr.building].n+(pr.workers?` (${pr.workers} раб.)`:''):''}`;};
@@ -625,9 +632,9 @@ document.addEventListener('click',async e=>{
     case 'build':await act('build',{p_id:id,p_type:t.dataset.t});break;
     case 'hire':await act('hire',{p_id:id,p_delta:1});break;
     case 'fire':await act('hire',{p_id:id,p_delta:-1});break;
-    case 'sell':await act('sell',{p_good:t.dataset.g,p_q:Math.floor(inv(me,t.dataset.g))});break;
+    case 'sell':if(await act('sell',{p_good:t.dataset.g,p_q:Math.floor(inv(me,t.dataset.g))})){toast('🚚 Грузовик выехал на базу');loadShips();}break;
     case 'buy':await act('buy',{p_good:t.dataset.g,p_q:5});break;
-    case 'job':if(await act('take_job',{p_id:id}))toast('💼 Принят на работу');break;
+    case 'job':if(world.me)world.me.hold=false;if(await act('take_job',{p_id:id}))toast('💼 Принят на работу');break;
     case 'quit':await act('quit_job');break;
     case 'buyunit':if(await act('buy_unit',{p_id:id}))toast('🎉 Поздравляем с покупкой!');break;
     case 'sellprop':if(confirm('Точно продать?'))await act('sell_prop',{p_id:id});break;

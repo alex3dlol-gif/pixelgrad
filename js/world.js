@@ -204,7 +204,8 @@ export function createWorld(canvas,{mobile}){
   }
   function makeBC(p){const g=new THREE.Group(),v=p.id%2;
     const m=tower('bc',v,20,.4,3.2,2.4);m.position.set(1.5,20*.4/2+.6,1.2);g.add(m);B(g,3.6,.6,2.8,0x9aa3ab,1.5,0,1.2);
-    B(g,3.25,.35,2.45,0x2ecc71,1.5,8.6,1.2,true);B(g,1.2,.05,.8,0x7f8c8d,1.5,0,3.1);
+    B(g,3.25,.12,2.45,0x6d6a66,1.5,8.6,1.2);for(const[w,d,x,z]of[[3.3,.1,1.5,0],[3.3,.1,1.5,2.4],[.1,2.5,-.13,1.2],[.1,2.5,3.13,1.2]])B(g,w,.22,d,0x8a8580,x,8.6,z);
+    B(g,.7,.4,.5,0x9aa3ab,.6,8.72,.7);B(g,.5,.3,.5,0xb8c0c6,2.4,8.72,1.7);B(g,.05,1.2,.05,0xdddddd,2.6,8.72,.5);B(g,1.2,.05,.8,0x7f8c8d,1.5,0,3.1);
     g.position.set(p.x0,0,p.y0);statics.add(g);}
 
   function makeBuilding(type,color){
@@ -576,6 +577,24 @@ export function createWorld(canvas,{mobile}){
         sg.position.set(.18,.35,.12);sg.rotation.y=-Math.PI/2;m.add(sg);tick=t=>{pace(m,t,.6,3.4,3.75,.35);arms(m,-1.4,-1.4);};break;}
     }
     scene.add(g);return{g,tick};}
+  // вороны: бродят по крыше, клюют, иногда подпрыгивают и хлопают крыльями
+  function makeCrow(){const g=new THREE.Group();B(g,.12,.1,.2,0x15151a,0,.06,0);const h=new THREE.Group();h.position.set(0,.13,.09);B(h,.08,.08,.08,0x15151a,0,0,0);B(h,.03,.03,.07,0x555555,0,.02,.07);g.add(h);
+    const wl=B(g,.03,.07,.15,0x22222a,-.07,.07,0),wr=B(g,.03,.07,.15,0x22222a,.07,.07,0);B(g,.08,.03,.1,0x15151a,0,.08,-.13);B(g,.02,.06,.02,0x777777,-.03,0,0);B(g,.02,.06,.02,0x777777,.03,0,0);
+    g.userData={h,wl,wr};g.scale.setScalar(1.6);return g;}
+  const crowRoofs=[];for(const p of plots){if(p.sp==='bc')crowRoofs.push({p,y:8.72,x0:.2,x1:2.8,z0:.3,z1:2.1});else if(p.sp==='res'&&p.rt==='tower')crowRoofs.push({p,y:30*.36,x0:.5,x1:2.5,z0:.35,z1:.6});}
+  function updateCrows(time,dt){for(const r of crowRoofs){const p=r.p,on=near(p.x,p.y,zoom*2);
+    if(on&&!r.g){r.g=new THREE.Group();r.g.position.set(p.x0,r.y,p.y0);const n=2+Math.floor(hash(p.id,5)*3);
+      r.crows=Array.from({length:n},(_,k)=>{const c=makeCrow();const b={c,x:r.x0+hash(p.id,k)*(r.x1-r.x0),z:r.z0+hash(k,p.id)*(r.z1-r.z0),tx:0,tz:0,st:'wait',t:Math.random()*2,hop:0};b.tx=b.x;b.tz=b.z;r.g.add(c);return b;});scene.add(r.g);}
+    else if(!on&&r.g){scene.remove(r.g);r.g=null;r.crows=null;}
+    if(!r.g)continue;
+    for(const b of r.crows){const u=b.c.userData;b.t-=dt;
+      if(b.st==='walk'){const dx=b.tx-b.x,dz=b.tz-b.z,d=Math.hypot(dx,dz);if(d<.03){b.st='wait';b.t=rand(.6,2.5);}else{const sp=Math.min(d,dt*.35);b.x+=dx/d*sp;b.z+=dz/d*sp;b.c.rotation.y=Math.atan2(dx,dz);}
+        b.c.position.y=Math.abs(Math.sin(time*16+b.tx*9))*.02;u.h.rotation.x=Math.sin(time*16)*.25;}
+      else if(b.st==='peck'){u.h.rotation.x=.9+Math.sin(time*14)*.3;if(b.t<=0){b.st='wait';b.t=rand(.5,1.5);}}
+      else if(b.st==='hop'){b.hop+=dt*3;b.c.position.y=Math.sin(Math.min(1,b.hop)*Math.PI)*.18;const f=Math.sin(time*40)*.9;u.wl.rotation.z=f;u.wr.rotation.z=-f;if(b.hop>=1){b.st='wait';b.t=rand(.5,2);u.wl.rotation.z=u.wr.rotation.z=0;b.c.position.y=0;}}
+      else{u.h.rotation.x=0;b.c.position.y=0;if(b.t<=0){const q=Math.random();
+        if(q<.5){b.st='walk';b.tx=r.x0+Math.random()*(r.x1-r.x0);b.tz=r.z0+Math.random()*(r.z1-r.z0);}else if(q<.8){b.st='peck';b.t=rand(.6,1.6);}else{b.st='hop';b.hop=0;b.c.rotation.y+=rand(-2,2);}}}
+      b.c.position.x=b.x;b.c.position.z=b.z;}}}
   const vigPlots=[];
   function updateVignettes(time,dt){for(const p of vigPlots){const on=near(p.x,p.y,zoom*2);
     if(on&&!p.vig)p.vig=makeVignette(p);else if(!on&&p.vig){scene.remove(p.vig.g);p.vig=null;}
@@ -690,11 +709,12 @@ export function createWorld(canvas,{mobile}){
     else if(r.state==='back'&&stepMove(r,dt))removeRes(r);}
   const removeRes=r=>{scene.remove(r.mesh);residents.splice(residents.indexOf(r),1);};
   function spawnTruck(plotId,good,color){const p=plots[plotId];if(!p)return;const mt=pick(marketTiles);
-    const v={kind:'truck',x:p.door.x,y:p.door.y,speed:5,path:[],phase:'go',home:p.door,face:0,mesh:makeTruck(new THREE.Color(color||'#fff').getHex(),GOODS[good]?.col||0xffffff)};
+    const v={kind:'truck',x:p.door.x,y:p.door.y,speed:2.4,path:[],phase:'go',home:p.door,face:0,mesh:makeTruck(new THREE.Color(color||'#fff').getHex(),GOODS[good]?.col||0xffffff)};
     v.path=pathTo(v,mt[0],mt[1]);scene.add(v.mesh);vehicles.push(v);}
   function spawnVan(){const t=pick(plots.filter(p=>(p.sp==='pvzCity'||(p.building==='pvz'&&p.workers>0))&&p.parcels<12&&!vehicles.some(v=>v.target===p)));if(!t)return;
     const v={kind:'van',x:sortPlot.door.x,y:sortPlot.door.y,speed:5.5,path:[],phase:'go',target:t,face:0,mesh:makeVan()};v.path=pathTo(v,t.door.x,t.door.y);scene.add(v.mesh);vehicles.push(v);}
-  function updateVehicle(v,dt){if(!stepMove(v,dt))return;
+  function updateVehicle(v,dt){const n=v.path[0];if(n){const d=Math.hypot(n[0]-v.x,n[1]-v.y);if(d>.45&&d<.8&&!greenFor(Math.round(v.x-(n[0]-v.x)/d*.9),Math.round(v.y-(n[1]-v.y)/d*.9),n[0],n[1])){v.moving=false;return;}}
+    if(!stepMove(v,dt))return;
     if(v.phase==='go'){v.phase='back';if(v.kind==='van'){v.target.parcels+=12;v.path=pathTo(v,sortPlot.door.x,sortPlot.door.y);}else{v.mesh.userData.cargo.visible=false;v.path=pathTo(v,v.home.x,v.home.y);}}
     else{scene.remove(v.mesh);vehicles.splice(vehicles.indexOf(v),1);}}
   // корабли
@@ -732,6 +752,40 @@ export function createWorld(canvas,{mobile}){
   wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
+  // ===== Светофоры: цикл 12 с — 5 с зелёный по X, 1 с жёлтый, 5 с зелёный по Y, 1 с жёлтый =====
+  const lightSet=new Set(),lights=[];
+  {const CB=BLOCKS[0];for(let k=0;k<=CB.cols;k++)for(let m=0;m<=CB.rows;m++){const x=CB.x+STEP*k,y=CB.y+STEP*m;if(inb(x,y)){lightSet.add(I(x,y));lights.push([x,y]);}}}
+  const matLX=new THREE.MeshBasicMaterial({color:0xe74c3c}),matLY=new THREE.MeshBasicMaterial({color:0x2ecc71});
+  {const n=lights.length,pole=new THREE.InstancedMesh(BOX,mat(0x333333),n),hx=new THREE.InstancedMesh(BOX,matLX,n),hy=new THREE.InstancedMesh(BOX,matLY,n),o=new THREE.Object3D();
+    lights.forEach(([x,y],i)=>{o.position.set(x+.48,.45,y+.48);o.scale.set(.06,.9,.06);o.updateMatrix();pole.setMatrixAt(i,o.matrix);
+      o.position.set(x+.48,.93,y+.48);o.scale.set(.03,.12,.14);o.updateMatrix();hx.setMatrixAt(i,o.matrix);
+      o.position.set(x+.48,1.07,y+.48);o.scale.set(.14,.12,.03);o.updateMatrix();hy.setMatrixAt(i,o.matrix);});
+    for(const m of[pole,hx,hy]){m.computeBoundingSphere();scene.add(m);}}
+  let lightX='g',lightY='r';
+  function updateLights(time){const ph=time%12;lightX=ph<5?'g':ph<6?'y':'r';lightY=ph>=6&&ph<11?'g':ph>=11?'y':'r';
+    const C={g:0x2ecc71,y:0xf1c40f,r:0xe74c3c};matLX.color.setHex(C[lightX]);matLY.color.setHex(C[lightY]);}
+  // можно ли въехать с клетки (cx,cy) на перекрёсток (nx,ny)
+  function greenFor(cx,cy,nx,ny){if(!lightSet.has(I(nx,ny))||lightSet.has(I(cx,cy)))return true;return(nx!==cx?lightX:lightY)==='g';}
+  // ===== Городские машины: едут по асфальту, на перекрёстках поворачивают, стоят на красный и за впереди стоящей =====
+  const cars=[],DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+  const isRoad=(x,y)=>{if(!inb(x,y))return false;const t=grid[I(x,y)];return(t===T.ASPH||t===T.RING||t===T.BRIDGE)&&plotIdx[I(x,y)]<0;};
+  const CARC=[0xc0392b,0x2980b9,0xf1c40f,0xecf0f1,0x2c3e50,0x27ae60,0x7f8c8d,0x8e44ad,0xe67e22];
+  function spawnCar(){const c=lights.filter(([x,y])=>Math.abs(x-camT.x)+Math.abs(y-camT.z)<zoom*2);if(!c.length)return;const[x,y]=pick(c);
+    const ds=DIRS.filter(([dx,dy])=>isRoad(x+dx,y+dy));if(!ds.length)return;const[dx,dy]=pick(ds);
+    const car={x,y,dx,dy,t:Math.random()*.5,speed:rand(2.2,3.4),mesh:makeCar(pick(CARC))};scene.add(car.mesh);cars.push(car);}
+  function updateCar(c,dt){const nx=c.x+c.dx,ny=c.y+c.dy;
+    if(c.t<.05){if(!greenFor(c.x,c.y,nx,ny))return;for(const o of cars)if(o!==c&&o.x===nx&&o.y===ny&&o.t<.7)return;}
+    c.t+=dt*c.speed;
+    if(c.t>=1){c.t=0;c.x=nx;c.y=ny;const back=[-c.dx,-c.dy];let opts=DIRS.filter(([dx,dy])=>!(dx===back[0]&&dy===back[1])&&isRoad(c.x+dx,c.y+dy));
+      if(!opts.length)opts=[back];const st=opts.find(([dx,dy])=>dx===c.dx&&dy===c.dy);const d=st&&Math.random()<.65?st:pick(opts);c.dx=d[0];c.dy=d[1];}}
+  function placeCar(c){const fx=c.x+c.dx*c.t,fy=c.y+c.dy*c.t;c.mesh.position.set(fx-c.dy*.22,0,fy+c.dx*.22);c.mesh.rotation.y=Math.atan2(c.dx,c.dy);}
+  let carT=0;
+  function updateCars(dt){for(const c of[...cars]){if(Math.abs(c.x-camT.x)+Math.abs(c.y-camT.z)>zoom*3){scene.remove(c.mesh);cars.splice(cars.indexOf(c),1);continue;}updateCar(c,dt);placeCar(c);}
+    if((carT-=dt)<=0){carT=.4;if(cars.length<(mobile?14:24))spawnCar();}}
+  // значки над остановками: крутятся и подпрыгивают, светятся ночью
+  const stopMarks=STOPS.map(st=>{const g=new THREE.Group();B(g,.7,.36,.34,0xf1c40f,0,0,0,true);B(g,.72,.12,.36,0x2e86ab,0,.17,0,true);B(g,.12,.1,.37,0x1a1a1a,-.22,-.05,0,true);B(g,.12,.1,.37,0x1a1a1a,.22,-.05,0,true);
+    g.position.set(st.x+.5,2.6,st.y-.5);scene.add(g);return{g,x:st.x,y:st.y,ph:Math.random()*6};});
+  function updateStopMarks(time){for(const m of stopMarks){if(Math.abs(m.x-camT.x)+Math.abs(m.y-camT.z)>zoom*3)continue;m.g.rotation.y=time*1.5+m.ph;m.g.position.y=2.6+Math.abs(Math.sin(time*2.5+m.ph))*.35;}}
   // ===== Реклама: 3 билборда и экран на небоскрёбе =====
   const adScreens=[];
   function adScreen(cw,ch,slot,x,y){const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const tx=new THREE.CanvasTexture(cv);
@@ -849,7 +903,7 @@ export function createWorld(canvas,{mobile}){
     if(me){if(stepMove(me,dt)){}animPerson(me,time);me.label.p.set(me.x,1.2,me.y);}
     for(const[,a]of avatars){const dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);a.moving=d>.05;if(d>12){a.x=a.tx;a.y=a.ty;}else if(a.moving){const s=Math.min(d,3.2*dt);a.x+=dx/d*s;a.y+=dy/d*s;a.face=Math.atan2(dx,dy);}
       animPerson(a,time);a.label.p.set(a.x,1.2,a.y);}
-    updateVignettes(time,dt);updateAds(time);
+    updateVignettes(time,dt);updateAds(time);updateLights(time);updateCars(dt);updateStopMarks(time);updateCrows(time,dt);
     for(const p of plots){const a=p.anim;if(!a)continue;if(!near(p.x,p.y))continue;const busy=p.wk.some(w=>w.working)||p.sp;
       if(a.blades&&(p.workers||p.sp))a.blades.rotation.z+=dt*1.5;if(a.spin&&busy)a.spin.rotation.y+=dt*15;
       if(a.smoke&&(p.workers||p.sp)&&Math.random()<dt*3)puff(p.x0+1.5+a.smoke[0],a.smoke[1],p.y0+1.5+a.smoke[2],0xcfcfcf,1,.5,.08);
@@ -874,6 +928,22 @@ export function createWorld(canvas,{mobile}){
     set arrow(p){arrowTarget=p;},
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},STOPS,
+    // автобус по дорогам от остановки до остановки; игрок внутри, камера следует
+    busRide(a,b,onDone){const A=STOPS[a],Bs=STOPS[b];if(!A||!Bs||!me)return onDone&&onDone();
+      const road=(x,y)=>{const t=grid[I(x,y)];return t===T.ROAD||t===T.ASPH||t===T.RING||t===T.BRIDGE;};
+      const prv=new Int32Array(W*H).fill(-2),q=[I(A.x,A.y)];prv[q[0]]=-1;let h=0,found=false;const goal=I(Bs.x,Bs.y);
+      while(h<q.length){const c=q[h++];if(c===goal){found=true;break;}const cx=c%W,cy=(c/W)|0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+dx,ny=cy+dy;if(!inb(nx,ny))continue;const n=I(nx,ny);if(prv[n]!==-2||!road(nx,ny))continue;prv[n]=c;q.push(n);}}
+      let path=[];if(found){let k=goal;while(k!==-1){path.push([k%W,(k/W)|0]);k=prv[k];}path.reverse();}else path=[[A.x,A.y],[Bs.x,Bs.y]];
+      const bus=new THREE.Group();B(bus,.5,.45,1.5,0xf1c40f,0,.1,0);B(bus,.52,.16,1.3,0x9fd3ff,0,.36,0,true);B(bus,.52,.04,1.52,0xffffff,0,.55,0);B(bus,.4,.08,.02,0xffd166,0,.2,.76,true);
+      wheel(bus,-.24,.5);wheel(bus,.24,.5);wheel(bus,-.24,-.5);wheel(bus,.24,-.5);shadow(bus);scene.add(bus);
+      me.mesh.visible=false;if(me.label)me.label.el.style.display='none';me.path=[];
+      const sp=Math.max(18,path.length/7);let i=0,x=path[0][0],y=path[0][1],last=performance.now();
+      const step=()=>{const now=performance.now(),dt=Math.min(.05,(now-last)/1000);last=now;let mv=sp*dt;
+        while(mv>0&&i<path.length-1){const[tx,ty]=path[i+1],dx=tx-x,dy=ty-y,d=Math.hypot(dx,dy);if(d<=mv){x=tx;y=ty;i++;mv-=d;}else{x+=dx/d*mv;y+=dy/d*mv;mv=0;bus.rotation.y=Math.atan2(dx,dy);}}
+        bus.position.set(x,0,y);camFly=null;camT.x+=(x-camT.x)*.15;camT.z+=(y-camT.z)*.15;updateCam();
+        if(i<path.length-1)requestAnimationFrame(step);
+        else{scene.remove(bus);me.x=Bs.x;me.y=Bs.y;me.path=[];me.moving=false;me.mesh.visible=true;if(me.label)me.label.el.style.display='';onDone&&onDone();}};
+      requestAnimationFrame(step);},
     teleport(x,y){if(!me)return;me.x=x;me.y=y;me.path=[];me.moving=false;camFly=null;camT.set(x,0,y);clampCam();updateCam();},
     busMap(cv,hi){const k=cv.width/W,c=cv.getContext('2d'),tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;tmp.getContext('2d').putImageData(mmBase,0,0);
       c.imageSmoothingEnabled=false;c.drawImage(tmp,0,0,cv.width,cv.height);c.fillStyle='rgba(10,8,16,.25)';c.fillRect(0,0,cv.width,cv.height);
