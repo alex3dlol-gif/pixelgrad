@@ -370,6 +370,19 @@ export function createWorld(canvas,{mobile}){
       B(g,.9,.55,.8,[0x8b5a2b,0x7a4a24,0x9c6b3e,0xc9a26b][k%4]);GR(g,1.05,.45,.95,[0x3d6b35,0x8a3a2a,0x5a6a7a,0x2e5e8c][(k+1)%4],0,.55,0);B(g,.2,.18,.03,0x2e86ab,0,.25,.41);
       decoTree(g,1,.3,.8);g.position.set(x,0,y);statics.add(g);walk[I(x,y)]=0;}}
   for(const k in POIS)if(k!=='harvest')(k==='cat'?scene:statics).add(makePOI(k,POIS[k]));
+  const STOPS=[];{const CB=BLOCKS[0],ccx=CB.x+CB.cols*STEP/2,ccy=CB.y+CB.rows*STEP/2;
+    const roadNear=(x,y)=>{x=Math.round(x);y=Math.round(y);for(let r=0;r<14;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const X=x+dx,Y=y+dy;
+      if(inb(X,Y)&&(grid[I(X,Y)]===T.ROAD||grid[I(X,Y)]===T.ASPH)&&walk[I(X,Y)])return{x:X,y:Y};}return null;};
+    const cap=n=>n.split(' ').map(w=>w==='СНТ'?w:w[0]==='«'?'«'+w[1]+w.slice(2).toLowerCase():w[0]+w.slice(1).toLowerCase()).join(' ');
+    for(const b of BLOCKS.slice(1)){let px,py;const bx0=b.x,by0=b.y,bx1=b.x+b.cols*STEP,by1=b.y+b.rows*STEP;
+      if(b.link){px=b.x+STEP*Math.floor(b.cols/2)+1;py=b.link<b.y?by0-1:by1+1;}
+      else{px=Math.max(bx0,Math.min(bx1,ccx));py=Math.max(by0,Math.min(by1,ccy));}
+      const r=roadNear(px,py);if(r)STOPS.push({name:cap(b.name),x:r.x,y:r.y,reg:b.reg});}
+    for(const[n,i,j]of[['Центр',8,6],['Рынок',0,6],['Кинотеатр «Мир»',4,9],['Северная',8,0],['Южная',8,13],['Деловой квартал',13,4]]){
+      const r=roadNear(CB.x+i*STEP,CB.y+j*STEP);if(r)STOPS.push({name:n,x:r.x,y:r.y,reg:'c'});}
+    for(const s of STOPS){const g=new THREE.Group();B(g,.06,.9,.06,0x555555,-.45,0,.3);B(g,.06,.9,.06,0x555555,.45,0,.3);B(g,1.1,.05,.6,0x2e86ab,0,.9,.1);B(g,1,.6,.04,0x9fd3ff,0,.25,-.18,true);
+      B(g,.8,.06,.25,0x8b5a2b,0,.25,0);B(g,.04,1.2,.04,0x333333,.7,0,.35);B(g,.3,.3,.04,0xf1c40f,.7,1.1,.35,true);B(g,.14,.14,.041,0x2c3e50,.7,1.18,.36,true);
+      g.position.set(s.x+.5,0,s.y-.5);statics.add(g);}}
   {const I_=ISLAND;for(const[k,type]of[['spawn','guesthouse'],['pvz','pvzCity'],['alko','alko'],['lavka','lavka']]){const b=makeBuilding(type,0);b.g.position.set(I_[k].x,0,I_[k].y);statics.add(b.g);
       for(let y=I_[k].y-1;y<=I_[k].y;y++)for(let x=I_[k].x-1;x<=I_[k].x;x++)walk[I(x,y)]=0;}
     const pg=new THREE.Group();for(let k=0;k<4;k++){B(pg,.08,.5,.08,0x6b4a2f,I_.pier.x-.4,-.3,I_.pier.y-2-k*1.6);B(pg,.08,.5,.08,0x6b4a2f,I_.pier.x+1.4,-.3,I_.pier.y-2-k*1.6);}statics.add(pg);
@@ -718,6 +731,7 @@ export function createWorld(canvas,{mobile}){
   wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
+  for(const s of STOPS){const L=wlabel('🚌 '+s.name,s.x+.5,1.7,s.y-.5,'emp','#9fd3ff');L.zMax=mobile?9:13;}
   for(const p of plots)if(p.sp==='dk'||p.sp==='cinema'){const L=wlabel(p.sp==='dk'?'🎭 Дом культуры':'🎬 Кинотеатр «Мир»',p.x,2.6,p.y,'emp','#ffd166');L.zMax=mobile?11:15;}
   for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];const L=wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');L.zMax=mobile?11:15;}
 
@@ -845,7 +859,14 @@ export function createWorld(canvas,{mobile}){
     select(p){if(p){selF.visible=true;selF.position.set(p.x,0,p.y);}else selF.visible=false;},
     set arrow(p){arrowTarget=p;},
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
-    jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
+    jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},STOPS,
+    teleport(x,y){if(!me)return;me.x=x;me.y=y;me.path=[];me.moving=false;camFly=null;camT.set(x,0,y);clampCam();updateCam();},
+    busMap(cv,hi){const k=cv.width/W,c=cv.getContext('2d'),tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;tmp.getContext('2d').putImageData(mmBase,0,0);
+      c.imageSmoothingEnabled=false;c.drawImage(tmp,0,0,cv.width,cv.height);c.fillStyle='rgba(10,8,16,.25)';c.fillRect(0,0,cv.width,cv.height);
+      if(me){c.fillStyle='#ffd166';c.beginPath();c.arc(me.x*k,me.y*k,5,0,7);c.fill();}
+      c.font='bold 12px sans-serif';c.textAlign='center';
+      STOPS.forEach((s,i)=>{c.fillStyle=i===hi?'#ffd166':'#2e86ab';c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.arc(s.x*k,s.y*k,i===hi?8:6,0,7);c.fill();c.stroke();
+        c.lineWidth=3;c.strokeStyle='#0e0b14';c.strokeText(s.name,s.x*k,s.y*k-10);c.fillStyle='#fff';c.fillText(s.name,s.x*k,s.y*k-10);});},
     marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
     tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);tutFence.visible=!tutPlot.owner;if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
     setFog(on){fog.visible=!!on;camBounds=on?{x0:ISLAND.x0-2,y0:ISLAND.y0-2,x1:ISLAND.x1+2,y1:ISLAND.y1+2}:null;clampCam();},

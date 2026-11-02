@@ -237,7 +237,25 @@ $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;co
   addEventListener('keydown',e=>{if(mode==='room'&&e.code==='KeyR'&&e.target.tagName!=='INPUT')room.rotateHand();});}
 
 // ================= ВЫБОР НА КАРТЕ =================
-world.onTap=(p,g)=>{if(mode!=='city')return;if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
+// ================= АВТОБУСЫ (бесплатно) =================
+const nearStop=(x,y,r)=>{let b=null,bd=r;world.STOPS.forEach((s,i)=>{const d=Math.hypot(s.x+.5-x,s.y-.5-y);if(d<bd){bd=d;b=i;}});return b;};
+let stopSel=null;
+function stopHTML(){const s=world.STOPS[stopSel];if(!s)return'';const m=world.me,d=m?Math.hypot(m.x-s.x,m.y-s.y):99;
+  return`<h3>🚌 Остановка «${esc(s.name)}»</h3><div>Автобус ходит между деревнями и городом. <b>Бесплатно.</b></div>`+
+  (d<=3?`<span class="btn gold" data-act="busmap">🗺 Куда едем?</span>`:`<div class="mut" style="margin-top:6px">Подойди к остановке, чтобы сесть в автобус.</div><span class="btn blue" data-act="gostop">Идти к остановке</span>`);}
+function showBusMap(){const S=world.STOPS,from=stopSel;$('auth').style.display='flex';
+  $('authbox').innerHTML=`<h3 style="font-size:14px">🚌 Куда едем?</h3><div class="mut">Нажми на остановку на карте или выбери из списка</div>
+  <canvas id="buscv" width="800" height="640" style="width:100%;image-rendering:pixelated;border:3px solid #0e0b14;cursor:pointer;touch-action:manipulation"></canvas>
+  <div style="max-height:22vh;overflow:auto;margin-top:6px">${S.map((s,i)=>i===from?'':`<span class="btn sm ${s.reg==='c'?'blue':''}" data-act="busgo" data-i="${i}">${s.reg==='c'?'🏙':'🏡'} ${esc(s.name)}</span>`).join('')}</div>
+  <span class="btn" data-act="closemodal">Отмена</span>`;
+  const cv=$('buscv');world.busMap(cv,from);
+  cv.onclick=e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*world.W,y=(e.clientY-r.top)/r.height*world.H;const i=nearStop(x,y,14);if(i!=null&&i!==from)busGo(i);};}
+function busGo(i){const s=world.STOPS[i],f=world.STOPS[stopSel];if(!s)return;
+  $('authbox').innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:48px" id="busic">🚌</div><div>${esc(f?f.name:'')} → <b>${esc(s.name)}</b></div><div class="bar" style="margin-top:10px"><i id="busbar" style="width:0;transition:width 1.6s linear"></i></div></div>`;
+  requestAnimationFrame(()=>{const b=$('busbar');if(b)b.style.width='100%';});
+  setTimeout(()=>{$('auth').style.display='none';const m=world.me;if(m){m.goal=null;}world.teleport(s.x,s.y);stopSel=i;sheetOpen=false;trackPos(true);
+    rpc('set_pos',{p_x:s.x,p_y:s.y}).catch(()=>{});toast(`🚌 Приехали: ${esc(s.name)}`);dirty=true;},1700);}
+world.onTap=(p,g)=>{if(mode!=='city')return;if(!ob&&g){const si=nearStop(g.x,g.z,1.6);if(si!=null){stopSel=si;tab='stop';sheetOpen=true;sel=null;world.select(null);dirty=true;return;}}if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
 world.onHover=(p,e)=>{const t=$('tip');if(!p||!e){t.style.display='none';return;}t.style.display='block';t.style.left=e.clientX+16+'px';t.style.top=e.clientY+12+'px';t.innerHTML=tipHTML(p);};
 function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(CLUBS[p.sp])return`${CLUBS[p.sp].ic} ${CLUBS[p.sp].n} · ⚡×3, пока ты внутри`;if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
@@ -533,11 +551,11 @@ function renderUI(){
   $('topbtns').style.display=me&&me.home_unit&&!ob?'':'none';
   document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
   if(mobile&&ob){$('coach').classList.toggle('mini',coachMin);$('coach').classList.toggle('withsheet',sheetOpen);}
-  const T=mode==='room'?(roomCtx&&roomCtx.club?CLUB_TABS:ROOM_TABS):CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile')))tab=T[0][0];
+  const T=mode==='room'?(roomCtx&&roomCtx.club?CLUB_TABS:ROOM_TABS):CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile'||tab==='stop')))tab=T[0][0];
   const th=ob?'':T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
-  const body=ob?(tab==='inv'?obInvHTML():obHTML()):{profile:profileHTML,inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML,club:clubHTML}[tab]();
+  const body=ob?(tab==='inv'?obInvHTML():obHTML()):{profile:profileHTML,inv:invHTML,obj:objHTML,stop:stopHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML,club:clubHTML}[tab]();
   if(body!==lastBody){const s=$('tabbody').scrollTop;$('tabbody').innerHTML=body;$('tabbody').scrollTop=s;lastBody=body;}
   $('hand').style.display=room.state&&room.state.hand?'inline':'none';
   dirty=false;tutCheck();
@@ -618,6 +636,10 @@ document.addEventListener('click',async e=>{
     case 'longstart':{const h=+t.dataset.h;if(await act('start_long_shift',{p_id:id,p_hours:h})){toast(`🕒 Ты на смене ${h} ч. Можно закрыть игру — награда будет ждать.`);}break;}
     case 'longclaim':{const before=me.money;if(await act('claim_long_shift')){const d=Math.round(me.money-before);toast(`✅ Смена окончена: +${fmt(d)}💰`);world.me&&world.float(`+${fmt(d)}💰`,world.me.x,1.7,world.me.y,'#c8ffb0');}break;}
     case 'longcancel':if(confirm('Уйти со смены раньше? Оплаты не будет, энергия не вернётся.'))await act('cancel_long_shift');break;
+    case 'busmap':showBusMap();break;
+    case 'busgo':busGo(+t.dataset.i);break;
+    case 'gostop':{const s=world.STOPS[stopSel];if(s){world.goMe(s.x,s.y);if(mobile)sheetOpen=false;}break;}
+    case 'closemodal':$('auth').style.display='none';break;
     case 'club':if(mode==='room')leaveRoom();await enterClub(id);break;
     case 'enter':if(mode==='room')leaveRoom();await enterRoom({unit:id,hostUid:me.id,hostNick:me.nick,editable:true});break;
     case 'redit':if(room.state){room.setEdit(!room.state.edit);sheetOpen=true;tab='furn';}break;
