@@ -13,7 +13,7 @@ const room=createRoom(world.renderer);
 const plots=world.plots;
 
 // ================= СОСТОЯНИЕ =================
-let me=null,mode='city',sel=null,tab='obj',sheetOpen=!mobile,dirty=true;
+let me=null,mode='city',sel=null,tab='work',sheetOpen=!mobile,dirty=true;
 const props=new Map(),profiles=new Map(),goods=new Map(),events=[],unitsByPlot=new Map();
 let city=null;const qlog=new Map();let quest=null;const listings=new Map(),auctions=new Map();let mkSec='base',aucDraft=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
 const LV=()=>me?lvlOf(me.xp||0):1;
@@ -188,7 +188,8 @@ function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(p.sp==='shop')return`<b
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
 
 // ================= ВКЛАДКИ =================
-const CITY_TABS=[['obj','📍','Объект'],['work','💼','Работа'],['market','🏭','Рынок'],['home','🏠','Жильё',2],['gov','🏛','Мэрия',4],['more','☰','Ещё']];
+const CITY_TABS=[['work','💼','Дела'],['market','🏪','Рынок'],['home','🏠','Жильё',2],['gov','🏛','Город',4],['more','☰','Ещё']];
+let coachMin=false,lastInvOpen=false;
 const newTabs=new Set();
 const ROOM_TABS=[['furn','🛋','Мебель'],['guests','👥','Гости']];
 function ioText(b){if(b.kind==='retail')return'твой товар со склада → розница ×1.6';if(b.kind==='gather')return`→ ${b.rate}${Object.keys(b.out).map(g=>GOODS[g].ic).join('')}/мин`;
@@ -209,6 +210,11 @@ function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),
   if(l<5)return{t:'Дорасти до 5 уровня',d:'Откроются точки в городе: ПВЗ, шаурмичные, ларьки.'+xpBar(5),a:'tab',v:'work',b:'Задания'};
   if(!mp.some(p=>p.reg==='c'&&p.building))return{t:'Открой точку в городе',d:'Город — главный рынок сбыта: жители платят за готовое.',a:'tab',v:'market',b:'Рынок'};
   return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'gov',b:'Мэрия'};}
+function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость — ${c} каждого товара (растёт с числом и уровнем бизнесов). Сверх лимита товар пропадает.</div>`;
+  if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
+  for(const g of gs){const q=Math.floor(inv(me,g)),pc=Math.min(100,q/c*100);h+=`<div class="row">${GOODS[g].ic} <b>${GOODS[g].n}</b> — ${q}/${c} <span class="mut">≈${Math.round(q*price(g,q/2))}💰 на базе</span><div class="bar"><i style="width:${pc}%;background:${pc>=100?'#c0392b':pc>80?'#e67e22':'#ffd166'}"></i></div>
+    <span class="btn sm" data-act="sell" data-g="${g}">Продать на базу</span>${LV()>=2?`<span class="btn sm blue" data-act="toex">На биржу</span>`:''}</div>`;}
+  return h;}
 function nextHTML(){const n=nextStep();if(!n)return'';return`<div class="box" style="border-color:#7bd389;padding:8px"><div class="mut" style="color:#7bd389">🎯 ЧТО ДЕЛАТЬ ДАЛЬШЕ</div><b>${n.t}</b><div style="font-size:14px;margin:4px 0">${n.d}</div><span class="btn gold sm" data-act="next" data-a="${n.a}" data-v="${n.v??''}">${n.b} →</span></div>`;}
 function bizHTML(pr){const b=BLD[pr.building],building=pr.built_at&&Date.parse(pr.built_at)>Date.now();
   const lv=pr.level||1,mx=MAX_WORKERS+(lv>=3?1:0)+(lv>=5?1:0);
@@ -238,7 +244,7 @@ function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
       else h+=u.building?`<div>${bizHTML(u)}</div>`:`<div>${buildListHTML(u)}</div>`;h+=`<span class="btn sm red" data-act="sellprop" data-id="${id}">Продать</span>`;}
     else h+=`<span class="mut">владелец: </span>${nm(u.owner)}${u.building?` · ${BLD[u.building].ic} ${BLD[u.building].n}`+jobBtn(u):''}`;
     h+='</div>';}return h;}
-function objHTML(){const p=sel;if(!p)return nextHTML()+`<h3 style="margin-top:10px">📍 Объект</h3><div>Нажми на участок, дом или предприятие на карте.</div><div class="mut" style="margin-top:6px">${mobile?'Двигай карту пальцем, щипок — зум.':'Тяни мышью, колесо — зум, Q/E — поворот.'}</div>`;
+function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>Нажми на участок, дом или предприятие на карте.</div><div class="mut" style="margin-top:6px">${mobile?'Двигай карту пальцем, щипок — зум.':'Тяни мышью, колесо — зум, Q/E — поворот.'}</div>`;
   if(p.sp==='res'){const r=RES[p.rt];return`<h3>🏢 ${r.n}</h3><div class="mut">${r.floors} этажей · комната ${r.room[0]}×${r.room[1]}. Купи квартиру, обставь мебелью и зови друзей.</div>${unitsHTML(p)}`;}
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство: делает район живым, тут гуляют жители.</div>`;
   const pr=props.get(p.id);if(!pr)return'<div class="mut">Загрузка…</div>';
@@ -299,7 +305,7 @@ function questsHTML(){const l=LV();let h=`<h3>🗺 Задания в округ�
       ` <span class="btn sm blue" data-act="gopoi" data-q="${id}">На карте</span></div>`;}
   if(qLocked)h+=`<div class="row mut">✨ Ещё ${qLocked} заданий откроются на следующих уровнях</div>`;
   return h;}
-function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
+function workHTML(){if(!me)return'';let h=nextHTML()+'<div style="height:8px"></div>'+questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
   const cur=me.job_prop!=null&&props.get(me.job_prop);
   if(cur){const j=jobInfo(cur);h+=`<div class="row">Сейчас: <b>${j?.n}</b> · ${j?.pay}💰/смена<div class="bar"><i id="shiftbar" style="width:0"></i></div><span class="mut">Смена ${SHIFT_SEC} сек, идёт пока ты в игре</span><br><span class="btn sm blue" data-act="goto" data-plot="${cur.plot}">Показать</span><span class="btn sm red" data-act="quit">Уволиться</span></div>`;}
   else h+=`<div class="row">Ты без работы.</div>`;
@@ -431,13 +437,19 @@ function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10
   <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 тратятся на скины (Ещё → Скины).</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
 let lastBody='',lastTabs='';
 function renderUI(){
-  if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1);$('money').innerHTML='💰 '+fmt(me.money)+` <span style="color:#9be7ff;font-size:15px">💎${me.gems||0}</span>`;const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('rank').innerHTML=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')} · Ур. ${l} · ${careerOf(me.shifts)} · <span data-act="energy" style="cursor:pointer;color:${EN()<3?'#ff9b9b':'#ffd166'}">⚡${Math.floor(EN())}/${ENERGY.max}</span><div class="bar" style="height:6px"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div>`;
-    $('inv').innerHTML=GK.filter(g=>inv(me,g)>=1).map(g=>{const q=Math.floor(inv(me,g)),c=CAP();return`<span class="chip" style="${q>=c?'color:#ff9b9b':''}" title="склад ${q}/${c}">${GOODS[g].ic} ${q}${q>=c*.8?'/'+c:''}</span>`;}).join('')||'<span class="mut">склад пуст</span>';}
-  const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab))tab=T[0][0];
+  if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1),fr=Math.max(0,Math.min(1,((me.xp||0)-x0)/(x1-x0)));
+    $('hlvl').textContent=l;$('hxp').setAttribute('stroke-dasharray',`${(fr*100.5).toFixed(1)} 101`);
+    $('money').textContent='💰 '+fmt(me.money);$('hgems').textContent='💎 '+(me.gems||0);
+    const e=Math.floor(EN());$('hen').textContent='⚡ '+e+(mobile?'':'/'+ENERGY.max);$('hen').classList.toggle('low',e<ENERGY.shift);
+    const c=CAP(),full=GK.some(g=>inv(me,g)>=c),n=GK.reduce((a,g)=>a+Math.floor(inv(me,g)),0);$('invn').textContent=full?'!':n?(n>999?'999+':n):'';$('invn').style.background=full?'#c0392b':'#3a7d44';}
+  {const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('htime').textContent=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;}
+  document.body.classList.toggle('sheetopen',sheetOpen);
+  if(mobile&&tutI>=0&&tutI<TUT.length){$('coach').classList.toggle('mini',sheetOpen||coachMin);}
+  const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv')))tab=T[0][0];
   const th=T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
-  const body={obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
+  const body={inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
   if(body!==lastBody){const s=$('tabbody').scrollTop;$('tabbody').innerHTML=body;$('tabbody').scrollTop=s;lastBody=body;}
   $('hand').style.display=room.state&&room.state.hand?'inline':'none';
   dirty=false;tutCheck();
@@ -464,6 +476,9 @@ document.addEventListener('click',async e=>{
     case 'govset':{const raw=$('gv_'+t.dataset.k)?.value??t.dataset.v??'0';const v=parseFloat(String(raw).replace(',','.'))||0;if(await act('gov_set',{p_key:t.dataset.k,p_val:t.dataset.pct?v/100:v}))toast('Сохранено');break;}
     case 'moresec':moreSec=t.dataset.s;break;
     case 'mksec':mkSec=t.dataset.s;break;
+    case 'inv':if(tab==='inv'&&sheetOpen)sheetOpen=false;else{tab='inv';sheetOpen=true;}break;
+    case 'levels':tab='more';moreSec='levels';sheetOpen=true;break;
+    case 'toex':tab='market';mkSec='ex';break;
     case 'aucnew':showAucCreate(props.get(id));return;
     case 'aucgo':{const st=+$('ac_s').value,bo=+($('ac_b').value||0),hh=+$('ac_h').value;if(await act('create_auction',{p_id:id,p_start:st,p_buyout:bo||null,p_hours:hh})){$('auth').style.display='none';toast('🔨 Лот выставлен');mkSec='auc';tab='market';}break;}
     case 'auccancel':if(await act('cancel_auction',{p_auction:id}))toast('Лот снят');break;
@@ -494,7 +509,7 @@ document.addEventListener('click',async e=>{
     case 'qcancel':quest=null;if(world.me)world.me.goal=null;break;
     case 'gopoi':{const P=world.POIS[QUESTS[t.dataset.q].poi];world.flyTo(P.x,P.y,mobile?12:16);if(mobile)sheetOpen=false;break;}
     case 'closesheet':sheetOpen=false;break;
-    case 'coachmin':$('coach').classList.toggle('mini');break;
+    case 'coachmin':coachMin=!$('coach').classList.contains('mini');$('coach').classList.toggle('mini');break;
     case 'buyland':await act('buy_land',{p_id:id});break;
     case 'build':await act('build',{p_id:id,p_type:t.dataset.t});break;
     case 'hire':await act('hire',{p_id:id,p_delta:1});break;
@@ -511,7 +526,7 @@ document.addEventListener('click',async e=>{
     case 'leave':leaveRoom();break;
     case 'findme':if(mode==='city'&&world.me)world.flyTo(world.me.x,world.me.y);break;
     case 'map':$('mmbox').classList.toggle('show');break;
-    case 'goto':{const p=plots[+t.dataset.plot];world.flyTo(p.x,p.y,mobile?12:16);sel=p;world.select(p);tab='obj';if(mobile)sheetOpen=false;break;}
+    case 'goto':{const p=plots[+t.dataset.plot];world.flyTo(p.x,p.y,mobile?12:16);sel=p;world.select(p);tab='obj';sheetOpen=true;break;}
     case 'place':if(room.takeToHand(t.dataset.it)&&mobile)sheetOpen=false;break;
     case 'rot':room.rotateHand();break;
     case 'drop':room.dropHand();break;
@@ -536,17 +551,17 @@ const TUT=[
   {t:'Здорово, сосед! Я Петрович, местный завхоз. Человечек с твоим ником — это ты. Приехал(а) налегке: 150💰 и койка в общаге. Покажу, как тут всё устроено — займёт пару минут.',btn:'Поехали',enter(){const m=world.me;m&&world.flyTo(m.x,m.y,mobile?9:11);}},
   {t:mobile?'Сначала научимся смотреть по сторонам: <b>проведи пальцем</b> по карте, чтобы её подвинуть. Двумя пальцами — приблизить/отдалить.':'Сначала научимся смотреть по сторонам: <b>потяни карту мышкой</b>. Колесо — приблизить/отдалить, Q/E — повернуть.',
     enter(){camStart={x:world.camT.x,z:world.camT.z};},done:()=>camStart&&Math.hypot(world.camT.x-camStart.x,world.camT.z-camStart.z)>8},
-  {t:'Отлично! Нажми 📍 сверху, если потеряешься — камера вернётся к тебе. А теперь к делу: без денег никуда. Над ПВЗ «Коробас» стрелка — нажми на него и «Устроиться».',arrow:()=>pvzPlot,enter(){world.flyTo(pvzPlot.x,pvzPlot.y,mobile?10:12);},done:()=>me.job_prop!=null},
-  {t:`Ты на работе! Человечек сам дойдёт до ПВЗ. Каждая смена (${SHIFT_SEC} сек) — 💰 и ⭐ опыт (полоска под деньгами сверху). Подожди первую смену.`,hl:['rank'],enter(){const m=world.me;m&&world.flyTo(m.x,m.y);},done:()=>me.shifts>=1},
-  {t:'Есть первая зарплата! Ещё деньги и опыт дают <b>задания в округе</b>: вкладка «Работа» → например, «Найти кота бабы Зины». Сходи — заодно погуляешь по городу.',hl:['tabs'],enter(){tab='work';sheetOpen=true;},done:()=>[...qlog.values()].some(q=>q.cnt>0)||(LV()>=2&&me.money>=200)},
+  {t:'Отлично! Нажми 📍 справа, если потеряешься — камера вернётся к тебе. А теперь к делу: без денег никуда. Над ПВЗ «Коробас» стрелка — нажми на него и «Устроиться».',arrow:()=>pvzPlot,enter(){world.flyTo(pvzPlot.x,pvzPlot.y,mobile?10:12);},done:()=>me.job_prop!=null},
+  {t:`Ты на работе! Человечек сам дойдёт до ПВЗ. Каждая смена (${SHIFT_SEC} сек) — 💰 и ⭐ опыт (кольцо вокруг уровня слева сверху). Подожди первую смену.`,hl:['rank'],enter(){const m=world.me;m&&world.flyTo(m.x,m.y);},done:()=>me.shifts>=1},
+  {t:'Есть первая зарплата! Ещё деньги и опыт дают <b>задания в округе</b>: вкладка «💼 Дела» → например, «Найти кота бабы Зины». Сходи — заодно погуляешь по городу.',hl:['tabs'],enter(){tab='work';sheetOpen=true;},done:()=>[...qlog.values()].some(q=>q.cnt>0)||(LV()>=2&&me.money>=200)},
   {t:'Молодец! Игра открывается постепенно: новые вкладки и здания появляются с уровнем (их отмечу ✨). Набери <b>2 уровень</b> и <b>200💰</b> — тогда купим землю. Смены идут, пока ты в игре.',hl:['money','rank'],done:()=>LV()>=2&&me.money>=200},
   {t:'Пора своё дело! В деревнях и на дачах земля дешёвая. Отметил тебе участок стрелкой — нажми на него и «Купить».',arrow:()=>recLand&&plots[recLand.plot],enter(){recLand=cheapLand();if(recLand)world.flyTo(plots[recLand.plot].x,plots[recLand.plot].y,mobile?11:13);},
     tick(){if(recLand&&props.get(recLand.id)?.owner&&props.get(recLand.id).owner!==me.id){recLand=cheapLand();}},done:()=>myPlots().length>0},
   {t:'Твоя земля! Построй 🌾 <b>Ферму</b> — самый дешёвый старт. Есть ещё сад, огород, пасека, делянка, птичник. Работник выйдет сам.',enter(){const p=myPlots()[0];if(p){sel=plots[p.plot];world.select(sel);tab='obj';sheetOpen=true;}},done:()=>myPlots().some(p=>p.building)},
-  {t:'Стройка 20 секунд, потом работник начнёт добывать. Продукция копится на складе — он сверху. Пока ты в игре, бизнес работает на 100%, без тебя — на 25%.',hl:['inv'],done:()=>GK.some(g=>inv(me,g)>=5)},
+  {t:'Стройка 20 секунд, потом работник начнёт добывать. Продукция копится на складе — кнопка 📦 справа. Пока ты в игре, бизнес работает на 100%, без тебя — на 25%.',hl:['inv'],done:()=>GK.some(g=>inv(me,g)>=5)},
   {t:'Урожай есть! Продай его: вкладка «Рынок» → «Продать». Грузовик повезёт товар на оптовую базу — это увидят все игроки.',hl:['tabs'],enter(){tab='market';sheetOpen=true;},done:()=>me.sold>0},
-  {t:'Почти всё! Жми 🏠 сверху — это твоя койка в общаге. Мебель покупается за товар игроков, потом можно купить квартиру и звать друзей в гости.',hl:['topbtns'],done:()=>tutFlags.room},
-  {t:'Ты готов(а)! Во вкладке «📍 Объект» всегда есть карточка <b>🎯 Что делать дальше</b> — она подскажет следующий шаг. Дальше: найм, магазин, переработка, биржа, квартиры, выборы мэра. Удачи!',btn:'Погнали!',enter(){tab='obj';sel=null;world.select(null);sheetOpen=true;}},
+  {t:'Почти всё! Жми 🏠 справа — это твоя койка в общаге. Мебель покупается за товар игроков, потом можно купить квартиру и звать друзей в гости.',hl:['topbtns'],done:()=>tutFlags.room},
+  {t:'Ты готов(а)! Во вкладке «💼 Дела» всегда есть карточка <b>🎯 Что делать дальше</b> — она подскажет следующий шаг. Дальше: найм, магазин, переработка, биржа, квартиры, выборы мэра. Удачи!',btn:'Погнали!',enter(){tab='work';sel=null;world.select(null);sheetOpen=true;}},
 ];
 function tutGo(i){document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));
   if(i>=TUT.length){tutEnd();return;}tutI=i;if(me&&me.tut!==i){me.tut=i;act('set_tut',{p_n:i},true);}

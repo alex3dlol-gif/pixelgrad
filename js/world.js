@@ -590,7 +590,7 @@ export function createWorld(canvas,{mobile}){
   for(const b of BLOCKS)wlabel(b.name,b.x+b.cols*STEP/2,0,b.y-3,'big');
   wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
-  for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');}
+  for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];const L=wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');L.zMax=mobile?11:15;}
 
   // ================= КАМЕРА =================
   const cam=new THREE.OrthographicCamera(-1,1,1,-1,.1,800);
@@ -695,7 +695,7 @@ export function createWorld(canvas,{mobile}){
     clampCam();updateCam();dayState=applyDayNight();
     renderer.render(scene,cam);
     for(let i=floats.length-1;i>=0;i--){const f=floats[i];f.t+=dt;f.p.y+=dt*.7;project(f.p,f.el);f.el.style.opacity=1-f.t/1.6;if(f.t>1.6){f.el.remove();floats.splice(i,1);}}
-    for(const L of wlabels)project(L.p,L.el);
+    for(const L of wlabels){if(L.zMax&&zoom>L.zMax){L.el.style.display='none';continue;}project(L.p,L.el);}
   }
 
   return {renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,
