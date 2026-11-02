@@ -582,7 +582,7 @@ export function createWorld(canvas,{mobile}){
     if(v.phase==='go'){v.phase='back';if(v.kind==='van'){v.target.parcels+=12;v.path=pathTo(v,sortPlot.door.x,sortPlot.door.y);}else{v.mesh.userData.cargo.visible=false;v.path=pathTo(v,v.home.x,v.home.y);}}
     else{scene.remove(v.mesh);vehicles.splice(vehicles.indexOf(v),1);}}
   // корабли
-  function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:215+rand(-20,20),y:H+6,wp:[[px+3.5,190],[px+3.5,177],[px+3.5,168]],wait:25,out:[[px+3.5,179],[px+3.5,200],[215+rand(-20,20),H+8]],speed:2.2};scene.add(s.mesh);ships.push(s);}
+  function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:px+3.5,y:H+6,wp:[[px+3.5,190],[px+3.5,177],[px+3.5,168]],wait:25,out:[[px+3.5,179],[px+3.5,200],[px+3.5,H+8]],speed:2.2};scene.add(s.mesh);ships.push(s);}
   function spawnFishing(){const px=pick(PIERS);const s={kind:'fishing',mesh:makeShip(false),x:px+.5,y:172,wp:[[px+rand(-12,12),rand(178,200)],[px+rand(-15,15),rand(176,200)],[px+.5,172]],wait:0,speed:1.5};scene.add(s.mesh);ships.push(s);}
   function updateShip(s,dt){
     if(s.ferry){const t=s.wp[0];if(!t)return;const dx=t[0]-s.x,dy=t[1]-s.y,d=Math.hypot(dx,dy),sp=s.speed*dt;s.face=Math.atan2(dx,dy);if(d<=sp){s.x=t[0];s.y=t[1];s.wp.shift();}else{s.x+=dx/d*sp;s.y+=dy/d*sp;}return;}

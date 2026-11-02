@@ -473,7 +473,7 @@ function renderUI(){
   const th=ob?'':T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
-  const body=ob?(tab==='inv'?obInvHTML:obHTML):{profile:profileHTML,inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
+  const body=ob?(tab==='inv'?obInvHTML():obHTML()):{profile:profileHTML,inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
   if(body!==lastBody){const s=$('tabbody').scrollTop;$('tabbody').innerHTML=body;$('tabbody').scrollTop=s;lastBody=body;}
   $('hand').style.display=room.state&&room.state.hand?'inline':'none';
   dirty=false;tutCheck();
