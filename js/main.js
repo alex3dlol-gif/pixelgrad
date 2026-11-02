@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE} from './config.js';
 import {createWorld} from './world.js';
 import {createRoom} from './room.js';
@@ -30,7 +31,7 @@ function missCost(need){let c=0,ok=true;for(const[g,q]of Object.entries(need)){c
 const costText=need=>Object.entries(need).map(([g,q])=>q+GOODS[g].ic).join(' ');
 
 function setMe(p){const old=me;me={...me,...p};profiles.set(p.id,{...profiles.get(p.id),...p});
-  if(old&&old.xp!=null&&lvlOf(me.xp)>lvlOf(old.xp)){const l=lvlOf(me.xp);toast(`⭐ Уровень ${l}! Открыто: ${UNLOCKS[l]||'новые возможности'}`,6000);lastTabs='';}
+  if(old&&old.xp!=null&&lvlOf(me.xp)>lvlOf(old.xp)){const l=lvlOf(me.xp);toast(`⭐ Уровень ${l}! Открыто: ${UNLOCKS[l]||'новые возможности'}`,7000);for(const t of CITY_TABS)if(t[3]===l)newTabs.add(t[0]);if(l===2||l===3)newTabs.add('market');if(l>=2)newTabs.add('obj');lastTabs='';}
   if(old&&(old.skin!==me.skin||JSON.stringify(old.look)!==JSON.stringify(me.look))&&world.me){const m=world.me;world.setMe(me.nick,me.color,m.x,m.y,me.skin,me.look);trackPos(true);}
   if(old&&old.inv)for(const g of GK){const d=Math.floor(inv(me,g))-Math.floor(inv(old,g));if(d>0){const pl=myPlots().find(x=>x.building&&BLD[x.building].out&&BLD[x.building].out[g]);if(pl)world.float(`+${d}${GOODS[g].ic}`,pl.x,2.2,pl.y,'#fff');}}
   dirty=true;}
@@ -182,24 +183,43 @@ function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(p.sp==='shop')return`<b
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
 
 // ================= ВКЛАДКИ =================
-const CITY_TABS=[['obj','📍','Объект'],['work','💼','Работа'],['market','🏭','Рынок'],['home','🏠','Жильё',2],['gov','🏛','Мэрия'],['more','☰','Ещё']];
+const CITY_TABS=[['obj','📍','Объект'],['work','💼','Работа'],['market','🏭','Рынок'],['home','🏠','Жильё',2],['gov','🏛','Мэрия',4],['more','☰','Ещё']];
+const newTabs=new Set();
 const ROOM_TABS=[['furn','🛋','Мебель'],['guests','👥','Гости']];
 function ioText(b){if(b.kind==='retail')return'твой товар со склада → розница ×1.6';if(b.kind==='gather')return`→ ${b.rate}${Object.keys(b.out).map(g=>GOODS[g].ic).join('')}/мин`;
   if(b.kind==='proc')return`${costText(b.in)} → ${Object.entries(b.out).map(([g,q])=>q+GOODS[g].ic).join('')} · ${b.rate}/мин`;
   return`${Object.keys(b.in).length?costText(b.in):'📦'} → ${b.pay}💰/клиент`;}
+function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),xpBar=(n)=>`<div class="bar"><i style="width:${Math.min(100,(me.xp||0)/xpFor(n)*100)}%"></i></div>`;
+  if(me.job_prop==null&&me.shifts===0)return{t:'Устройся на работу',d:'ПВЗ «Коробас» платит за каждую смену — это первые деньги и опыт.',a:'goto',v:pvzPlot.id,b:'Показать ПВЗ'};
+  if(!mp.length){if(l<2)return{t:'Дорасти до 2 уровня',d:`Опыт ${me.xp||0}/${xpFor(2)} — даётся за смены и задания. На 2 уровне можно купить землю.`+xpBar(2),a:'tab',v:'work',b:'Задания рядом'};
+    if(cl&&me.money<cl.price)return{t:'Накопи на участок',d:`Самый дешёвый участок — ${cl.price}💰, у тебя ${fmt(me.money)}💰. Смены и задания помогут.`,a:'tab',v:'work',b:'Работа и задания'};
+    return{t:'Купи участок',d:'В деревнях и на дачах земля дешёвая. Своя земля — свой бизнес.',a:'land',b:'Показать участок'};}
+  const nob=mp.find(p=>!p.building);if(!mp.some(p=>p.building))return{t:'Построй первый бизнес',d:'🌾 Ферма — самый дешёвый старт. Ещё есть сад, огород, пасека, делянка.',a:'goto',v:nob.plot,b:'К участку'};
+  if(!me.sold&&!listings.size)return{t:'Продай урожай',d:'Рынок → «Продать». Грузовик отвезёт товар на оптовую базу.',a:'tab',v:'market',b:'Открыть рынок'};
+  if(l<3)return{t:'Дорасти до 3 уровня',d:'Откроются найм работников (больше продукции) и свой магазин.'+xpBar(3),a:'tab',v:'work',b:'Задания'};
+  if(!mp.some(p=>p.workers>=2))return{t:'Найми второго работника',d:'Два работника — вдвое больше продукции.',a:'goto',v:mp.find(p=>p.building).plot,b:'К бизнесу'};
+  if(l<4)return{t:'Дорасти до 4 уровня',d:'Откроются переработка (дороже сырья) и покупка квартиры.'+xpBar(4),a:'tab',v:'work',b:'Задания'};
+  if(!mp.some(p=>BLD[p.building]?.kind==='proc'))return{t:'Построй переработку',d:'Мельница, пилорама, соковый цех… Переработанный товар стоит в разы дороже. Можно купить новый участок или сырьё на бирже у других.',a:'land',b:'Найти участок'};
+  if(!myProps().some(p=>p.kind==='apt'))return{t:'Купи квартиру',d:'Хрущёвка — от ~525💰. Обставь мебелью и зови друзей в гости.',a:'tab',v:'home',b:'Квартиры'};
+  if(l<5)return{t:'Дорасти до 5 уровня',d:'Откроются точки в городе: ПВЗ, шаурмичные, ларьки.'+xpBar(5),a:'tab',v:'work',b:'Задания'};
+  if(!mp.some(p=>p.reg==='c'&&p.building))return{t:'Открой точку в городе',d:'Город — главный рынок сбыта: жители платят за готовое.',a:'tab',v:'market',b:'Рынок'};
+  return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'gov',b:'Мэрия'};}
+function nextHTML(){const n=nextStep();if(!n)return'';return`<div class="box" style="border-color:#7bd389;padding:8px"><div class="mut" style="color:#7bd389">🎯 ЧТО ДЕЛАТЬ ДАЛЬШЕ</div><b>${n.t}</b><div style="font-size:14px;margin:4px 0">${n.d}</div><span class="btn gold sm" data-act="next" data-a="${n.a}" data-v="${n.v??''}">${n.b} →</span></div>`;}
 function bizHTML(pr){const b=BLD[pr.building],building=pr.built_at&&Date.parse(pr.built_at)>Date.now();
   let h=`<h3>${b.ic} ${b.n}</h3><div class="mut">${b.desc}</div><div style="margin:6px 0">${ioText(b)} на работника · зарплата ${b.wage}💰/мин каждому</div><div class="mut">🟢 Пока ты в игре — 100% выработки, офлайн — ${Math.round(OFFLINE_RATE*100)}% (до 8 ч).</div>`;
   if(b.kind==='service'||b.kind==='retail')h+=`<div class="mut">Спрос района: ~${pr.demand} клиентов/мин (делится с конкурентами рядом)</div>`;
   if(building)h+=`<div>🏗 Строится… ${Math.max(0,Math.ceil((Date.parse(pr.built_at)-Date.now())/1000))} сек</div>`;
   h+=`<div style="margin:6px 0">Работники: <b>${pr.workers}/${MAX_WORKERS}</b></div>`;
-  if(LV()<NEED.hire)h+=lock(NEED.hire)+' (найм)<br>';else h+=`<span class="btn ${pr.workers<MAX_WORKERS?'':'dis'}" data-act="hire" data-id="${pr.id}">Нанять (+${HIRE_FEE}💰)</span><span class="btn red ${pr.workers?'':'dis'}" data-act="fire" data-id="${pr.id}">Уволить</span>`;
+  if(LV()>=NEED.hire)h+=`<span class="btn ${pr.workers<MAX_WORKERS?'':'dis'}" data-act="hire" data-id="${pr.id}">Нанять (+${HIRE_FEE}💰)</span><span class="btn red ${pr.workers?'':'dis'}" data-act="fire" data-id="${pr.id}">Уволить</span>`;
   h+=`<div class="mut" style="margin-top:6px">Живые игроки тоже могут устроиться к тебе: ты платишь им ${OWNER_JOB_PAY}💰 за смену, а их смена даёт продукцию.</div>`;
   h+=`<div style="margin-top:8px"><span class="btn red sm" data-act="sellprop" data-id="${pr.id}">Продать (вернёшь ~70%)</span></div>`;return h;}
 function buildListHTML(pr){let h=`<div class="mut">Выбери, что построить. Недостающие материалы докупятся на базе — если они там есть.</div>`;
-  for(const[k,b]of Object.entries(BLD)){if(!b.reg.includes(pr.reg))continue;const m=missCost(b.mat),c=b.cost+m.c,can=me&&me.money>=c&&m.ok;
+  const here=Object.entries(BLD).filter(([k,b])=>b.reg.includes(pr.reg)),locked=here.filter(([k,b])=>LV()<needFor(b));
+  for(const[k,b]of here){if(LV()<needFor(b))continue;const m=missCost(b.mat),c=b.cost+m.c,can=me&&me.money>=c&&m.ok;
     h+=`<div class="row"><b>${b.ic} ${b.n}</b> <span class="mut">${ioText(b)}</span><br><span class="mut">${b.desc}<br>Стройка ${b.cost}💰${Object.keys(b.mat).length?' + '+costText(b.mat):''} · зарплата ${b.wage}💰/мин</span><br>
-    ${LV()<needFor(b)?lock(needFor(b)):`<span class="btn ${can?'':'dis'}" data-act="build" data-id="${pr.id}" data-t="${k}">Построить · ${c}💰</span>`}${m.ok?'':'<span class="mut"> нет материалов на базе</span>'}</div>`;}return h;}
-function jobBtn(pr){const j=jobInfo(pr);if(!j||!me)return'';if(pr.kind!=='npc'&&LV()<NEED.playerJob&&me.job_prop!==pr.id)return'<div>'+lock(NEED.playerJob)+' (работа у игроков)</div>';if(me.job_prop===pr.id)return`<div style="margin-top:6px">✅ Ты работаешь здесь<div class="bar"><i id="shiftbar" style="width:0"></i></div></div><span class="btn red" data-act="quit">Уволиться</span>`;
+    <span class="btn ${can?'':'dis'}" data-act="build" data-id="${pr.id}" data-t="${k}">Построить · ${c}💰</span>${m.ok?'':'<span class="mut"> нет материалов на базе</span>'}</div>`;}
+  if(locked.length){const nx=Math.min(...locked.map(([k,b])=>needFor(b)));h+=`<div class="row mut">✨ Ещё ${locked.length} видов зданий откроются позже. На ${nx} уровне: ${locked.filter(([k,b])=>needFor(b)===nx).map(([k,b])=>b.ic+' '+b.n).join(', ')}</div>`;}return h;}
+function jobBtn(pr){const j=jobInfo(pr);if(!j||!me)return'';if(pr.kind!=='npc'&&LV()<NEED.playerJob&&me.job_prop!==pr.id)return'';if(me.job_prop===pr.id)return`<div style="margin-top:6px">✅ Ты работаешь здесь<div class="bar"><i id="shiftbar" style="width:0"></i></div></div><span class="btn red" data-act="quit">Уволиться</span>`;
   const ok=me.shifts>=j.req;return`<div style="margin-top:6px"><span class="btn ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться · ${j.pay}💰/смена</span>${ok?'':`<div class="mut">Нужен опыт: ${j.req} смен (у тебя ${me.shifts})</div>`}</div>`;}
 function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
   for(const id of ids){const u=props.get(id);const mine=me&&u.owner===me.id;
@@ -209,7 +229,7 @@ function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
       else h+=u.building?`<div>${bizHTML(u)}</div>`:`<div>${buildListHTML(u)}</div>`;h+=`<span class="btn sm red" data-act="sellprop" data-id="${id}">Продать</span>`;}
     else h+=`<span class="mut">владелец: </span>${nm(u.owner)}${u.building?` · ${BLD[u.building].ic} ${BLD[u.building].n}`+jobBtn(u):''}`;
     h+='</div>';}return h;}
-function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>Нажми на участок, дом или предприятие на карте.</div><div class="mut" style="margin-top:6px">${mobile?'Двигай карту пальцем, щипок — зум.':'Тяни мышью, колесо — зум, Q/E — поворот.'}</div>`;
+function objHTML(){const p=sel;if(!p)return nextHTML()+`<h3 style="margin-top:10px">📍 Объект</h3><div>Нажми на участок, дом или предприятие на карте.</div><div class="mut" style="margin-top:6px">${mobile?'Двигай карту пальцем, щипок — зум.':'Тяни мышью, колесо — зум, Q/E — поворот.'}</div>`;
   if(p.sp==='res'){const r=RES[p.rt];return`<h3>🏢 ${r.n}</h3><div class="mut">${r.floors} этажей · комната ${r.room[0]}×${r.room[1]}. Купи квартиру, обставь мебелью и зови друзей.</div>${unitsHTML(p)}`;}
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3><div class="mut">Благоустройство: делает район живым, тут гуляют жители.</div>`;
   const pr=props.get(p.id);if(!pr)return'<div class="mut">Загрузка…</div>';
@@ -225,7 +245,7 @@ function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>На�
     ${LV()<NEED.land?lock(NEED.land):`<span class="btn gold ${can?'':'dis'}" data-act="buyland" data-id="${pr.id}">Купить участок</span>`}${me&&!can?`<div class="mut">Не хватает ${fmt(pr.price-me.money)}💰</div>`:''}`;}
   if(me&&pr.owner===me.id)return pr.building?bizHTML(pr):`<h3>Твой участок #${p.id+1}</h3>`+buildListHTML(pr);
   return`<h3>Участок #${p.id+1}</h3><div>Владелец: ${nm(pr.owner)}</div><div>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n+' · работников: '+pr.workers:'пока пусто'}</div>${jobBtn(pr)}`;}
-function marketHTML(){const tabs=`<div style="margin-bottom:6px"><span class="btn sm ${mkSec==='base'?'on':'blue'}" data-act="mksec" data-s="base">🏭 Оптовая база</span><span class="btn sm ${mkSec==='ex'?'on':'blue'}" data-act="mksec" data-s="ex">🤝 Биржа игроков</span></div>`;
+function marketHTML(){const tabs=`<div style="margin-bottom:6px"><span class="btn sm ${mkSec==='base'?'on':'blue'}" data-act="mksec" data-s="base">🏭 Оптовая база</span>${LV()>=2?`<span class="btn sm ${mkSec==='ex'?'on':'blue'}" data-act="mksec" data-s="ex">🤝 Биржа игроков</span>`:''}</div>`;if(LV()<2)mkSec='base';
   return tabs+(mkSec==='ex'?exchangeHTML():baseHTML());}
 function exchangeHTML(){let h=`<h3>🤝 Биржа игроков</h3><div class="mut">Продавай свой товар другим игрокам по своей цене — выгоднее, чем базе. Налог с продажи идёт в казну города.</div>`;
   if(me){const mine=GK.filter(g=>inv(me,g)>=1);
@@ -240,15 +260,17 @@ function exchangeHTML(){let h=`<h3>🤝 Биржа игроков</h3><div class
   return h;}
 function baseHTML(){let h=`<h3>🏭 Оптовая база</h3><div class="mut">Цена зависит от склада: везут много — дешевеет. Купить можно только то, что реально лежит на складе.</div><table>`;
   for(const g of GK){const pr=price(g),q=me?Math.floor(inv(me,g)):0;
-    h+=`<tr><td>${GOODS[g].ic} ${GOODS[g].n}</td><td><b>${pr.toFixed(1)}</b></td><td class="mut">склад ${fmt(stock(g))}</td>${me?`<td>${q}</td><td><span class="btn sm ${q?'':'dis'}" data-act="sell" data-g="${g}">Продать</span><span class="btn sm blue ${stock(g)>=5&&LV()>=NEED.buyMarket?'':'dis'}" data-act="buy" data-g="${g}" title="закупка с ${NEED.buyMarket} ур.">+5</span></td>`:''}</tr>`;}
+    h+=`<tr><td>${GOODS[g].ic} ${GOODS[g].n}</td><td><b>${pr.toFixed(1)}</b></td><td class="mut">склад ${fmt(stock(g))}</td>${me?`<td>${q}</td><td><span class="btn sm ${q?'':'dis'}" data-act="sell" data-g="${g}">Продать</span>${LV()>=NEED.buyMarket?`<span class="btn sm blue ${stock(g)>=5?'':'dis'}" data-act="buy" data-g="${g}">+5</span>`:''}</td>`:''}</tr>`;}
   return h+'</table>';}
 function questsHTML(){const l=LV();let h=`<h3>🗺 Задания в округе</h3><div class="mut">Прогуляйся по живописным местам — за помощь местным дают деньги, опыт и кристаллы. Пока ты на задании, смены на работе не идут.</div>`;
   if(quest){const Q=QUESTS[quest.id];h+=`<div class="row">▶ <b>${Q.n}</b> — ${quest.phase==='go'?'идёшь к месту…':Q.act+'…'}<div class="bar"><i id="questbar" style="width:0"></i></div><span class="btn sm red" data-act="qcancel">Отменить</span></div>`;}
-  for(const[id,Q]of Object.entries(QUESTS)){const P=world.POIS[Q.poi],lg=qlog.get(id),next=lg&&lg.done_at?Date.parse(lg.done_at)+Q.cd*60000:0,wait=Math.max(0,next-Date.now());
+  const qLocked=Object.values(QUESTS).filter(Q=>Q.lvl>LV()).length;
+  for(const[id,Q]of Object.entries(QUESTS)){if(Q.lvl>LV())continue;const P=world.POIS[Q.poi],lg=qlog.get(id),next=lg&&lg.done_at?Date.parse(lg.done_at)+Q.cd*60000:0,wait=Math.max(0,next-Date.now());
     const rw=[Q.money&&`${Q.money}💰`,Q.gems&&`${Q.gems}💎`,Q.good&&`${Q.qty}${GOODS[Q.good].ic}`,`${Q.xp} XP`].filter(Boolean).join(' · ');
     h+=`<div class="row">${P.ic} <b>${Q.n}</b> <span class="mut">${P.n}</span><br><span class="mut">Награда: ${rw}</span><br>`+
       (l<Q.lvl?lock(Q.lvl):wait?`<span class="mut">⏳ снова через ${wait>=3600000?Math.ceil(wait/3600000)+' ч':Math.ceil(wait/60000)+' мин'}</span>`:`<span class="btn sm gold ${quest?'dis':''}" data-act="quest" data-q="${id}">Отправиться</span>`)+
       ` <span class="btn sm blue" data-act="gopoi" data-q="${id}">На карте</span></div>`;}
+  if(qLocked)h+=`<div class="row mut">✨ Ещё ${qLocked} заданий откроются на следующих уровнях</div>`;
   return h;}
 function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
   const cur=me.job_prop!=null&&props.get(me.job_prop);
@@ -286,7 +308,7 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
   if(st.editable)h+=`<div>Позови друга по нику:</div><input id="invnick" maxlength="16" placeholder="Ник игрока"><span class="btn gold" data-act="invite">Пригласить</span>`;
   h+=`<div class="row">В комнате: ${[...st.people.keys()].map(nm).join(', ')||'—'}</div><div class="mut">Пиши в чат сверху — сообщения увидят все в комнате.</div>`;return h;}
 let moreSec='goals';
-function moreHTML(){const sec=[['goals','📋 Цели'],['gear','🦺 Экипировка'],['look','👤 Персонаж'],['skins','💎 Скины'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
+function moreHTML(){const sec=[['goals','📋 Цели'],...(LV()>=3?[['gear','🦺 Экипировка']]:[]),['look','👤 Персонаж'],['skins','💎 Скины'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
   return`<div style="margin-bottom:8px">${sec.map(([k,n])=>`<span class="btn sm ${moreSec===k?'on':'blue'}" data-act="moresec" data-s="${k}">${n}</span>`).join('')}</div>`+
     ({goals:goalsHTML,gear:gearHTML,look:()=>{showCreator(false);moreSec='goals';return goalsHTML();},skins:skinsHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]());}
 function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=`<h3>🦺 Рабочая экипировка</h3><div class="mut">Даёт бонусы к производству. Получить трудно: за многократные задания, стаж или дорого. Один предмет на слот.</div>`;
@@ -324,31 +346,50 @@ function govHTML(){if(!city)return'<div class="mut">Загрузка…</div>';c
     h+='</div>';}
   if(me&&l>=NEED.run)h+=`<input id="slogan" maxlength="120" placeholder="Твой лозунг для выборов">`;
   return h+`<div class="mut">Налоги идут в казну, из неё — зарплаты мэру и начальникам. Налог на имущество списывается раз в сутки.</div>`;}
-let draft=null;
-function lookPreview(l){const sk=LOOK.skin[l.skin],legC=l.bk==='shorts'?sk:l.bottom,arm=l.tk==='tee'?sk:l.top;
-  const hairH={short:10,buzz:5,curly:14,bald:0,long:12,bob:14,tail:10,buns:10}[l.hair]||0,long=l.hair==='long'||l.hair==='bob';
-  return`<div style="position:relative;width:96px;height:150px;margin:6px auto;image-rendering:pixelated">
-    <div style="position:absolute;left:28px;top:${22-hairH}px;width:40px;height:${hairH}px;background:${l.hc}"></div>
-    ${long?`<div style="position:absolute;left:24px;top:22px;width:48px;height:${l.hair==='long'?52:28}px;background:${l.hc}"></div>`:''}
-    ${l.hair==='tail'?`<div style="position:absolute;left:66px;top:24px;width:10px;height:30px;background:${l.hc}"></div>`:''}
-    ${l.hair==='buns'?`<div style="position:absolute;left:22px;top:6px;width:14px;height:14px;background:${l.hc}"></div><div style="position:absolute;left:60px;top:6px;width:14px;height:14px;background:${l.hc}"></div>`:''}
-    <div style="position:absolute;left:30px;top:22px;width:36px;height:34px;background:${sk}"></div>
-    <div style="position:absolute;left:38px;top:34px;width:5px;height:5px;background:#222"></div><div style="position:absolute;left:53px;top:34px;width:5px;height:5px;background:#222"></div>
-    <div style="position:absolute;left:${l.g==='f'?28:25}px;top:58px;width:${l.g==='f'?40:46}px;height:46px;background:${l.top}"></div>
-    <div style="position:absolute;left:${l.g==='f'?16:13}px;top:58px;width:12px;height:42px;background:${arm}"></div><div style="position:absolute;left:${l.g==='f'?68:71}px;top:58px;width:12px;height:42px;background:${arm}"></div>
-    ${l.bk==='skirt'?`<div style="position:absolute;left:24px;top:100px;width:48px;height:22px;background:${l.bottom}"></div>`:''}
-    ${l.bk==='shorts'?`<div style="position:absolute;left:30px;top:102px;width:36px;height:14px;background:${l.bottom}"></div>`:''}
-    <div style="position:absolute;left:31px;top:104px;width:15px;height:42px;background:${legC}"></div><div style="position:absolute;left:50px;top:104px;width:15px;height:42px;background:${legC}"></div></div>`;}
-function showCreator(first){draft={...DEFAULT_LOOK,...(me.look||{})};renderCreator(first);}
-function renderCreator(first){const l=draft,f=l.g==='f',sw=(k,arr)=>arr.map(c=>`<span class="sw ${l[k]===c?'on':''}" style="background:${c};width:26px;height:26px" data-lk="${k}" data-v="${c}"></span>`).join('');
-  const opt=(k,arr)=>arr.map(([v,n])=>`<span class="btn sm ${l[k]===v?'on':'blue'}" data-lk="${k}" data-v="${v}">${n}</span>`).join('');
-  $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:14px">${first?'Создай персонажа':'Внешность'}</h3>${lookPreview(l)}
-  <div>Пол: <span class="btn sm ${!f?'on':'blue'}" data-lk="g" data-v="m">Мужской</span><span class="btn sm ${f?'on':'blue'}" data-lk="g" data-v="f">Женский</span></div>
-  <div>Кожа: ${LOOK.skin.map((c,i)=>`<span class="sw ${l.skin===i?'on':''}" style="background:${c};width:26px;height:26px" data-lk="skin" data-v="${i}"></span>`).join('')}</div>
-  <div>Причёска: ${opt('hair',f?LOOK.hairF:LOOK.hairM)}</div><div>Волосы: ${sw('hc',LOOK.hairCol)}</div>
-  <div>Верх: ${opt('tk',LOOK.topKind)}</div><div>${sw('top',LOOK.top)}</div>
-  <div>Низ: ${opt('bk',f?LOOK.bottomKindF:LOOK.bottomKindM)}</div><div>${sw('bottom',LOOK.bottom)}</div>
-  <div style="margin-top:8px"><span class="btn gold" data-act="savelook" style="font-size:17px">${first?'Готово, в город →':'Сохранить'}</span>${first?'':'<span class="btn blue" data-act="closedaily">Отмена</span>'}</div>`;}
+let draft=null,cCat='body',pv=null,creatorFirst=false;
+const CATS=[['body','🧍','Тело'],['face','🙂','Лицо'],['hair','💇','Волосы'],['top','👕','Верх'],['bottom','👖','Низ'],['shoes','👟','Обувь'],['acc','🎒','Аксессуары']];
+function showCreator(first){draft={...DEFAULT_LOOK,...(me.look||{})};creatorFirst=first;cCat='body';
+  $('auth').style.display='flex';$('authbox').style.width='min(780px,100%)';
+  $('authbox').innerHTML=`<h3 style="font-size:14px">${first?'Создай своего персонажа':'Внешность персонажа'}</h3>
+  <div class="creator"><div class="cprev"><canvas id="lookcv"></canvas>
+    <div style="text-align:center"><span class="btn sm blue" data-act="crot" data-d="-1">⟲</span><span class="btn sm blue" data-act="czoom">🔍 Лицо</span><span class="btn sm blue" data-act="crot" data-d="1">⟳</span><span class="btn sm gold" data-act="crand">🎲</span></div>
+    <div class="mut" style="text-align:center">Крути пальцем или мышкой</div></div>
+    <div class="copts"><div class="ctabs">${CATS.map(([k,ic,n])=>`<span class="btn sm" data-act="ccat" data-c="${k}" id="cc_${k}">${ic} ${n}</span>`).join('')}</div><div id="copt"></div></div></div>
+  <div style="margin-top:10px"><span class="btn gold" data-act="savelook" style="font-size:17px">${first?'Готово, в город →':'Сохранить'}</span>${first?'':'<span class="btn blue" data-act="closecreator">Отмена</span>'}</div>`;
+  pvInit();updateCreator();}
+function updateCreator(){const l=draft,f=l.g==='f';
+  const sw=(k,arr)=>`<div class="swrow">${arr.map(c=>`<span class="sw ${l[k]===c?'on':''}" style="background:${c}" data-lk="${k}" data-v="${c}"></span>`).join('')}</div>`;
+  const opt=(k,arr)=>`<div>${arr.map(([v,n])=>`<span class="btn sm ${l[k]===v?'on':'blue'}" data-lk="${k}" data-v="${v}">${n}</span>`).join('')}</div>`;
+  const row=(t,h)=>`<div class="crow"><div class="mut">${t}</div>${h}</div>`;
+  const body={
+    body:()=>row('Пол',opt('g',[['m','Мужской'],['f','Женский']]))+row('Рост',opt('height',LOOK.height))+row('Телосложение',opt('build',LOOK.build))+
+      row('Кожа',`<div class="swrow">${LOOK.skin.map((c,i)=>`<span class="sw ${l.skin===i?'on':''}" style="background:${c}" data-lk="skin" data-v="${i}"></span>`).join('')}</div>`),
+    face:()=>row('Глаза',sw('eyes',LOOK.eyes))+row('Брови',opt('brows',LOOK.brows))+row('Рот',opt('mouth',LOOK.mouth))+(f?'':row('Борода и усы',opt('beard',LOOK.beard)))+row('Очки',opt('glasses',LOOK.glasses)),
+    hair:()=>row('Причёска',opt('hair',f?LOOK.hairF:LOOK.hairM))+row('Цвет волос',sw('hc',LOOK.hairCol)),
+    top:()=>row('Фасон',opt('tk',LOOK.topKind))+row('Цвет',sw('top',LOOK.top))+row('Акцент (полоски, вставки, воротник)',sw('top2',LOOK.accent)),
+    bottom:()=>row('Фасон',opt('bk',f?LOOK.bottomKindF:LOOK.bottomKindM))+row('Цвет',sw('bottom',LOOK.bottom)),
+    shoes:()=>row('Обувь',opt('sk',LOOK.shoeKind))+row('Цвет',sw('shoes',LOOK.shoes)),
+    acc:()=>row('Аксессуар',opt('acc',LOOK.acc))+'<div class="mut">Головные уборы покупаются за 💎 в «Ещё → Скины».</div>',
+  }[cCat]();
+  $('copt').innerHTML=body;CATS.forEach(([k])=>$('cc_'+k)?.classList.toggle('on',k===cCat));
+  if(pv){if(pv.obj)pv.sc.remove(pv.obj);pv.obj=world.makeAvatar(draft,me?.skin);pv.sc.add(pv.obj);}}
+function pvInit(){if(pv)pvClose();const cv=$('lookcv');const r=new THREE.WebGLRenderer({canvas:cv,antialias:false,alpha:true});r.setPixelRatio(1);r.setSize(120,150,false);
+  const sc=new THREE.Scene();sc.add(new THREE.HemisphereLight(0xffffff,0x6a5a80,1.3));const d=new THREE.DirectionalLight(0xfff4e0,1.8);d.position.set(2,3,4);sc.add(d);
+  const ped=new THREE.Mesh(new THREE.CylinderGeometry(.42,.46,.06,16),new THREE.MeshLambertMaterial({color:0x4a3f5c}));ped.position.y=-.03;sc.add(ped);
+  const cam=new THREE.OrthographicCamera(-.4,.4,.5,-.5,.1,20);cam.position.set(0,1.2,5);
+  pv={r,sc,cam,rot:-.4,auto:true,face:false,obj:null,drag:null,t:0};
+  cv.addEventListener('pointerdown',e=>{pv.drag=e.clientX;pv.auto=false;cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener('pointermove',e=>{if(pv&&pv.drag!=null){pv.rot+=(e.clientX-pv.drag)*.02;pv.drag=e.clientX;}});
+  cv.addEventListener('pointerup',()=>{if(pv)pv.drag=null;});
+  const loop=()=>{if(!pv)return;requestAnimationFrame(loop);pv.t+=.016;if(pv.auto)pv.rot+=.012;if(pv.obj){pv.obj.rotation.y=pv.rot;const ud=pv.obj.userData;ud.armL.rotation.x=Math.sin(pv.t*1.5)*.08;ud.armR.rotation.x=-Math.sin(pv.t*1.5)*.08;}
+    const H={s:.9,m:1,t:1.1}[draft.height]||1,cy=pv.face?.64*H:.47*H,hs=pv.face?.2:.52*Math.max(1,H);
+    cam.left=-hs*.8;cam.right=hs*.8;cam.top=hs;cam.bottom=-hs;cam.position.set(0,cy+.9,5);cam.lookAt(0,cy,0);cam.updateProjectionMatrix();r.render(sc,cam);};
+  loop();}
+function pvClose(){if(!pv)return;pv.r.dispose();pv=null;}
+function randomLook(){const pk=a=>a[Math.floor(Math.random()*a.length)],f=draft.g==='f';
+  draft={...draft,skin:Math.floor(Math.random()*LOOK.skin.length),height:pk(LOOK.height)[0],build:pk(LOOK.build)[0],eyes:pk(LOOK.eyes),brows:pk(LOOK.brows)[0],mouth:pk(LOOK.mouth)[0],
+    beard:f?'none':pk(LOOK.beard)[0],glasses:Math.random()<.7?'none':pk(LOOK.glasses)[0],hair:pk(f?LOOK.hairF:LOOK.hairM)[0],hc:pk(LOOK.hairCol),tk:pk(LOOK.topKind)[0],top:pk(LOOK.top),top2:pk(LOOK.accent),
+    bk:pk(f?LOOK.bottomKindF:LOOK.bottomKindM)[0],bottom:pk(LOOK.bottom),sk:pk(LOOK.shoeKind)[0],shoes:pk(LOOK.shoes),acc:Math.random()<.6?'none':pk(LOOK.acc)[0]};}
 function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10),s=me.last_daily===y?(me.streak||0)+1:1;
   $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:15px">🎁 Ежедневная награда</h3><div>День ${s} подряд: <b>+${DAILY[Math.min(s,7)-1]}💎</b> и +20 XP</div>
   <div style="display:flex;gap:4px;margin:10px 0;flex-wrap:wrap">${DAILY.map((g,i)=>`<div class="chip" style="${i+1===Math.min(s,7)?'outline:2px solid #ffd166;':''}opacity:${i+1<Math.min(s,7)?.5:1}">д${i+1}<br>${g}💎</div>`).join('')}</div>
@@ -358,7 +399,7 @@ function renderUI(){
   if(me){const l=LV(),x0=xpFor(l),x1=xpFor(l+1);$('money').innerHTML='💰 '+fmt(me.money)+` <span style="color:#9be7ff;font-size:15px">💎${me.gems||0}</span>`;$('rank').innerHTML=`Ур. ${l} · ${careerOf(me.shifts)}<div class="bar" style="height:6px"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div>`;
     $('inv').innerHTML=GK.filter(g=>inv(me,g)>=1).map(g=>`<span class="chip">${GOODS[g].ic} ${Math.floor(inv(me,g))}</span>`).join('')||'<span class="mut">склад пуст</span>';}
   const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab))tab=T[0][0];
-  const th=T.map(([k,ic,n,l])=>{const lk=l&&LV()<l;return`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}" ${lk?`data-lock="${l}" style="opacity:.45"`:''}><span class="ic">${lk?'🔒':ic}</span>${n}</div>`;}).join('');
+  const th=T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
   const body={obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
@@ -370,13 +411,13 @@ function renderUI(){
 // ================= КНОПКИ =================
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-tab],[data-act],[data-auth],[data-color],[data-tut],[data-visit],[data-lk]');if(!t)return;
-  if(t.dataset.lk){const k=t.dataset.lk;let v=t.dataset.v;if(k==='skin')v=+v;draft[k]=v;if(k==='g'){draft.hair=v==='f'?'long':'short';if(v==='m'&&draft.bk==='skirt')draft.bk='pants';}renderCreator(!me.look);return;}
+  if(t.dataset.lk){const k=t.dataset.lk;let v=t.dataset.v;if(k==='skin')v=+v;draft[k]=v;if(k==='g'){draft.hair=v==='f'?'long':'short';if(v==='m'&&draft.bk==='skirt')draft.bk='pants';if(v==='f')draft.beard='none';}updateCreator();return;}
   if(t.dataset.color){myColor=t.dataset.color;document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on',s.dataset.color===myColor));return;}
   if(t.dataset.auth)return authAction(t.dataset.auth);
   if(t.dataset.tut)return t.dataset.tut==='next'?tutGo(tutI+1):tutEnd();
   if(t.dataset.visit!=null){$('toast').style.display='none';if(mode==='room')leaveRoom();return enterRoom({unit:+t.dataset.visit,hostUid:t.dataset.host,hostNick:t.dataset.hn,editable:false});}
   if(t.dataset.lock&&t.dataset.tab){toast(`🔒 Откроется на ${t.dataset.lock} уровне`);return;}
-  if(t.dataset.tab){if(mobile&&t.dataset.tab===tab&&sheetOpen)sheetOpen=false;else{tab=t.dataset.tab;sheetOpen=true;}lastBody='';return renderUI();}
+  if(t.dataset.tab){newTabs.delete(t.dataset.tab);if(mobile&&t.dataset.tab===tab&&sheetOpen)sheetOpen=false;else{tab=t.dataset.tab;sheetOpen=true;}lastBody='';return renderUI();}
   const a=t.dataset.act,id=t.dataset.id!=null?+t.dataset.id:null;
   switch(a){
     case 'daily':{const r=await act('claim_daily');if(r){$('auth').style.display='none';toast(`🎁 +${DAILY[Math.min(me.streak,7)-1]}💎 · серия ${me.streak} дн.`);}break;}
@@ -388,13 +429,21 @@ document.addEventListener('click',async e=>{
     case 'govset':{const raw=$('gv_'+t.dataset.k)?.value??t.dataset.v??'0';const v=parseFloat(String(raw).replace(',','.'))||0;if(await act('gov_set',{p_key:t.dataset.k,p_val:t.dataset.pct?v/100:v}))toast('Сохранено');break;}
     case 'moresec':moreSec=t.dataset.s;break;
     case 'mksec':mkSec=t.dataset.s;break;
+    case 'next':{const a2=t.dataset.a,v=t.dataset.v;if(a2==='tab'){tab=v;sheetOpen=true;newTabs.delete(v);}
+      else if(a2==='goto'){const pl=plots[+v];sel=pl;world.select(pl);world.flyTo(pl.x,pl.y,mobile?11:14);tab='obj';if(mobile)sheetOpen=true;}
+      else if(a2==='land'){const c=cheapLand();if(c){const pl=plots[c.plot];sel=pl;world.select(pl);world.flyTo(pl.x,pl.y,mobile?11:14);world.arrow=pl;setTimeout(()=>{if(tutI>=TUT.length)world.arrow=null;},8000);}}break;}
     case 'exlist':{const g=$('ex_g')?.value,q=parseInt($('ex_q')?.value||'0'),pr=parseFloat($('ex_p')?.value||'0');if(!g||!q||!pr){toast('Укажи количество и цену');break;}if(await act('list_good',{p_good:g,p_qty:q,p_price:pr}))toast('Лот выставлен');break;}
     case 'exbuy':if(await act('buy_listing',{p_id:id,p_qty:+t.dataset.q}))toast('Куплено!');break;
     case 'excancel':await act('cancel_listing',{p_id:id});break;
     case 'getgear':if(await act('get_gear',{p_id:t.dataset.id}))toast('🦺 Получено и надето!');break;
     case 'equipgear':await act('equip_gear',{p_slot:t.dataset.slot,p_id:t.dataset.id});break;
     case 'unequip':await act('equip_gear',{p_slot:t.dataset.slot,p_id:''});break;
-    case 'savelook':{const first=!me.look;if(await act('set_look',{p_look:draft})){$('auth').style.display='none';if(first&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();}break;}
+    case 'ccat':cCat=t.dataset.c;updateCreator();return;
+    case 'crot':if(pv){pv.auto=false;pv.rot+=+t.dataset.d*Math.PI/4;}return;
+    case 'czoom':if(pv){pv.face=!pv.face;t.textContent=pv.face?'🧍 Весь':'🔍 Лицо';}return;
+    case 'crand':randomLook();updateCreator();return;
+    case 'closecreator':pvClose();$('auth').style.display='none';$('authbox').style.width='';return;
+    case 'savelook':{const first=!me.look;if(await act('set_look',{p_look:draft})){pvClose();$('authbox').style.width='';$('auth').style.display='none';if(first&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();}break;}
     case 'quest':{const Q=QUESTS[t.dataset.q],P=world.POIS[Q.poi];quest={id:t.dataset.q,phase:'go'};world.me.goal='quest';world.goMe(P.x,P.y);world.flyTo(P.x,P.y);if(mobile)sheetOpen=false;toast(`Идёшь: ${P.ic} ${P.n}`);break;}
     case 'qcancel':quest=null;if(world.me)world.me.goal=null;break;
     case 'gopoi':{const P=world.POIS[QUESTS[t.dataset.q].poi];world.flyTo(P.x,P.y,mobile?12:16);if(mobile)sheetOpen=false;break;}
@@ -434,20 +483,24 @@ $('auth').addEventListener('keydown',e=>{if(e.key==='Enter'){const b=$('authbox'
 
 // ================= ОБУЧЕНИЕ (Петрович) =================
 const tutFlags={room:false};let tutI=-1;
-const cheapLand=()=>[...props.values()].filter(p=>p.kind==='land'&&!p.owner&&(p.reg==='v'||p.reg==='d')).sort((a,b)=>a.price-b.price||a.plot-b.plot)[0];
+const cheapLand=()=>{const m=world.me||marketPlot,sc=p=>p.price+Math.hypot(p.x-m.x,p.y-m.y)*1.2;return[...props.values()].filter(p=>p.kind==='land'&&!p.owner&&(p.reg==='v'||p.reg==='d')).sort((a,b)=>sc(a)-sc(b))[0];};
 let recLand=null;
+let camStart=null;
 const TUT=[
-  {t:'Здорово! Я Петрович, местный завхоз. Человечек с твоим ником — это ты. Приехал(а) налегке: 150💰 и койка в общаге.',btn:'Дальше',enter(){const m=world.me;m&&world.flyTo(m.x,m.y,mobile?9:11);}},
-  {t:`Город огромный: центр с небоскрёбами и бизнес-центрами, панельки, деревня, дачи у озера, промзона, морской порт и карьер. ${mobile?'Двигай карту пальцем, щипок — зум, 🗺 — миникарта.':'Тяни карту мышкой, колесо — зум, миникарта слева внизу.'} Все люди с никами — живые игроки.`,btn:'Понял',enter(){world.flyTo(135,91,mobile?26:30);}},
-  {t:'Без денег никуда. Иди в ПВЗ «Коробас» — над ним стрелка. Нажми на него и «Устроиться».',arrow:()=>pvzPlot,enter(){world.flyTo(pvzPlot.x,pvzPlot.y,mobile?10:12);},done:()=>me.job_prop!=null},
-  {t:`Ты на работе! Каждая смена (${SHIFT_SEC} сек) — деньги, пока ты в игре. Копим 200💰 на первый участок.`,hl:['money'],enter(){const m=world.me;m&&world.flyTo(m.x,m.y);},done:()=>me.money>=200},
-  {t:'Пора своё дело! В деревне и на дачах земля дешёвая. Отметил тебе участок — нажми и купи.',arrow:()=>recLand&&plots[recLand.plot],enter(){recLand=cheapLand();if(recLand)world.flyTo(plots[recLand.plot].x,plots[recLand.plot].y,mobile?11:13);},
+  {t:'Здорово, сосед! Я Петрович, местный завхоз. Человечек с твоим ником — это ты. Приехал(а) налегке: 150💰 и койка в общаге. Покажу, как тут всё устроено — займёт пару минут.',btn:'Поехали',enter(){const m=world.me;m&&world.flyTo(m.x,m.y,mobile?9:11);}},
+  {t:mobile?'Сначала научимся смотреть по сторонам: <b>проведи пальцем</b> по карте, чтобы её подвинуть. Двумя пальцами — приблизить/отдалить.':'Сначала научимся смотреть по сторонам: <b>потяни карту мышкой</b>. Колесо — приблизить/отдалить, Q/E — повернуть.',
+    enter(){camStart={x:world.camT.x,z:world.camT.z};},done:()=>camStart&&Math.hypot(world.camT.x-camStart.x,world.camT.z-camStart.z)>8},
+  {t:'Отлично! Нажми 📍 сверху, если потеряешься — камера вернётся к тебе. А теперь к делу: без денег никуда. Над ПВЗ «Коробас» стрелка — нажми на него и «Устроиться».',arrow:()=>pvzPlot,enter(){world.flyTo(pvzPlot.x,pvzPlot.y,mobile?10:12);},done:()=>me.job_prop!=null},
+  {t:`Ты на работе! Человечек сам дойдёт до ПВЗ. Каждая смена (${SHIFT_SEC} сек) — 💰 и ⭐ опыт (полоска под деньгами сверху). Подожди первую смену.`,hl:['rank'],enter(){const m=world.me;m&&world.flyTo(m.x,m.y);},done:()=>me.shifts>=1},
+  {t:'Есть первая зарплата! Ещё деньги и опыт дают <b>задания в округе</b>: вкладка «Работа» → например, «Найти кота бабы Зины». Сходи — заодно погуляешь по городу.',hl:['tabs'],enter(){tab='work';sheetOpen=true;},done:()=>[...qlog.values()].some(q=>q.cnt>0)||(LV()>=2&&me.money>=200)},
+  {t:'Молодец! Игра открывается постепенно: новые вкладки и здания появляются с уровнем (их отмечу ✨). Набери <b>2 уровень</b> и <b>200💰</b> — тогда купим землю. Смены идут, пока ты в игре.',hl:['money','rank'],done:()=>LV()>=2&&me.money>=200},
+  {t:'Пора своё дело! В деревнях и на дачах земля дешёвая. Отметил тебе участок стрелкой — нажми на него и «Купить».',arrow:()=>recLand&&plots[recLand.plot],enter(){recLand=cheapLand();if(recLand)world.flyTo(plots[recLand.plot].x,plots[recLand.plot].y,mobile?11:13);},
     tick(){if(recLand&&props.get(recLand.id)?.owner&&props.get(recLand.id).owner!==me.id){recLand=cheapLand();}},done:()=>myPlots().length>0},
-  {t:'Твоя земля! Построй 🌾 Ферму — самый дешёвый старт. Или огород, делянку, рыбацкую будку. Работник выйдет сам.',enter(){const p=myPlots()[0];if(p){sel=plots[p.plot];world.select(sel);tab='obj';sheetOpen=true;}},done:()=>myPlots().some(p=>p.building)},
-  {t:'Стройка 20 секунд, потом работник начнёт добывать. Продукция копится на складе (сверху) — даже когда ты не в игре.',hl:['inv'],done:()=>GK.some(g=>inv(me,g)>=5)},
-  {t:'Продай урожай: вкладка «Рынок» → «Продать». Твой грузовик повезёт товар на базу — это увидят все.',hl:['tabs'],enter(){tab='market';sheetOpen=true;},done:()=>me.sold>0},
-  {t:'А теперь домой! Жми 🏠 сверху. Купи мебель и обставь комнату. Накопишь — купи квартиру получше и зови друзей в гости.',hl:['topbtns'],done:()=>tutFlags.room},
-  {t:'Дальше выбирай путь: карьера (30 смен → бизнес-центр → менеджер → директор) или бизнес (переработка → точки в городе → офис в БЦ → ресторан). Удачи, сосед!',btn:'Погнали!'},
+  {t:'Твоя земля! Построй 🌾 <b>Ферму</b> — самый дешёвый старт. Есть ещё сад, огород, пасека, делянка, птичник. Работник выйдет сам.',enter(){const p=myPlots()[0];if(p){sel=plots[p.plot];world.select(sel);tab='obj';sheetOpen=true;}},done:()=>myPlots().some(p=>p.building)},
+  {t:'Стройка 20 секунд, потом работник начнёт добывать. Продукция копится на складе — он сверху. Пока ты в игре, бизнес работает на 100%, без тебя — на 25%.',hl:['inv'],done:()=>GK.some(g=>inv(me,g)>=5)},
+  {t:'Урожай есть! Продай его: вкладка «Рынок» → «Продать». Грузовик повезёт товар на оптовую базу — это увидят все игроки.',hl:['tabs'],enter(){tab='market';sheetOpen=true;},done:()=>me.sold>0},
+  {t:'Почти всё! Жми 🏠 сверху — это твоя койка в общаге. Мебель покупается за товар игроков, потом можно купить квартиру и звать друзей в гости.',hl:['topbtns'],done:()=>tutFlags.room},
+  {t:'Ты готов(а)! Во вкладке «📍 Объект» всегда есть карточка <b>🎯 Что делать дальше</b> — она подскажет следующий шаг. Дальше: найм, магазин, переработка, биржа, квартиры, выборы мэра. Удачи!',btn:'Погнали!',enter(){tab='obj';sel=null;world.select(null);sheetOpen=true;}},
 ];
 function tutGo(i){document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));
   if(i>=TUT.length){tutEnd();return;}tutI=i;if(me&&me.tut!==i){me.tut=i;act('set_tut',{p_n:i},true);}

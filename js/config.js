@@ -139,17 +139,29 @@ export const QUESTS={
 
 // ===== Внешность персонажа =====
 export const LOOK={
-  skin:['#f1c27d','#e0ac69','#c68642','#8d5524'],
-  hairM:[['short','Короткая'],['buzz','Ёжик'],['curly','Кудри'],['bald','Лысый']],
-  hairF:[['long','Длинные'],['bob','Каре'],['tail','Хвост'],['buns','Пучки']],
-  hairCol:['#2b1d14','#5a3a22','#a0522d','#e6c27a','#d9d9d9','#c0392b'],
-  top:['#3d6ea6','#c0392b','#2e7d32','#f1c40f','#8e44ad','#ecf0f1','#222222','#ff8c1a'],
-  topKind:[['tee','Футболка'],['hoodie','Худи'],['shirt','Рубашка']],
-  bottom:['#2c3e50','#34495e','#1e3a5f','#5d4037','#222222','#7f8c8d'],
-  bottomKindM:[['pants','Брюки'],['shorts','Шорты']],
-  bottomKindF:[['pants','Брюки'],['skirt','Юбка'],['shorts','Шорты']],
+  skin:['#ffdbb4','#f1c27d','#e0ac69','#c68642','#a0662f','#6b3f1f'],
+  height:[['s','Невысокий'],['m','Средний'],['t','Высокий']],
+  build:[['slim','Худой'],['m','Обычный'],['strong','Крепкий']],
+  eyes:['#3b2a1a','#2e86ab','#3a7d44','#6b6b6b','#7a4a24'],
+  brows:[['thin','Тонкие'],['m','Обычные'],['thick','Густые']],
+  mouth:[['smile','Улыбка'],['calm','Спокойный'],['smirk','Ухмылка']],
+  beard:[['none','Нет'],['stubble','Щетина'],['mustache','Усы'],['beard','Борода']],
+  glasses:[['none','Нет'],['round','Круглые'],['square','Квадратные'],['sun','Тёмные']],
+  hairM:[['short','Короткая'],['buzz','Ёжик'],['side','Пробор'],['curly','Кудри'],['mohawk','Ирокез'],['longm','Длинные'],['bald','Лысый']],
+  hairF:[['long','Длинные'],['bob','Каре'],['tail','Хвост'],['buns','Пучки'],['braids','Косички'],['curlyf','Кудри'],['pixie','Пикси']],
+  hairCol:['#1a1410','#3b2a1a','#5a3a22','#8b5a2b','#a0522d','#e6c27a','#d9d9d9','#c0392b','#3d6ea6','#ff8fab'],
+  topKind:[['tee','Футболка'],['hoodie','Худи'],['shirt','Рубашка'],['jacket','Куртка'],['track','Спортивка'],['sweater','Свитер']],
+  top:['#3d6ea6','#c0392b','#2e7d32','#f1c40f','#8e44ad','#ecf0f1','#222222','#ff8c1a','#1e3a5f','#7f8c8d','#e67e22','#ff8fab'],
+  accent:['#ffffff','#222222','#f1c40f','#c0392b','#3d6ea6','#2e7d32','#ff8c1a','#8e44ad'],
+  bottomKindM:[['pants','Брюки'],['jeans','Джинсы'],['track','Спортивные'],['shorts','Шорты']],
+  bottomKindF:[['pants','Брюки'],['jeans','Джинсы'],['track','Спортивные'],['shorts','Шорты'],['skirt','Юбка']],
+  bottom:['#2c3e50','#34495e','#1e3a5f','#3d5a80','#5d4037','#222222','#7f8c8d','#c8b89a','#2e7d32','#8e3b46'],
+  shoeKind:[['sneakers','Кеды'],['runners','Кроссовки'],['boots','Ботинки']],
+  shoes:['#ffffff','#222222','#c0392b','#3d6ea6','#8b5a2b','#f1c40f','#7f8c8d','#2e7d32'],
+  acc:[['none','Нет'],['chain','Цепочка'],['backpack','Рюкзак'],['bag','Сумка']],
 };
-export const DEFAULT_LOOK={g:'m',skin:0,hair:'short',hc:'#2b1d14',top:'#3d6ea6',tk:'tee',bottom:'#2c3e50',bk:'pants'};
+export const DEFAULT_LOOK={g:'m',skin:1,height:'m',build:'m',eyes:'#3b2a1a',brows:'m',mouth:'smile',beard:'none',glasses:'none',
+  hair:'short',hc:'#3b2a1a',tk:'tee',top:'#3d6ea6',top2:'#ffffff',bk:'jeans',bottom:'#3d5a80',sk:'sneakers',shoes:'#ffffff',acc:'none'};
 
 // ===== Рабочая экипировка: бонусы к производству. Получить трудно: сложные задания или дорого =====
 export const GEAR={

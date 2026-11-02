@@ -365,28 +365,71 @@ export function createWorld(canvas,{mobile}){
     drawHat(g,skin);
     const carry=B(g,.22,.2,.22,0xffffff,0,.84,0);carry.visible=false;g.userData={legL,legR,armL,armR,carry};return shadow(g);}
 
-  // аватар игрока: пол, кожа, причёска, одежда
-  function makeAvatar(look,skin){look={...DEFAULT_LOOK,...(look||{})};const g=new THREE.Group(),hx=c=>new THREE.Color(c).getHex();
-    const sk=hx(LOOK.skin[look.skin]||LOOK.skin[0]),top=hx(look.top),bot=hx(look.bottom),hc=hx(look.hc),f=look.g==='f';
-    const limb=(x,y,w,h,c)=>{const p=new THREE.Group();p.position.set(x,y,0);const m=new THREE.Mesh(BOX,mat(c));m.scale.set(w,h,w);m.position.y=-h/2;p.add(m);g.add(p);return p;};
-    const legC=look.bk==='shorts'?sk:bot;const legL=limb(-.07,.26,.09,.26,legC),legR=limb(.07,.26,.09,.26,legC);
-    if(look.bk==='shorts')B(g,.24,.1,.15,bot,0,.18,0);
-    if(look.bk==='skirt')B(g,.32,.16,.22,bot,0,.14,0);
-    const tw=f?.24:.27;B(g,tw,.28,.16,top,0,.26,0);
-    if(look.tk==='hoodie'){B(g,tw+.02,.06,.17,top,0,.5,0);B(g,.14,.05,.02,0xffffff,0,.36,.085);}
-    if(look.tk==='shirt')B(g,.06,.2,.01,0xffffff,0,.32,.083);
-    const armC=look.tk==='tee'?sk:top;const armL=limb(-(tw/2+.035),.52,.07,.24,armC),armR=limb(tw/2+.035,.52,.07,.24,armC);
-    B(g,.2,.2,.2,sk,0,.54,0);B(g,.03,.03,.01,0x222222,-.05,.64,.1);B(g,.03,.03,.01,0x222222,.05,.64,.1);
-    if(!(skin&&SKINS[skin]))switch(look.hair){
-      case 'short':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);break;
-      case 'buzz':B(g,.21,.03,.21,hc,0,.735,0);break;
-      case 'curly':B(g,.25,.09,.25,hc,0,.72,0);B(g,.06,.06,.06,hc,-.1,.79,.06);B(g,.06,.06,.06,hc,.09,.79,-.05);break;
-      case 'long':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.3,.06,hc,0,.45,-.1);B(g,.04,.22,.18,hc,-.11,.52,0);B(g,.04,.22,.18,hc,.11,.52,0);break;
-      case 'bob':B(g,.24,.07,.24,hc,0,.72,0);B(g,.24,.14,.05,hc,0,.6,-.1);B(g,.04,.14,.2,hc,-.12,.6,0);B(g,.04,.14,.2,hc,.12,.6,0);break;
-      case 'tail':B(g,.22,.06,.22,hc,0,.73,0);B(g,.07,.2,.07,hc,0,.52,-.14);break;
-      case 'buns':B(g,.22,.05,.22,hc,0,.73,0);B(g,.09,.09,.09,hc,-.09,.79,0);B(g,.09,.09,.09,hc,.09,.79,0);break;
+  // аватар игрока: детальная модель (тело, лицо, причёска, одежда, обувь, аксессуары)
+  function makeAvatar(look,skin){look={...DEFAULT_LOOK,...(look||{})};const g=new THREE.Group(),C=c=>new THREE.Color(c).getHex();
+    const f=look.g==='f',sk=C(LOOK.skin[look.skin]??LOOK.skin[1]),skD=new THREE.Color(sk).multiplyScalar(.85).getHex();
+    const top=C(look.top),acc=C(look.top2||'#ffffff'),bot=C(look.bottom),hc=C(look.hc),shoe=C(look.shoes||'#ffffff'),eye=C(look.eyes||'#3b2a1a');
+    const Wd={slim:.88,m:1,strong:1.14}[look.build]||1,tw=(f?.24:.27)*Wd,td=.16*Wd;
+    // ноги: штанины/кожа + обувь, внутри поворотной группы (анимация ходьбы)
+    const leg=(x)=>{const p=new THREE.Group();p.position.set(x,.26,0);g.add(p);
+      const lw=.09*Wd,bare=look.bk==='shorts'||look.bk==='skirt';
+      if(bare){B(p,lw,.12,lw,sk,0,-.26+.06,0);B(p,lw+.01,.14,lw+.01,look.bk==='shorts'?bot:sk,0,-.14,0);}
+      else{B(p,lw,.2,lw,bot,0,-.26+.06,0);if(look.bk==='jeans')B(p,.012,.2,lw+.002,new THREE.Color(bot).multiplyScalar(1.25).getHex(),lw/2-.006,-.2,0);
+        if(look.bk==='track')B(p,.012,.2,lw+.004,acc,lw/2,-.2,0);}
+      const sh=look.sk||'sneakers';B(p,lw+.02,sh==='boots'?.09:.06,.15,shoe,0,-.26,.025);
+      if(sh==='sneakers')B(p,lw+.022,.015,.152,0xffffff,0,-.26,.025);if(sh==='runners')B(p,lw+.024,.02,.06,acc,0,-.24,.03);
+      return p;};
+    const legL=leg(-.07*Wd),legR=leg(.07*Wd);
+    if(look.bk==='skirt')B(g,tw+.08,.15,td+.08,bot,0,.14,0);
+    if(look.bk==='shorts')B(g,tw-.01,.06,td,bot,0,.22,0);
+    if(look.bk==='pants'||look.bk==='jeans')B(g,tw+.005,.03,td+.005,0x3b2a1a,0,.26,0); // ремень
+    // торс
+    B(g,tw,.28,td,top,0,.26,0);
+    if(look.tk==='hoodie'){B(g,tw*.9,.12,.08,top,0,.46,-td/2-.03);B(g,.012,.07,.01,0xffffff,-.03,.42,td/2+.005);B(g,.012,.07,.01,0xffffff,.03,.42,td/2+.005);B(g,tw*.6,.07,.01,new THREE.Color(top).multiplyScalar(.85).getHex(),0,.3,td/2+.005);}
+    if(look.tk==='shirt'){B(g,.1,.04,.01,0xffffff,0,.5,td/2+.004);for(let k=0;k<3;k++)B(g,.012,.012,.01,0xdddddd,0,.33+k*.06,td/2+.006);}
+    if(look.tk==='jacket'){B(g,tw*.36,.24,.01,acc,0,.28,td/2+.004);B(g,.008,.26,.012,0xbbbbbb,0,.27,td/2+.008);B(g,tw+.01,.05,td+.01,top,0,.51,0);}
+    if(look.tk==='track'){B(g,.008,.24,.012,0xcccccc,0,.28,td/2+.006);B(g,tw+.005,.04,td+.005,acc,0,.5,0);}
+    if(look.tk==='sweater'){B(g,tw+.01,.035,td+.01,new THREE.Color(top).multiplyScalar(.8).getHex(),0,.26,0);B(g,.1,.03,.02,new THREE.Color(top).multiplyScalar(.8).getHex(),0,.52,0);}
+    if(look.tk==='tee')B(g,.09,.02,.01,new THREE.Color(top).multiplyScalar(.8).getHex(),0,.52,td/2+.004);
+    // руки: рукав + кисть
+    const arm=(x)=>{const p=new THREE.Group();p.position.set(x,.52,0);g.add(p);const short=look.tk==='tee';
+      if(short){B(p,.08,.1,.08,top,0,-.1,0);B(p,.065,.13,.065,sk,0,-.22,0);}else{B(p,.075,.21,.075,top,0,-.21,0);if(look.tk==='track')B(p,.012,.21,.077,acc,x>0?.035:-.035,-.21,0);}
+      B(p,.065,.05,.065,sk,0,-.26,0);return p;};
+    const armL=arm(-(tw/2+.04)),armR=arm(tw/2+.04);
+    // шея и голова
+    B(g,.08,.04,.08,sk,0,.53,0);B(g,.2,.2,.2,sk,0,.54,0);
+    for(const x of[-.05,.05]){B(g,.045,.035,.01,0xffffff,x,.625,.1);B(g,.022,.03,.012,eye,x,.627,.101);}
+    const bw={thin:.012,m:.018,thick:.026}[look.brows]||.018;for(const x of[-.05,.05])B(g,.05,bw,.01,new THREE.Color(hc).multiplyScalar(.9).getHex(),x,.665,.101);
+    B(g,.03,.045,.02,skD,0,.59,.105);
+    const mc=0x8e3b46;if(look.mouth==='smile'){B(g,.06,.014,.01,mc,0,.565,.101);B(g,.012,.012,.01,mc,-.035,.572,.101);B(g,.012,.012,.01,mc,.035,.572,.101);}
+    else if(look.mouth==='smirk'){B(g,.05,.012,.01,mc,.008,.567,.101);B(g,.012,.012,.01,mc,.038,.575,.101);}else B(g,.05,.012,.01,mc,0,.567,.101);
+    if(!f){if(look.beard==='stubble')B(g,.2,.07,.01,new THREE.Color(hc).lerp(new THREE.Color(sk),.55).getHex(),0,.54,.1);
+      if(look.beard==='mustache')B(g,.08,.02,.012,hc,0,.582,.104);
+      if(look.beard==='beard'){B(g,.21,.08,.06,hc,0,.53,.08);B(g,.08,.02,.012,hc,0,.582,.104);}}
+    if(look.glasses&&look.glasses!=='none'){const fr=0x1a1a1a,lens=look.glasses==='sun'?0x111111:0xbfe3ff;
+      for(const x of[-.05,.05]){B(g,.06,look.glasses==='round'?.05:.045,.008,fr,x,.605,.104);B(g,.045,.032,.008,lens,x,.612,.108,true);}B(g,.03,.008,.008,fr,0,.625,.106);}
+    // причёска
+    const hat=skin&&SKINS[skin];
+    if(!hat)switch(look.hair){
+      case 'short':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);B(g,.03,.07,.2,hc,-.105,.68,-.01);B(g,.03,.07,.2,hc,.105,.68,-.01);break;
+      case 'buzz':B(g,.21,.03,.21,hc,0,.735,0);B(g,.21,.08,.02,hc,0,.68,-.1);break;
+      case 'side':B(g,.22,.07,.22,hc,0,.73,0);B(g,.14,.04,.12,hc,-.04,.78,.03);B(g,.22,.12,.04,hc,0,.65,-.09);break;
+      case 'curly':B(g,.25,.09,.25,hc,0,.72,0);for(const[x,z]of[[-.1,.06],[.09,-.05],[.0,.1],[-.08,-.08],[.1,.07]])B(g,.07,.07,.07,hc,x,.78,z);break;
+      case 'mohawk':B(g,.06,.13,.2,hc,0,.74,0);B(g,.2,.02,.2,new THREE.Color(hc).multiplyScalar(.7).getHex(),0,.735,0);break;
+      case 'longm':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.2,.06,hc,0,.52,-.1);B(g,.04,.14,.18,hc,-.11,.6,0);B(g,.04,.14,.18,hc,.11,.6,0);break;
+      case 'long':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.32,.06,hc,0,.42,-.1);B(g,.04,.24,.18,hc,-.11,.5,0);B(g,.04,.24,.18,hc,.11,.5,0);B(g,.18,.04,.02,hc,0,.71,.1);break;
+      case 'bob':B(g,.24,.07,.24,hc,0,.72,0);B(g,.24,.16,.05,hc,0,.58,-.1);B(g,.04,.16,.2,hc,-.12,.58,0);B(g,.04,.16,.2,hc,.12,.58,0);B(g,.2,.04,.02,hc,0,.7,.11);break;
+      case 'tail':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);B(g,.06,.04,.06,0xc0392b,0,.7,-.13);B(g,.07,.22,.07,hc,0,.48,-.14);break;
+      case 'buns':B(g,.22,.05,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);B(g,.09,.09,.09,hc,-.09,.79,0);B(g,.09,.09,.09,hc,.09,.79,0);break;
+      case 'braids':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);for(const x of[-.09,.09]){B(g,.05,.24,.05,hc,x,.38,-.08);B(g,.055,.03,.055,0xf1c40f,x,.38,-.08);}break;
+      case 'curlyf':B(g,.27,.1,.27,hc,0,.71,0);B(g,.27,.22,.08,hc,0,.48,-.1);for(const[x,z]of[[-.12,.05],[.12,.04],[-.1,-.08],[.11,-.07]])B(g,.08,.08,.08,hc,x,.62,z);break;
+      case 'pixie':B(g,.22,.05,.22,hc,0,.735,0);B(g,.12,.04,.08,hc,.04,.71,.08);B(g,.22,.08,.03,hc,0,.67,-.1);break;
     }
     drawHat(g,skin);
+    if(look.acc==='chain'){B(g,.12,.012,.01,0xf1c40f,0,.5,td/2+.006);B(g,.025,.025,.01,0xf1c40f,0,.47,td/2+.007);}
+    if(look.acc==='backpack'){B(g,tw*.8,.2,.09,acc,0,.3,-td/2-.045);B(g,tw*.6,.06,.02,new THREE.Color(acc).multiplyScalar(.8).getHex(),0,.34,-td/2-.09);}
+    if(look.acc==='bag'){const b=B(g,.012,.3,.012,0x3b2a1a,0,.27,td/2+.01);b.rotation.z=.6;B(g,.12,.1,.05,acc,tw/2+.02,.26,.04);}
+    const H={s:.9,m:1,t:1.1}[look.height]||1;g.scale.setScalar(H);
     const carry=B(g,.22,.2,.22,0xffffff,0,.84,0);carry.visible=false;g.userData={legL,legR,armL,armR,carry};return shadow(g);}
   function makeTruck(cab,cargo){const g=new THREE.Group();B(g,.42,.07,.8,0x444444,0,.1,0);B(g,.4,.3,.28,cab,0,.15,.25);B(g,.34,.1,.02,0x9fd3ff,0,.3,.391);
     B(g,.42,.16,.48,0x8b5a2b,0,.17,-.14);const cg=B(g,.3,.16,.32,cargo,0,.33,-.14);wheel(g,-.21,.25);wheel(g,.21,.25);wheel(g,-.21,-.25);wheel(g,.21,-.25);g.userData.cargo=cg;return shadow(g);}
@@ -503,7 +546,7 @@ export function createWorld(canvas,{mobile}){
     if(v.phase==='go'){v.phase='back';if(v.kind==='van'){v.target.parcels+=12;v.path=pathTo(v,sortPlot.door.x,sortPlot.door.y);}else{v.mesh.userData.cargo.visible=false;v.path=pathTo(v,v.home.x,v.home.y);}}
     else{scene.remove(v.mesh);vehicles.splice(vehicles.indexOf(v),1);}}
   // корабли
-  function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:W+6,y:182+rand(-3,3),wp:[[px+3.5,177],[px+3.5,168]],wait:25,out:[[px+3.5,179],[W+8,190]],speed:2.2};scene.add(s.mesh);ships.push(s);}
+  function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:215+rand(-20,20),y:H+6,wp:[[px+3.5,190],[px+3.5,177],[px+3.5,168]],wait:25,out:[[px+3.5,179],[px+3.5,200],[215+rand(-20,20),H+8]],speed:2.2};scene.add(s.mesh);ships.push(s);}
   function spawnFishing(){const px=pick(PIERS);const s={kind:'fishing',mesh:makeShip(false),x:px+.5,y:172,wp:[[px+rand(-12,12),rand(178,200)],[px+rand(-15,15),rand(176,200)],[px+.5,172]],wait:0,speed:1.5};scene.add(s.mesh);ships.push(s);}
   function updateShip(s,dt){
     if(s.kind==='boat'){ // судно игрока
@@ -635,5 +678,5 @@ export function createWorld(canvas,{mobile}){
     set arrow(p){arrowTarget=p;},
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
-    marketTile:()=>marketTiles[6],resize,W,H,POIS,walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
+    marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
 }

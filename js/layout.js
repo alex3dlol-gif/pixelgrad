@@ -19,11 +19,11 @@ export const BLOCKS=[
   {reg:'d',name:'СНТ «ЮЖНОЕ»',x:5,y:200,cols:18,rows:5,link:HY},
   {reg:'v',name:'С. КЛЮЧИ',x:20,y:245,cols:14,rows:6,link:225},
   {reg:'d',name:'СНТ «ГРИБНОЕ»',x:5,y:282,cols:22,rows:6,link:275},
-  {reg:'v',name:'Д. СЕВЕРНОЕ',x:200,y:5,cols:10,rows:5,link:HY},
+  {reg:'p',name:'ПРОМЗОНА «СЕВЕРНАЯ»',x:200,y:5,cols:10,rows:5,link:HY},
   {reg:'d',name:'СНТ «ОЗЁРКИ»',x:320,y:10,cols:12,rows:8,link:HY},
-  {reg:'v',name:'С. ВОСТОЧНОЕ',x:262,y:55,cols:12,rows:6,link:HY},
+  {reg:'p',name:'ПРОМЗОНА «ВОСТОЧНАЯ»',x:262,y:55,cols:12,rows:6,link:HY},
   {reg:'d',name:'СНТ «СОСНОВЫЙ БОР»',x:262,y:110,cols:12,rows:8,link:HY},
-  {reg:'v',name:'Д. ДАЛЬНЕЕ',x:310,y:170,cols:14,rows:10,link:150},
+  {reg:'p',name:'ПРОМПАРК «ДАЛЬНИЙ»',x:310,y:170,cols:14,rows:10,link:150},
   {reg:'v',name:'С. ЛУГОВОЕ',x:330,y:240,cols:12,rows:12,link:220},
 ];
 export const RING={x0:57+OX,y0:27+OY,x1:143+OX,y1:103+OY};
@@ -82,7 +82,7 @@ export function buildLayout(){
       price=Math.max(400,Math.round((1150-d*85)/10)*10);
     }else if(reg==='v')price=b.link?140:(i===0?150:170);
     else if(reg==='d')price=b.link?100:110+(j===2?20:0);
-    else if(reg==='p')price=380;
+    else if(reg==='p')price=b.link?260:380;
     else price=450;
     plots.push({id:plots.length,reg,i,j,x0,y0,x:x0+1.5,y:y0+1.5,sp,rt,price,demand:0,zone,name:sp==='shop'?SHOP_NAMES[Math.floor(hash(i,j+99)*SHOP_NAMES.length)]:null});
   }
