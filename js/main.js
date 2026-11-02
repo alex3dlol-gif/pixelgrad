@@ -218,6 +218,12 @@ function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),
   if(l<5)return{t:'Дорасти до 5 уровня',d:'Откроются точки в городе: ПВЗ, шаурмичные, ларьки.'+xpBar(5),a:'tab',v:'work',b:'Задания'};
   if(!mp.some(p=>p.reg==='c'&&p.building))return{t:'Открой точку в городе',d:'Город — главный рынок сбыта: жители платят за готовое.',a:'tab',v:'market',b:'Рынок'};
   return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'more',b:'Ещё'};}
+function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),biz=myPlots().filter(p=>p.building).length,apt=myProps().filter(p=>p.kind==='apt').length;
+  return`<h3>👤 Профиль</h3><div class="row"><span style="color:${me.color};font-size:20px;font-weight:700">${esc(me.nick)}</span><br>
+    <span class="mut">${careerOf(me.shifts)} · уровень ${l} (${me.xp||0}/${x1} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
+  <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
+  <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span><span class="btn blue" data-act="psec" data-s="skins">💎 Скины</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}<span class="btn blue" data-act="psec" data-s="levels">⭐ Уровни</span><span class="btn blue" data-act="psec" data-s="top">🏆 Рейтинг</span></div>
+  <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
 function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость — ${c} каждого товара (растёт с числом и уровнем бизнесов). Сверх лимита товар пропадает.</div>`;
   if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
   for(const g of gs){const q=Math.floor(inv(me,g)),pc=Math.min(100,q/c*100);h+=`<div class="row">${GOODS[g].ic} <b>${GOODS[g].n}</b> — ${q}/${c} <span class="mut">≈${Math.round(q*price(g,q/2))}💰 на базе</span><div class="bar"><i style="width:${pc}%;background:${pc>=100?'#c0392b':pc>80?'#e67e22':'#ffd166'}"></i></div>
@@ -457,13 +463,14 @@ function renderUI(){
     const c=CAP(),full=GK.some(g=>inv(me,g)>=c),n=GK.reduce((a,g)=>a+Math.floor(inv(me,g)),0);$('invn').textContent=full?'!':n?(n>999?'999+':n):'';$('invn').style.background=full?'#c0392b':'#3a7d44';}
   {const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('htime').textContent=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;}
   if(ob){$('money').textContent='💰 '+ob.money+' уч.';$('hen').textContent='⚡ '+ob.en;const q=Math.floor(ob.inv.wheat||0);$('invn').textContent=q||'';}
+  $('topbtns').style.display=me&&me.home_unit&&!ob?'':'none';
   document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
   if(mobile&&ob){$('coach').classList.toggle('mini',sheetOpen||coachMin);}
-  const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv')))tab=T[0][0];
+  const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv'||tab==='profile')))tab=T[0][0];
   const th=ob?'':T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
-  const body=ob?(tab==='inv'?obInvHTML:obHTML):{inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
+  const body=ob?(tab==='inv'?obInvHTML:obHTML):{profile:profileHTML,inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
   if(body!==lastBody){const s=$('tabbody').scrollTop;$('tabbody').innerHTML=body;$('tabbody').scrollTop=s;lastBody=body;}
   $('hand').style.display=room.state&&room.state.hand?'inline':'none';
   dirty=false;tutCheck();
@@ -492,7 +499,10 @@ document.addEventListener('click',async e=>{
     case 'moresec':moreSec=t.dataset.s;break;
     case 'mksec':mkSec=t.dataset.s;break;
     case 'inv':if(tab==='inv'&&sheetOpen)sheetOpen=false;else{tab='inv';sheetOpen=true;}break;
-    case 'levels':tab='more';moreSec='levels';sheetOpen=true;break;
+    case 'levels':if(ob)break;if(tab==='profile'&&sheetOpen)sheetOpen=false;else{tab='profile';sheetOpen=true;}break;
+    case 'psec':tab='more';moreSec=t.dataset.s;break;
+    case 'plook':showCreator(false);return;
+    case 'logout2':if(confirm('Выйти из аккаунта?')){await sb.auth.signOut();location.reload();}return;
     case 'toex':tab='market';mkSec='ex';break;
     case 'aucnew':showAucCreate(props.get(id));return;
     case 'aucgo':{const st=+$('ac_s').value,bo=+($('ac_b').value||0),hh=+$('ac_h').value;if(await act('create_auction',{p_id:id,p_start:st,p_buyout:bo||null,p_hours:hh})){$('auth').style.display='none';toast('🔨 Лот выставлен');mkSec='auc';tab='market';}break;}
