@@ -760,6 +760,7 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
   if((uiT-=dt)<=0||dirty){uiT=.5;renderUI();}}
 requestAnimationFrame(loop);
 renderUI();
+if(new URLSearchParams(location.search).has('film'))import('./film.js').then(f=>f.run({world,room,CLUBS,setMode:v=>{mode=v;},$}));
 if(new URLSearchParams(location.search).has('fog'))setTimeout(()=>{world.setFog(true);world.jump(215,245);},60);
 {const c=new URLSearchParams(location.search).get('cam');if(c){const[x,y]=c.split(',').map(Number);setTimeout(()=>world.jump(x,y),50);}}
 

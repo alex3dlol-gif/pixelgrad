@@ -872,7 +872,7 @@ export function createWorld(canvas,{mobile}){
 
 
   // игровое время: полные сутки за один реальный час, одинаково у всех
-  const HOV=new URLSearchParams(location.search).get('hour');const gameHour=()=>HOV!=null?+HOV:((Date.now()/1000)%3600)/3600*24;
+  let HOV=new URLSearchParams(location.search).get('hour');const gameHour=()=>HOV!=null?+HOV:((Date.now()/1000)%3600)/3600*24;
   const SKY_DAY=new THREE.Color(0x8fbfe0),SKY_NIGHT=new THREE.Color(0x0b1530),SKY_DUSK=new THREE.Color(0xf0a070),SUN_DAY=new THREE.Color(0xfff0d0),SUN_DUSK=new THREE.Color(0xff9a5a),SUN_NIGHT=new THREE.Color(0x6a7cc0),_c=new THREE.Color();
   function applyDayNight(){const h=gameHour(),d=Math.max(0,Math.sin((h-6)/12*Math.PI)),dusk=Math.max(0,1-Math.abs(h-6.5)/1.5)+Math.max(0,1-Math.abs(h-18.5)/1.5);
     const night=1-Math.min(1,d*2.5);
@@ -961,6 +961,8 @@ export function createWorld(canvas,{mobile}){
       STOPS.forEach((s,i)=>{c.fillStyle=i===hi?'#ffd166':'#2e86ab';c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.arc(s.x*k,s.y*k,i===hi?8:6,0,7);c.fill();c.stroke();
         c.lineWidth=3;c.strokeStyle='#0e0b14';c.strokeText(s.name,s.x*k,s.y*k-10);c.fillStyle='#fff';c.fillText(s.name,s.x*k,s.y*k-10);});},
     marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
+    // съёмочный режим: камера и время суток задаются сценарием
+    setCam(x,z,zm,a){camFly=null;camBounds=null;camT.set(x,0,z);if(zm){zoom=zoomT=zm;}if(a!=null)camA=camAT=a;updateCam();},setHour(h){HOV=h;},
     tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);tutFence.visible=!tutPlot.owner;if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
     setFog(on){fog.visible=!!on;camBounds=on?{x0:ISLAND.x0-2,y0:ISLAND.y0-2,x1:ISLAND.x1+2,y1:ISLAND.y1+2}:null;clampCam();},
     tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutFence.visible=true;tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},
