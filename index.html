@@ -66,6 +66,13 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
 .sw{display:inline-block;width:32px;height:32px;border:3px solid #0e0b14;margin:3px;cursor:pointer}.sw.on{outline:3px solid #fff}
 #roomui{position:fixed;left:6px;top:66px;z-index:5;display:none;flex-direction:column;align-items:flex-start;gap:6px;max-width:300px}
 #hand{display:none}
+#inapp{position:fixed;inset:0;z-index:100;background:rgba(10,8,16,.82);display:flex;align-items:center;justify-content:center;padding:18px}
+#inapp .ia-box{background:#1a1622;border:3px solid #ffd166;border-radius:16px;padding:18px;max-width:340px;color:#fff;font-size:16px;line-height:1.4;display:flex;flex-direction:column;gap:10px;text-align:center}
+#inapp .ia-box b{color:#ffd166}#inapp .ia-step{background:#2b2438;border-radius:10px;padding:10px}
+#inapp .ia-dots{display:inline-block;background:#fff;color:#111;border-radius:8px;padding:0 8px;font-weight:900;font-size:20px;line-height:1.2}
+#inapp .ia-stay{color:#a99fb8;font-size:13px;text-decoration:underline;cursor:pointer}
+#inapp .ia-arrow{position:fixed;top:6px;right:14px;font-size:64px;color:#ffd166;text-shadow:0 3px 0 #0e0b14;animation:iaj 1s ease-in-out infinite}
+@keyframes iaj{50%{transform:translate(6px,-8px)}}
 #clubhud{display:none;background:linear-gradient(135deg,rgba(46,34,70,.82),rgba(20,15,30,.72));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,209,102,.45);border-radius:14px;padding:8px 12px;color:#fff;min-width:230px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 body.inclub #clubhud{display:block}body.inclub #roomtitlebox{display:none}body.inclub #sheet{display:none!important}
 .ch-top{display:flex;gap:8px;align-items:center;font-size:15px}.ch-top b{flex:1}#chppl{font-size:13px;opacity:.85}
