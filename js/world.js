@@ -188,7 +188,7 @@ export function createWorld(canvas,{mobile}){
     g.position.set(p.x0,0,p.y0);statics.add(g);
   }
   function makeBC(p){const g=new THREE.Group(),v=p.id%2;
-    const m=tower('bc',v,20,.4,3.2,2.4);m.position.set(1.5,0,1.2);m.position.y+=.6;g.add(m);B(g,3.6,.6,2.8,0x9aa3ab,1.5,0,1.2);
+    const m=tower('bc',v,20,.4,3.2,2.4);m.position.set(1.5,20*.4/2+.6,1.2);g.add(m);B(g,3.6,.6,2.8,0x9aa3ab,1.5,0,1.2);
     B(g,3.25,.35,2.45,0x2ecc71,1.5,8.6,1.2,true);B(g,1.2,.05,.8,0x7f8c8d,1.5,0,3.1);
     g.position.set(p.x0,0,p.y0);statics.add(g);}
 
