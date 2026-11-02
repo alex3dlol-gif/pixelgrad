@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GOODS,BLD,EMP,RES,BCT,SKINS,LOOK,DEFAULT_LOOK} from './config.js';
-import {W,H,STEP,HY,BLOCKS,RING,OX,OY,LAKES,POIS,buildLayout,hash} from './layout.js';
+import {W,H,STEP,HY,BLOCKS,RING,OX,OY,LAKES,POIS,ISLAND,buildLayout,hash} from './layout.js';
 
 const rand=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -32,6 +32,10 @@ export function createWorld(canvas,{mobile}){
     if(x>=262&&y<160&&n>.55)t=T.FOREST;if(x>=300&&y>=225&&y<238&&n2>.4)t=T.FIELD;
     grid[I(x,y)]=t;
   }
+  const IC={x:(ISLAND.x0+ISLAND.x1)/2,y:(ISLAND.y0+ISLAND.y1)/2,rx:(ISLAND.x1-ISLAND.x0)/2,ry:(ISLAND.y1-ISLAND.y0)/2};
+  const onIsland=(x,y,k=1)=>((x-IC.x)/IC.rx)**2+((y-IC.y)/IC.ry)**2<k;
+  for(let y=ISLAND.y0-4;y<=ISLAND.y1+4;y++)for(let x=ISLAND.x0-4;x<=ISLAND.x1+4;x++){if(!inb(x,y))continue;const n=vnoise(x*.2+7,y*.2);
+    if(onIsland(x,y,.82))grid[I(x,y)]=n>.62?T.FOREST:T.GRASS;else if(onIsland(x,y,1))grid[I(x,y)]=T.SAND;}
   const clearRect=(x0,y0,x1,y1,t=T.GRASS)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(inb(x,y)&&grid[I(x,y)]!==T.WATER&&grid[I(x,y)]!==T.SEA)grid[I(x,y)]=t;};
   for(const b of BLOCKS)clearRect(b.x-2,b.y-2,b.x+b.cols*STEP+2,b.y+b.rows*STEP+2);
   clearRect(RING.x0-2,RING.y0-2,RING.x1+2,RING.y1+2);
@@ -49,6 +53,9 @@ export function createWorld(canvas,{mobile}){
   carve(POIS.mush.x,POIS.mush.y,53,POIS.mush.y);carve(POIS.forester.x,POIS.forester.y,53,POIS.forester.y);carve(POIS.pier.x+1,POIS.pier.y,53,POIS.pier.y);carve(53,POIS.pier.y,53,70);
   carve(POIS.camp.x,POIS.camp.y,63,POIS.camp.y);carve(63,POIS.camp.y,63,152);carve(POIS.spring.x,POIS.spring.y,POIS.spring.x,70);
   carve(POIS.lighthouse.x,POIS.lighthouse.y,200,POIS.lighthouse.y);carve(200,POIS.lighthouse.y,200,140);carve(POIS.fire.x,POIS.fire.y,POIS.fire.x,HY);
+  {const I_=ISLAND;for(const k of['spawn','pvz','alko','lavka'])clearRect(I_[k].x-2,I_[k].y-2,I_[k].x+2,I_[k].y+2);clearRect(I_.plot.x0-1,I_.plot.y0-1,I_.plot.x0+4,I_.plot.y0+4);
+    carve(I_.spawn.x,I_.spawn.y+2,I_.lavka.x,I_.spawn.y+2);carve(I_.pvz.x,I_.pvz.y+2,I_.alko.x,I_.pvz.y+2);carve(I_.pier.x,I_.pier.y,I_.pier.x,I_.spawn.y+2);
+    for(let y=I_.pier.y-7;y<=I_.pier.y;y++)for(let x=I_.pier.x;x<=I_.pier.x+1;x++)grid[I(x,y)]=grid[I(x,y)]===T.SEA||grid[I(x,y)]===T.SAND?T.BRIDGE:grid[I(x,y)];}
   for(const b of BLOCKS)if(b.link){const cx=b.x+STEP*Math.floor(b.cols/2);if(b.link<b.y)carve(cx,b.y,cx,b.link);else carve(cx,b.y+b.rows*STEP,cx,b.link);}
   for(let x=RING.x0;x<=RING.x1;x++){grid[I(x,RING.y0)]=T.RING;grid[I(x,RING.y1)]=T.RING;}
   for(let y=RING.y0;y<=RING.y1;y++){grid[I(RING.x0,y)]=T.RING;grid[I(RING.x1,y)]=T.RING;}
@@ -246,6 +253,11 @@ export function createWorld(canvas,{mobile}){
     case 'confectionery':B(g,1.6,.9,1.3,0xffe4ec);PY(g,1.8,.7,1.5,0xff8fab,0,.9,0);B(g,1.2,.4,.03,0xfff1b0,0,.2,.66,true);B(g,.7,.22,.05,0xff6b9a,0,.68,.67,true);B(g,.25,.6,.25,0xeeeeee,.5,.95,-.3);a.smoke=[.5,1.6,-.3];break;
     case 'tailor':B(g,1.6,.95,1.3,0xd6e4f0);GR(g,1.75,.6,1.45,0x5e4b8b,0,.95,0);B(g,1,.4,.03,0x9fd3ff,0,.25,.66,true);B(g,.12,.6,.12,0x555555,-.9,0,.9);B(g,.3,.4,.2,0x3d6ea6,-.9,.35,.9);break;
     case 'store':{const c=new THREE.Color(color||0xffffff).getHex();B(g,1.8,.85,1.3,0xf2efe6);B(g,1.9,.1,1.4,0x555555,0,.85,0);B(g,1.6,.26,.05,c,0,.6,.67,true);B(g,1.4,.4,.03,0x9fd3ff,0,.12,.66,true);const aw=B(g,1.8,.05,.45,c,0,.55,.85);aw.rotation.x=.35;}break;
+    case 'alko':B(g,1.9,.9,1.4,0x5a2a2a);B(g,2,.1,1.5,0x2c1a1a,0,.9,0);B(g,1.7,.28,.05,0x8e1b2e,0,.62,.72,true);B(g,1.2,.14,.051,0xf1c40f,0,.69,.73,true);
+      B(g,1.3,.4,.03,0x9fd3ff,0,.12,.71,true);for(let k=0;k<3;k++){B(g,.35,.25,.3,0x8b5a2b,-.9+k*.4,0,1.05);for(let b=0;b<3;b++)B(g,.05,.14,.05,[0x2e7d32,0x6b3a1a,0xdddddd][b],-1+k*.4+b*.09,.25,1.05);}break;
+    case 'lavka':B(g,1.4,.1,1,0x8b5a2b,0,.6,0);for(const[x,z]of[[-.6,-.4],[.6,-.4],[-.6,.4],[.6,.4]])B(g,.08,.6,.08,0x6b4a2f,x,0,z);{const aw=B(g,1.6,.06,1.2,0xc0392b,0,1.05,0);aw.rotation.x=.15;}
+      for(let k=0;k<5;k++)B(g,.18,.14,.18,[0xe8c547,0xe67e22,0xd63031,0x7fb3d5,0xf5f5f5][k],-.5+k*.25,.7,0);break;
+    case 'guesthouse':B(g,1.5,.8,1.2,0xe8dcc0);GR(g,1.7,.6,1.4,0x2e5e8c,0,.8,0);B(g,.3,.5,.04,0x6b4a2f,0,0,.62);B(g,.3,.25,.04,0xffd27a,-.45,.35,.62,true);break;
     case 'kolkhoz':B(g,1.8,1.0,1.4,0x8c3b2e);GR(g,1.95,.75,1.55,0x6b6b6b,0,1,0);B(g,.6,.65,.04,0xe8dcc0,0,0,.71);break;
     case 'port':B(g,2.2,1,1.6,0x7f8c8d);B(g,2.3,.15,1.7,0x34495e,0,1,0);for(let k=0;k<6;k++)B(g,.9,.45,.4,pick([0xc0392b,0x2980b9,0x27ae60,0xf39c12]),-1.2+(k%2)*1,(Math.floor(k/2)%2)*.45,1.3+(k>3?.45:0));break;
     }
@@ -350,6 +362,10 @@ export function createWorld(canvas,{mobile}){
       B(g,.9,.55,.8,[0x8b5a2b,0x7a4a24,0x9c6b3e,0xc9a26b][k%4]);GR(g,1.05,.45,.95,[0x3d6b35,0x8a3a2a,0x5a6a7a,0x2e5e8c][(k+1)%4],0,.55,0);B(g,.2,.18,.03,0x2e86ab,0,.25,.41);
       decoTree(g,1,.3,.8);g.position.set(x,0,y);statics.add(g);walk[I(x,y)]=0;}}
   for(const k in POIS)if(k!=='harvest')(k==='cat'?scene:statics).add(makePOI(k,POIS[k]));
+  {const I_=ISLAND;for(const[k,type]of[['spawn','guesthouse'],['pvz','pvzCity'],['alko','alko'],['lavka','lavka']]){const b=makeBuilding(type,0);b.g.position.set(I_[k].x,0,I_[k].y);statics.add(b.g);
+      for(let y=I_[k].y-1;y<=I_[k].y;y++)for(let x=I_[k].x-1;x<=I_[k].x;x++)walk[I(x,y)]=0;}
+    const pg=new THREE.Group();for(let k=0;k<4;k++){B(pg,.08,.5,.08,0x6b4a2f,I_.pier.x-.4,-.3,I_.pier.y-2-k*1.6);B(pg,.08,.5,.08,0x6b4a2f,I_.pier.x+1.4,-.3,I_.pier.y-2-k*1.6);}statics.add(pg);
+    for(let k=0;k<8;k++){const x=I_.x0+6+Math.floor(hash(k,3)*(I_.x1-I_.x0-12)),y=I_.y0+5+Math.floor(hash(k,5)*(I_.y1-I_.y0-10));if(grid[I(x,y)]===T.GRASS&&walk[I(x,y)]){const g=new THREE.Group();decoTree(g,0,0,1);bush(g,.6,.4);g.position.set(x,0,y);statics.add(g);}}}
   // утки и лебеди на озёрах
   const birds=[];for(const L of LAKES)for(let i=0;i<5;i++){const b=new THREE.Group();const c=L.name.startsWith('ЛЕБ')?0xffffff:0x8d6e4b;B(b,.3,.16,.18,c,0,0,0);B(b,.08,.2,.08,c,.14,.1,0);B(b,.08,.05,.06,0xf39c12,.2,.2,0);scene.add(b);birds.push({b,L,a:Math.random()*6,r:.3+Math.random()*.4,s:.05+Math.random()*.08});}
   for(const im of signIM)im.computeBoundingSphere();
@@ -467,11 +483,15 @@ export function createWorld(canvas,{mobile}){
 
   // ================= СОСТОЯНИЕ УЧАСТКОВ =================
   const units=[],vehicles=[],residents=[],ships=[];
+  // учебный участок на острове (живёт только у клиента)
+  const tutPlot={id:-1,sp:null,reg:'v',x0:ISLAND.plot.x0,y0:ISLAND.plot.y0,x:ISLAND.plot.x0+1.5,y:ISLAND.plot.y0+1.5,door:{x:ISLAND.plot.x0+1,y:ISLAND.plot.y0+3},stock:{x:ISLAND.plot.x0+3,y:ISLAND.plot.y0+3},
+    crops:[],wk:[],owner:null,color:'#ffd166',building:null,workers:0,builtAt:0,level:1,mat:false,fast:true};
+  const plotsX=[...plots,tutPlot];
   function setPlotState(id,st){
     const p=plots[id];if(!p||p.sp)return;
     const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0)||(p.level||1)!==(st.level||1);
     if(p.building&&!st.building)for(let y=p.y0+1;y<=p.y0+2;y++)for(let x=p.x0+1;x<=p.x0+2;x++)walk[I(x,y)]=1;
-    Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0,level:st.level||1});
+    Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0,level:st.level||1,nick:st.nick||p.nick});
     setSign(p,!p.owner);if(p.building)blockFoot(p);
     if(changed&&p.mat){dematerialize(p);materialize(p);}else if(p.mat)syncWorkers(p);
   }
@@ -485,11 +505,13 @@ export function createWorld(canvas,{mobile}){
     add(B(g,.05,.7,.05,0x6b4a2f,-1.65,0,1.25));add(B(g,.12+.11*(lv-1),.16,.04,0x2b2438,-1.65+.05*(lv-1),.62,1.25));
     for(let i=0;i<lv-1;i++)add(B(g,.08,.08,.05,0xf1c40f,-1.65+i*.11,.66,1.28,true));}
   function materialize(p){if(p.mat||!p.owner)return;p.mat=true;
+    if(p.nick){p.lab=wlabel(p.nick,p.x0+3.2,1.6,p.y0-.2,'owner',p.color);p.lab.zMax=mobile?16:24;}
     p.fence=makeFence(p,p.color);scene.add(p.fence);
     if(p.building){const b=makeBuilding(p.building,new THREE.Color(p.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);levelDecor(b.g,p.level||1,new THREE.Color(p.color||'#fff').getHex());scene.add(b.g);p.group=b.g;p.anim=b.a;
       if(p.building==='farm')makeCrops(p,'wheat');if(p.building==='garden')makeCrops(p,'veg');}
     syncWorkers(p);}
   function dematerialize(p){if(!p.mat)return;p.mat=false;
+    if(p.lab){p.lab.el.remove();wlabels.splice(wlabels.indexOf(p.lab),1);p.lab=null;}
     if(p.fence){scene.remove(p.fence);p.fence=null;}if(p.group){scene.remove(p.group);p.group=null;p.anim=null;}
     for(const c of p.crops)scene.remove(c.grp);p.crops=[];syncWorkers(p);}
   function cullPlots(){const R=zoom*3+12;for(const p of landPlots){if(!p.owner){if(p.mat)dematerialize(p);continue;}
@@ -563,6 +585,7 @@ export function createWorld(canvas,{mobile}){
   function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:215+rand(-20,20),y:H+6,wp:[[px+3.5,190],[px+3.5,177],[px+3.5,168]],wait:25,out:[[px+3.5,179],[px+3.5,200],[215+rand(-20,20),H+8]],speed:2.2};scene.add(s.mesh);ships.push(s);}
   function spawnFishing(){const px=pick(PIERS);const s={kind:'fishing',mesh:makeShip(false),x:px+.5,y:172,wp:[[px+rand(-12,12),rand(178,200)],[px+rand(-15,15),rand(176,200)],[px+.5,172]],wait:0,speed:1.5};scene.add(s.mesh);ships.push(s);}
   function updateShip(s,dt){
+    if(s.ferry){const t=s.wp[0];if(!t)return;const dx=t[0]-s.x,dy=t[1]-s.y,d=Math.hypot(dx,dy),sp=s.speed*dt;s.face=Math.atan2(dx,dy);if(d<=sp){s.x=t[0];s.y=t[1];s.wp.shift();}else{s.x+=dx/d*sp;s.y+=dy/d*sp;}return;}
     if(s.kind==='boat'){ // судно игрока
       if(!s.wp){if((s.wait-=dt)>0)return;s.wp=[[s.home.x+rand(-14,14),rand(178,200)],[s.home.x+rand(-14,14),rand(178,200)],[s.home.x,s.home.y]];}
       if(!s.wp.length){s.wp=null;s.wait=rand(4,8);return;}}
@@ -588,7 +611,9 @@ export function createWorld(canvas,{mobile}){
   function wlabel(text,x,y,z,cls='',color=''){const el=document.createElement('div');el.className='wlab '+cls;el.textContent=text;if(color)el.style.color=color;labelsEl.appendChild(el);const L={el,p:new THREE.Vector3(x,y,z)};wlabels.push(L);return L;}
   function float(text,x,y,z,color='#ffd166'){const el=document.createElement('div');el.className='float';el.textContent=text;el.style.color=color;floatsEl.appendChild(el);floats.push({el,p:new THREE.Vector3(x,y,z),t:0});}
   for(const b of BLOCKS)wlabel(b.name,b.x+b.cols*STEP/2,0,b.y-3,'big');
-  wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
+  wlabel('ОСТРОВ «УЧЕБНЫЙ»',(ISLAND.x0+ISLAND.x1)/2,0,ISLAND.y1+3,'big');wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');
+  for(const[k,n]of[['pvz','ПВЗ «Коробас»'],['alko','Алкомаркет «Градус»'],['lavka','Лавка скупщика'],['spawn','Гостевой домик'],['pier','Пристань']]){wlabel(n,ISLAND[k].x,2.2,ISLAND[k].y,'emp','#ffe9a8');}
+  wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
   for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];const L=wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');L.zMax=mobile?11:15;}
 
@@ -598,8 +623,10 @@ export function createWorld(canvas,{mobile}){
   function updateCam(){const asp=innerWidth/innerHeight;cam.left=-zoom*asp;cam.right=zoom*asp;cam.top=zoom;cam.bottom=-zoom;cam.updateProjectionMatrix();
     const D=120;cam.position.set(camT.x+Math.sin(camA)*D,D*.95,camT.z+Math.cos(camA)*D);cam.lookAt(camT);
     const sx=Math.round(camT.x/2)*2,sz=Math.round(camT.z/2)*2;sun.position.set(sx-30,60,sz+20);sun.target.position.set(sx,0,sz);}
-  function resize(){PX=Math.max(1,Math.min(4,Math.round(Math.min(innerWidth,innerHeight*1.6)/540)));renderer.setSize(Math.ceil(innerWidth/PX),Math.ceil(innerHeight/PX),false);updateCam();}
-  addEventListener('resize',resize);resize();
+  // холст — ровно видимая область (на телефоне 100vh больше экрана → клики и подписи съезжали)
+  function resize(){const w=innerWidth,h=innerHeight;canvas.style.width=w+'px';canvas.style.height=h+'px';
+    PX=Math.max(1,Math.min(4,Math.round(Math.min(w,h*1.6)/540)));renderer.setSize(Math.ceil(w/PX),Math.ceil(h/PX),false);updateCam();}
+  addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,200));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
   const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),gplane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
   function groundAt(cx,cy){ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(ndc,cam);return ray.ray.intersectPlane(gplane,new THREE.Vector3());}
   const plotAtScreen=(cx,cy)=>{const g=groundAt(cx,cy);return g?plotAt(Math.round(g.x),Math.round(g.z)):null;};
@@ -624,7 +651,7 @@ export function createWorld(canvas,{mobile}){
       if(drag.moved&&drag.g){const g=groundAt(e.clientX,e.clientY);if(g){camT.x-=g.x-drag.g.x;camT.z-=g.z-drag.g.z;clampCam();updateCam();}}return;}
     if(e.pointerType==='mouse'){const p=plotAtScreen(e.clientX,e.clientY);if(p){hoverF.visible=true;hoverF.position.set(p.x,0,p.y);}else hoverF.visible=false;canvas.style.cursor=p?'pointer':'default';onHover&&onHover(p,e);}});
   const endPtr=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;
-    if(drag&&!drag.moved&&ptrs.size===0){onTap&&onTap(plotAtScreen(e.clientX,e.clientY));}if(ptrs.size===0)drag=null;};
+    if(drag&&!drag.moved&&ptrs.size===0){onTap&&onTap(plotAtScreen(e.clientX,e.clientY),groundAt(e.clientX,e.clientY));}if(ptrs.size===0)drag=null;};
   canvas.addEventListener('pointerup',endPtr);canvas.addEventListener('pointercancel',endPtr);
   canvas.addEventListener('pointerleave',()=>{hoverF.visible=false;onHover&&onHover(null);});
   canvas.addEventListener('wheel',e=>{zoomT=Math.max(5,Math.min(40,zoomT*(e.deltaY>0?1.12:1/1.12)));e.preventDefault();},{passive:false});
@@ -663,7 +690,7 @@ export function createWorld(canvas,{mobile}){
     if((cullT-=dt)<=0){cullT=.5;cullPlots();}
     for(let i=0;i<trees.length;i++){const t=trees[i];if(!t.alive){t.grow+=dt/50;if(t.grow>=1){t.alive=true;t.grow=1;}t._d=true;}else if(t.shake&&!t.reserved){t.shake=0;t._d=true;}if(t._d){setTree(i);t._d=false;}}
     for(const c of chunks.values())if(c.dirty){c.trunk.instanceMatrix.needsUpdate=c.pine.instanceMatrix.needsUpdate=c.leaf.instanceMatrix.needsUpdate=true;c.dirty=false;}
-    for(const p of plots){for(const c of p.crops)if(c.g<1&&near(p.x,p.y)){c.g=Math.min(1,c.g+dt/(p.sp?12:15));setCrop(c);}else if(p.sp&&c.g>=1&&Math.random()<dt*.05){c.g=0;setCrop(c);}
+    for(const p of plotsX){for(const c of p.crops)if(c.g<1&&near(p.x,p.y)){c.g=Math.min(1,c.g+dt/(p.fast?4:p.sp?12:15));setCrop(c);}else if(p.sp&&c.g>=1&&Math.random()<dt*.05){c.g=0;setCrop(c);}
       if(p.group&&p.builtAt){const dur=({gather:3,retail:10,proc:15,service:30}[BLD[p.building]?.kind]||3)*60000,k=Math.min(1,1-(p.builtAt-Date.now())/dur);p.group.scale.y=Math.max(.02,k);if(k<1&&near(p.x,p.y)&&Math.random()<dt*6)puff(p.x0+rand(.5,2.5),.2,p.y0+rand(.5,2.5),0xc8b89a,1,.6,.5);
         if(k>=1&&p.wk.length!==p.workers)syncWorkers(p);}}
     for(const u of units){const vis=near(u.x,u.y);u.mesh.visible=vis;if(vis){updateWorker(u,dt);animPerson(u,time);}}
@@ -704,5 +731,10 @@ export function createWorld(canvas,{mobile}){
     set arrow(p){arrowTarget=p;},
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
-    marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
+    marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
+    tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
+    tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},
+    ferry(to,onDone){const boat={kind:'boat',mesh:makeShip(false,0xffd166),x:ISLAND.pier.x+.5,y:ISLAND.pier.y-8,wp:[[ISLAND.pier.x+.5,ISLAND.pier.y-16],[to.x,to.y+10],[to.x,to.y+2]],wait:0,speed:6,ferry:true};
+      scene.add(boat.mesh);ships.push(boat);if(me)me.mesh.visible=false;const f=()=>{camFly=null;camT.x+=(boat.x-camT.x)*.1;camT.z+=(boat.y-camT.z)*.1;
+        if(boat.wp&&boat.wp.length)requestAnimationFrame(f);else{scene.remove(boat.mesh);ships.splice(ships.indexOf(boat),1);if(me)me.mesh.visible=true;onDone&&onDone();}};f();},walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
 }

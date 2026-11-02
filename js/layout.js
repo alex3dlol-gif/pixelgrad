@@ -72,6 +72,7 @@ export function buildLayout(){
   for(const b of BLOCKS)for(let j=0;j<b.rows;j++)for(let i=0;i<b.cols;i++){
     const x0=b.x+1+STEP*i,y0=b.y+1+STEP*j,reg=b.reg;
     let sp=SPECIAL[`${reg},${i},${j}`]||null,rt=null,price=0,zone=null;
+    if(!sp&&reg==='v'&&j===0&&i===1)sp='pvzCity';if(!sp&&reg==='v'&&j===0&&i===2)sp='alko'; // первая работа в каждой деревне
     if(reg==='c'){
       const d=Math.hypot(i-7.5,j-6.5),h=hash(i*7+3,j*13+5);zone=zoneOf(i,j);
       const keep=sp==='keep';if(keep)sp=null;
@@ -103,3 +104,7 @@ export function buildLayout(){
   return {plots,units};
 }
 export const isEmployer=sp=>!!(sp&&EMP[sp]);
+
+// учебный остров в морском заливе — отдельный мир для новичков (только у клиента)
+export const ISLAND={x0:193,y0:229,x1:237,y1:261,
+  spawn:{x:203,y:246},pvz:{x:212,y:238},alko:{x:220,y:238},plot:{x0:208,y0:249},lavka:{x:228,y:249},pier:{x:215,y:230}};

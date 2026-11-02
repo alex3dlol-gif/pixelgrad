@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN} from './config.js';
 import {createWorld} from './world.js';
-import {createRoom} from './room.js';
+import {createRoom,WALL_COLORS,FLOOR_COLORS} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
 
 const $=id=>document.getElementById(id);
@@ -24,7 +24,8 @@ const DECOR={park:'🌳 Сквер — тут гуляют жители',yard:'�
 const inv=(p,g)=>Number(p?.inv?.[g]||0);
 const nm=uid=>{const p=profiles.get(uid);return p?`<b style="color:${p.color}">${esc(p.nick)}</b>`:'<b>игрок</b>';};
 const marketPlot=plots.find(p=>p.sp==='market'),pvzPlot=plots.find(p=>p.sp==='pvzCity');
-const dormPlot=plots.filter(p=>p.sp==='res').sort((a,b)=>Math.hypot(a.x-marketPlot.x,a.y-marketPlot.y)-Math.hypot(b.x-marketPlot.x,b.y-marketPlot.y))[0];
+const villagePvz=plots.filter(p=>p.sp==='pvzCity'&&p.reg==='v');
+const dormPlot=villagePvz[0]||plots.filter(p=>p.sp==='res').sort((a,b)=>Math.hypot(a.x-marketPlot.x,a.y-marketPlot.y)-Math.hypot(b.x-marketPlot.x,b.y-marketPlot.y))[0];
 
 function toast(msg,ms=2800){const t=$('toast');t.innerHTML=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',ms);}
 async function act(name,args,quiet){try{const r=await rpc(name,args);if(r&&me&&r.id===me.id)setMe(r);dirty=true;return r??true;}catch(e){if(!quiet)toast('⚠️ '+esc(e.message));return null;}}
@@ -44,7 +45,7 @@ const myPlots=()=>myProps().filter(p=>p.kind==='land').map(p=>({...plots[p.plot]
 function applyProp(r){const old=props.get(r.id);const n={...old,...r};props.set(r.id,n);
   if(!old&&(n.kind==='apt'||n.kind==='office')){if(!unitsByPlot.has(n.plot))unitsByPlot.set(n.plot,[]);unitsByPlot.get(n.plot).push(n.id);}
   if(n.kind==='land'){const pr=n.owner?profiles.get(n.owner):null;
-    world.setPlotState(n.plot,{owner:n.owner,color:pr?.color||'#ffffff',building:n.building,workers:n.workers,builtAt:n.built_at?Date.parse(n.built_at):0,level:n.level||1});
+    world.setPlotState(n.plot,{nick:pr?.nick,owner:n.owner,color:pr?.color||'#ffffff',building:n.building,workers:n.workers,builtAt:n.built_at?Date.parse(n.built_at):0,level:n.level||1});
     if(n.owner&&!pr)fetchProfile(n.owner).then(()=>applyProp(props.get(n.id)));}
   dirty=true;}
 async function fetchProfile(id){const {data}=await sb.from('profiles').select('id,nick,color,money,shifts').eq('id',id).maybeSingle();if(data)profiles.set(id,data);}
@@ -120,15 +121,20 @@ async function authAction(a){
 async function afterLogin(){
   const {data:{user}}=await sb.auth.getUser();if(!user)return showAuth('login');
   const {data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();if(!data)return showAuth('nick');
-  $('auth').style.display='none';setMe(data);
-  const h=homePlot();const sx=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y))?me.last_x:h.x0+1,sy=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y))?me.last_y:h.y0+3;
+  $('auth').style.display='none';setMe(data);$('coach').style.display='none';
+  if(!me.look)showCreator(true);
+  if(!me.onboarded){startOnboarding();return;}
+  enterWorld();
+}
+function enterWorld(){
+  const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);loadQuestLog();
-  if(me.tut<TUT.length)tutGo(me.tut);else $('coach').style.display='none';
-  if(!me.look)showCreator(true);else if(me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
+  joinPresence();act('settle',{},true);loadQuestLog();tab='work';
+  if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
   dirty=true;
 }
 function homePlot(){const u=me?.home_unit&&props.get(me.home_unit);return u?plots[u.plot]:dormPlot;}
+const villageSpawn=()=>{const p=villagePvz[Math.floor(Math.random()*villagePvz.length)]||dormPlot;return{x:p.x0+1,y:p.y0+3};};
 
 // ================= РАБОТА / СМЕНЫ =================
 let shiftT=0,shiftBusy=false;
@@ -154,26 +160,27 @@ function jobInfo(p){if(!p)return null;if(p.kind==='npc'){const e=EMP[p.sp];let p
 // ================= КВАРТИРА =================
 let roomCh=null,roomCtx=null,saveT=null;
 async function enterRoom({unit,hostUid,hostNick,editable}){
-  let layout,tier,size;
-  if(unit){const {data,error}=await sb.from('props').select('room,tier').eq('id',unit).single();if(error)return toast('Не удалось открыть квартиру');layout=data.room||[];tier=data.tier;size=RES[tier].room;}
-  else{const {data}=await sb.from('profiles').select('dorm').eq('id',hostUid).single();layout=data?.dorm||[];tier='dorm';size=DORM_ROOM;}
-  const elsewhere={};
+  if(!unit){toast('Своего жилья пока нет. Квартиры продаются во вкладке «🏠 Жильё» (с 4 уровня).');return;}
+  const {data,error}=await sb.from('props').select('room,tier').eq('id',unit).single();if(error||!data)return toast('Не удалось открыть квартиру');
+  const layout=data.room||[],tier=data.tier,size=RES[tier].room;const elsewhere={};
   if(editable){const {data:mine}=await sb.from('props').select('id,room').eq('owner',me.id).eq('kind','apt');
-    for(const r of mine||[])if(r.id!==unit)for(const o of r.room||[])elsewhere[o.i]=(elsewhere[o.i]||0)+1;
-    if(unit){const {data:d}=await sb.from('profiles').select('dorm').eq('id',me.id).single();for(const o of d?.dorm||[])elsewhere[o.i]=(elsewhere[o.i]||0)+1;}}
-  const title=(editable?'Мой дом':'В гостях у '+hostNick)+' · '+(tier==='dorm'?'койка в общаге':RES[tier].n);
+    for(const r of mine||[])if(r.id!==unit)for(const o of r.room||[])if(o.i[0]!=='_')elsewhere[o.i]=(elsewhere[o.i]||0)+1;}
+  const title=(editable?'Мой дом':'В гостях у '+hostNick)+' · '+RES[tier].n;
   roomCtx={unit,hostUid,editable};
-  room.open({size,tier,layout,editable,owned:me.furn||{},elsewhere,title,onSave:l=>{clearTimeout(saveT);saveT=setTimeout(()=>act('save_room',{p_unit:unit||0,p_layout:l}),500);dirty=true;}});
+  room.open({size,tier,layout,editable,owned:me.furn||{},elsewhere,title,makeAvatar:world.makeAvatar,meId:me.id,
+    onSave:l=>{clearTimeout(saveT);saveT=setTimeout(()=>act('save_room',{p_unit:unit,p_layout:l}),500);dirty=true;},
+    onMove:m=>roomCh&&roomCh.send({type:'broadcast',event:'move',payload:{uid:me.id,...m}})});
   mode='room';document.body.classList.add('inroom');$('roomui').style.display='flex';$('chat').style.display='block';
-  tab='furn';sheetOpen=!mobile;dirty=true;tutFlags.room=true;
-  roomCh=sb.channel('room:'+(unit||'d'+hostUid),{config:{presence:{key:me.id}}});
+  tab='furn';sheetOpen=!mobile;dirty=true;
+  roomCh=sb.channel('room:'+unit,{config:{presence:{key:me.id}}});
   roomCh.on('presence',{event:'sync'},()=>{const st=roomCh.presenceState();room.setPeople(Object.entries(st).map(([uid,a])=>({uid,...a[a.length-1]})));dirty=true;})
     .on('broadcast',{event:'chat'},({payload})=>room.say(payload.uid,payload.text))
-    .subscribe(s=>{if(s==='SUBSCRIBED')roomCh.track({nick:me.nick,color:me.color});});
+    .on('broadcast',{event:'move'},({payload})=>room.moveOther(payload.uid,payload))
+    .subscribe(s2=>{if(s2==='SUBSCRIBED')roomCh.track({nick:me.nick,color:me.color,look:me.look||null,skin:me.skin||null});});
 }
 function leaveRoom(){room.close();if(roomCh){roomCh.unsubscribe();roomCh=null;}mode='city';roomCtx=null;document.body.classList.remove('inroom');
   $('roomui').style.display='none';$('chat').style.display='none';tab='home';dirty=true;}
-function onInvite(inv){toast(`🔔 <b>${esc(inv.from_nick)}</b> зовёт в гости! <span class="btn gold" data-visit="${inv.unit}" data-host="${inv.from_uid}" data-hn="${esc(inv.from_nick)}">Пойти</span>`,12000);}
+function onInvite(inv){if(!inv.unit)return;toast(`🔔 <b>${esc(inv.from_nick)}</b> зовёт в гости! <span class="btn gold" data-visit="${inv.unit}" data-host="${inv.from_uid}" data-hn="${esc(inv.from_nick)}">Пойти</span>`,12000);}
 $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;const t=e.target.value.trim().slice(0,120);if(!t)return;
   roomCh.send({type:'broadcast',event:'chat',payload:{uid:me.id,text:t}});room.say(me.id,t);e.target.value='';});
 {let rd=null;const cv=$('c');
@@ -183,13 +190,13 @@ $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;co
   addEventListener('keydown',e=>{if(mode==='room'&&e.code==='KeyR'&&e.target.tagName!=='INPUT')room.rotateHand();});}
 
 // ================= ВЫБОР НА КАРТЕ =================
-world.onTap=p=>{if(mode!=='city')return;if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
+world.onTap=(p,g)=>{if(mode!=='city')return;if(ob){const k=obHotspot(g);if(k){ob.sel=k;tab='ob';sheetOpen=true;}else if(mobile&&sheetOpen)sheetOpen=false;dirty=true;return;}if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
 world.onHover=(p,e)=>{const t=$('tip');if(!p||!e){t.style.display='none';return;}t.style.display='block';t.style.left=e.clientX+16+'px';t.style.top=e.clientY+12+'px';t.innerHTML=tipHTML(p);};
 function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
 
 // ================= ВКЛАДКИ =================
-const CITY_TABS=[['work','💼','Дела'],['market','🏪','Рынок'],['home','🏠','Жильё',2],['gov','🏛','Город',4],['more','☰','Ещё']];
+const CITY_TABS=[['work','💼','Дела'],['market','🏪','Рынок'],['home','🏠','Жильё',2],['more','☰','Ещё']];
 let coachMin=false,lastInvOpen=false;
 const newTabs=new Set();
 const ROOM_TABS=[['furn','🛋','Мебель'],['guests','👥','Гости']];
@@ -210,7 +217,7 @@ function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),
   if(!myProps().some(p=>p.kind==='apt'))return{t:'Купи квартиру',d:'Хрущёвка — от ~525💰. Обставь мебелью и зови друзей в гости.',a:'tab',v:'home',b:'Квартиры'};
   if(l<5)return{t:'Дорасти до 5 уровня',d:'Откроются точки в городе: ПВЗ, шаурмичные, ларьки.'+xpBar(5),a:'tab',v:'work',b:'Задания'};
   if(!mp.some(p=>p.reg==='c'&&p.building))return{t:'Открой точку в городе',d:'Город — главный рынок сбыта: жители платят за готовое.',a:'tab',v:'market',b:'Рынок'};
-  return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'gov',b:'Мэрия'};}
+  return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'more',b:'Ещё'};}
 function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);let h=`<h3>📦 Склад</h3><div class="mut">Вместимость — ${c} каждого товара (растёт с числом и уровнем бизнесов). Сверх лимита товар пропадает.</div>`;
   if(!gs.length)return h+'<div class="row mut">Пока пусто. Купи участок и построй ферму — урожай появится здесь.</div>';
   for(const g of gs){const q=Math.floor(inv(me,g)),pc=Math.min(100,q/c*100);h+=`<div class="row">${GOODS[g].ic} <b>${GOODS[g].n}</b> — ${q}/${c} <span class="mut">≈${Math.round(q*price(g,q/2))}💰 на базе</span><div class="bar"><i style="width:${pc}%;background:${pc>=100?'#c0392b':pc>80?'#e67e22':'#ffd166'}"></i></div>
@@ -315,7 +322,7 @@ function workHTML(){if(!me)return'';let h=nextHTML()+'<div style="height:8px"></
     h+=`<div class="row"><b>${j.n}</b> · ${j.job} · <b>${j.pay}💰</b>${j.req?` <span class="mut">(от ${j.req} смен)</span>`:''}<br><span class="btn sm blue" data-act="goto" data-plot="${pr.plot}">На карте</span>${me.job_prop===pr.id?'':`<span class="btn sm ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться</span>`}</div>`;}
   return h+`<div class="mut">Также можно устроиться в бизнес любого игрока — кликни его участок.</div>`;}
 function homeHTML(){if(!me)return'';const apts=myProps().filter(p=>p.kind==='apt'),off=myProps().filter(p=>p.kind==='office');
-  let h=`<h3>🏠 Жильё</h3><div class="row">🛏 Койка в общаге <span class="btn sm" data-act="enter" data-id="0">Войти</span>${me.home_unit?`<span class="btn sm blue" data-act="sethome" data-id="0">Сделать домом</span>`:'<span class="mut"> 🏠 дом</span>'}</div>`;
+  let h=`<h3>🏠 Жильё</h3>${apts.length?'':'<div class="row">Своего жилья пока нет — копи на квартиру. Дом можно обставить, приглашать гостей и отдыхать.</div>'}`;
   for(const a of apts)h+=`<div class="row">🚪 ${RES[a.tier].n}, ${a.floor} эт. <span class="btn sm" data-act="enter" data-id="${a.id}">Войти</span>${me.home_unit===a.id?'<span class="mut"> 🏠 дом</span>':`<span class="btn sm blue" data-act="sethome" data-id="${a.id}">Сделать домом</span>`}<span class="btn sm blue" data-act="goto" data-plot="${a.plot}">На карте</span></div>`;
   for(const o of off)h+=`<div class="row">🏢 Офис, ${o.floor} эт. ${o.building?BLD[o.building].ic+' '+BLD[o.building].n:'пустой'} <span class="btn sm blue" data-act="goto" data-plot="${o.plot}">Открыть</span></div>`;
   h+=`<h3 style="margin-top:10px">Купить квартиру</h3><div class="mut">От однушки в хрущёвке до пентхауса в небоскрёбе. Чем дороже — тем больше комната.</div>`;
@@ -331,9 +338,14 @@ function topHTML(){const list=[...profiles.values()].sort((a,b)=>b.money-a.money
   return`<h3>🏆 Самые богатые</h3>`+list.map((p,i)=>`<div class="row" style="${me&&p.id===me.id?'background:#3a3148':''}">${i+1}. <span style="color:${p.color}">■</span> ${esc(p.nick)} — <b>${fmt(p.money)}💰</b> <span class="mut">${careerOf(p.shifts||0)}</span></div>`).join('')+
   (me?`<div style="margin-top:10px"><span class="btn sm red" data-act="logout">Выйти из аккаунта</span></div>`:'');}
 function feedHTML(){return`<h3>📰 Что происходит</h3>`+events.slice().reverse().map(e=>`<div class="row">${esc(e.txt)}</div>`).join('');}
-function furnHTML(){const st=room.state;if(!st)return'';let h=`<h3>🛋 Мебель</h3>`;
-  if(!st.editable)return h+'<div>Ты в гостях — расставлять нельзя, но можно болтать в чате.</div>';
-  h+=`<div class="mut">${mobile?'Нажми «Поставить», затем на пол. Нажми на вещь, чтобы переставить.':'«Поставить» → клик по полу. R — повернуть. Клик по вещи — переставить.'} Мебель делают игроки в мебельных цехах — цена зависит от склада базы.</div>`;
+function furnHTML(){const st=room.state;if(!st)return'';
+  if(!st.editable)return`<h3>🛋 В гостях</h3><div>Нажми на пол — пойдёшь туда, на стул, диван или кровать — сядешь. Пиши в чат сверху.</div>`;
+  let h=`<h3>${st.edit?'🛠 Ремонт':'🛋 Дом'}</h3><span class="btn ${st.edit?'on':'gold'}" data-act="redit">${st.edit?'✔ Готово':'🛠 Режим ремонта'}</span>`;
+  if(!st.edit)h+=`<div class="mut" style="margin:6px 0">Нажми на пол — персонаж пойдёт туда. На стул, диван или кровать — сядет или ляжет. Чтобы двигать мебель и красить стены — включи ремонт.</div>`;
+  else{h+=`<div class="mut" style="margin:6px 0">${mobile?'«Поставить» → нажми на пол. Нажми на вещь — переставить.':'«Поставить» → клик по полу, R — повернуть, клик по вещи — переставить.'}</div>
+    <div class="crow"><div class="mut">Цвет стен</div><div class="swrow">${WALL_COLORS.map(c=>`<span class="sw ${st.decor.wall===c?'on':''}" style="background:${c}" data-act="rwall" data-v="${c}"></span>`).join('')}</div></div>
+    <div class="crow"><div class="mut">Пол</div><div class="swrow">${FLOOR_COLORS.map(c=>`<span class="sw ${st.decor.floor===c?'on':''}" style="background:${c}" data-act="rfloor" data-v="${c}"></span>`).join('')}</div></div>`;}
+  h+=`<h3 style="margin-top:8px">Мебель</h3><div class="mut">Мебель делают игроки в мебельных цехах — цена зависит от склада базы.</div>`;
   for(const[k,f]of Object.entries(FURN)){const owned=Math.floor(me.furn?.[k]||0),free=room.free(k),m=missCost(f.cost),c=f.money+m.c;
     h+=`<div class="row">${f.ic} <b>${f.n}</b> <span class="mut">${f.w}×${f.d}</span> · есть ${owned}, свободно ${Math.max(0,free)}<br>
     <span class="btn sm ${free>0?'':'dis'}" data-act="place" data-it="${k}">Поставить</span><span class="btn sm gold ${me.money>=c&&m.ok&&LV()>=NEED.furn?'':'dis'}" data-act="buyfurn" data-it="${k}">Купить · ${costText(f.cost)} + ${f.money}💰 (≈${c}💰)</span></div>`;}
@@ -342,9 +354,9 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
   if(st.editable)h+=`<div>Позови друга по нику:</div><input id="invnick" maxlength="16" placeholder="Ник игрока"><span class="btn gold" data-act="invite">Пригласить</span>`;
   h+=`<div class="row">В комнате: ${[...st.people.keys()].map(nm).join(', ')||'—'}</div><div class="mut">Пиши в чат сверху — сообщения увидят все в комнате.</div>`;return h;}
 let moreSec='goals';
-function moreHTML(){const sec=[['goals','📋 Цели'],...(LV()>=3?[['gear','🦺 Экипировка']]:[]),['look','👤 Персонаж'],['skins','💎 Скины'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
+function moreHTML(){const sec=[['goals','📋 Цели'],['gov','🏛 Мэрия'],...(LV()>=3?[['gear','🦺 Экипировка']]:[]),['look','👤 Персонаж'],['skins','💎 Скины'],['top','🏆 Топ'],['feed','📰 Лента'],['levels','⭐ Уровни']];
   return`<div style="margin-bottom:8px">${sec.map(([k,n])=>`<span class="btn sm ${moreSec===k?'on':'blue'}" data-act="moresec" data-s="${k}">${n}</span>`).join('')}</div>`+
-    ({goals:goalsHTML,gear:gearHTML,look:()=>{showCreator(false);moreSec='goals';return goalsHTML();},skins:skinsHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]());}
+    ({gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,look:()=>{showCreator(false);moreSec='goals';return goalsHTML();},skins:skinsHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]());}
 function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=`<h3>🦺 Рабочая экипировка</h3><div class="mut">Даёт бонусы к производству. Получить трудно: за многократные задания, стаж или дорого. Один предмет на слот.</div>`;
   for(const[slot,sn]of Object.entries(SLOTS)){h+=`<div class="row"><b>${sn}:</b> ${eq[slot]&&GEAR[eq[slot]]?GEAR[eq[slot]].ic+' '+GEAR[eq[slot]].n+` <span class="btn sm red" data-act="unequip" data-slot="${slot}">Снять</span>`:'<span class="mut">пусто</span>'}</div>`;}
   for(const[id,G]of Object.entries(GEAR)){const has=own.includes(id),on=eq[G.slot]===id;let how='',can=true;
@@ -444,13 +456,14 @@ function renderUI(){
     const e=Math.floor(EN());$('hen').textContent='⚡ '+e+(mobile?'':'/'+EMAX());$('hen').classList.toggle('low',e<ENERGY.shift);
     const c=CAP(),full=GK.some(g=>inv(me,g)>=c),n=GK.reduce((a,g)=>a+Math.floor(inv(me,g)),0);$('invn').textContent=full?'!':n?(n>999?'999+':n):'';$('invn').style.background=full?'#c0392b':'#3a7d44';}
   {const gh=world.gameHour(),hh=Math.floor(gh),mm=Math.floor((gh-hh)*60);$('htime').textContent=`${hh>=6&&hh<20?'☀️':'🌙'} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;}
-  document.body.classList.toggle('sheetopen',sheetOpen);
-  if(mobile&&tutI>=0&&tutI<TUT.length){$('coach').classList.toggle('mini',sheetOpen||coachMin);}
+  if(ob){$('money').textContent='💰 '+ob.money+' уч.';$('hen').textContent='⚡ '+ob.en;const q=Math.floor(ob.inv.wheat||0);$('invn').textContent=q||'';}
+  document.body.classList.toggle('sheetopen',sheetOpen);document.body.classList.toggle('onisland',!!ob);
+  if(mobile&&ob){$('coach').classList.toggle('mini',sheetOpen||coachMin);}
   const T=mode==='room'?ROOM_TABS:CITY_TABS;if(!T.some(t=>t[0]===tab)&&!(mode==='city'&&(tab==='obj'||tab==='inv')))tab=T[0][0];
-  const th=T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
+  const th=ob?'':T.filter(t=>!t[3]||LV()>=t[3]).map(([k,ic,n])=>`<div class="tab ${k===tab&&sheetOpen?'on':''}" data-tab="${k}"><span class="ic">${ic}${newTabs.has(k)?'✨':''}</span>${n}</div>`).join('');
   if(th!==lastTabs){$('tabs').innerHTML=th;lastTabs=th;}
   $('sheet').classList.toggle('collapsed',!sheetOpen);
-  const body={inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
+  const body=ob?(tab==='inv'?obInvHTML:obHTML):{inv:invHTML,obj:objHTML,market:marketHTML,work:workHTML,home:homeHTML,gov:govHTML,more:moreHTML,furn:furnHTML,guests:guestsHTML}[tab]();
   if(body!==lastBody){const s=$('tabbody').scrollTop;$('tabbody').innerHTML=body;$('tabbody').scrollTop=s;lastBody=body;}
   $('hand').style.display=room.state&&room.state.hand?'inline':'none';
   dirty=false;tutCheck();
@@ -458,7 +471,8 @@ function renderUI(){
 
 // ================= КНОПКИ =================
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-tab],[data-act],[data-auth],[data-color],[data-tut],[data-visit],[data-lk]');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-act],[data-auth],[data-color],[data-tut],[data-visit],[data-lk],[data-ob]');if(!t)return;
+  if(t.dataset.ob&&ob){await obAction(t.dataset.ob,t);lastBody='';renderUI();return;}
   if(t.dataset.lk){const k=t.dataset.lk;let v=t.dataset.v;if(k==='skin')v=+v;draft[k]=v;if(k==='g'){draft.hair=v==='f'?'long':'short';if(v==='m'&&draft.bk==='skirt')draft.bk='pants';if(v==='f')draft.beard='none';}updateCreator();return;}
   if(t.dataset.color){myColor=t.dataset.color;document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on',s.dataset.color===myColor));return;}
   if(t.dataset.auth)return authAction(t.dataset.auth);
@@ -505,7 +519,7 @@ document.addEventListener('click',async e=>{
     case 'czoom':if(pv){pv.face=!pv.face;t.textContent=pv.face?'🧍 Весь':'🔍 Лицо';}return;
     case 'crand':randomLook();updateCreator();return;
     case 'closecreator':pvClose();$('auth').style.display='none';$('authbox').style.width='';return;
-    case 'savelook':{const first=!me.look;if(await act('set_look',{p_look:draft})){pvClose();$('authbox').style.width='';$('auth').style.display='none';if(first&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();}break;}
+    case 'savelook':{const first=!me.look;if(await act('set_look',{p_look:draft})){pvClose();$('authbox').style.width='';$('auth').style.display='none';if(first&&me.onboarded&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();}break;}
     case 'quest':{const Q=QUESTS[t.dataset.q],P=world.POIS[Q.poi];quest={id:t.dataset.q,phase:'go'};world.me.goal='quest';world.goMe(P.x,P.y);world.flyTo(P.x,P.y);if(mobile)sheetOpen=false;toast(`Идёшь: ${P.ic} ${P.n}`);break;}
     case 'qcancel':quest=null;if(world.me)world.me.goal=null;break;
     case 'gopoi':{const P=world.POIS[QUESTS[t.dataset.q].poi];world.flyTo(P.x,P.y,mobile?12:16);if(mobile)sheetOpen=false;break;}
@@ -523,6 +537,9 @@ document.addEventListener('click',async e=>{
     case 'sellprop':if(confirm('Точно продать?'))await act('sell_prop',{p_id:id});break;
     case 'sethome':await act('set_home',{p_id:id});{const h=homePlot();world.me&&(world.me.goal=null);}break;
     case 'enter':if(mode==='room')leaveRoom();await enterRoom({unit:id,hostUid:me.id,hostNick:me.nick,editable:true});break;
+    case 'redit':if(room.state){room.setEdit(!room.state.edit);sheetOpen=true;tab='furn';}break;
+    case 'rwall':room.setDecor('wall',t.dataset.v);break;
+    case 'rfloor':room.setDecor('floor',t.dataset.v);break;
     case 'home':if(!me)break;if(mode==='room')leaveRoom();else await enterRoom({unit:me.home_unit||0,hostUid:me.id,hostNick:me.nick,editable:true});break;
     case 'leave':leaveRoom();break;
     case 'findme':if(mode==='city'&&world.me)world.flyTo(world.me.x,world.me.y);break;
@@ -532,7 +549,7 @@ document.addEventListener('click',async e=>{
     case 'rot':room.rotateHand();break;
     case 'drop':room.dropHand();break;
     case 'buyfurn':if(await act('buy_furn',{p_item:t.dataset.it})&&room.state)room.state.owned=me.furn;break;
-    case 'invite':{const n=$('invnick').value.trim();if(n&&await act('invite',{p_nick:n}))toast('Приглашение отправлено');break;}
+    case 'invite':{if(!me.home_unit){toast('Сначала купи квартиру');break;}const n=$('invnick').value.trim();if(n&&await act('invite',{p_nick:n}))toast('Приглашение отправлено');break;}
     case 'logout':await sb.auth.signOut();location.reload();break;
   }
   lastBody='';renderUI();
@@ -548,22 +565,56 @@ const tutFlags={room:false};let tutI=-1;
 const cheapLand=()=>{const m=world.me||marketPlot,sc=p=>p.price+Math.hypot(p.x-m.x,p.y-m.y)*1.2;return[...props.values()].filter(p=>p.kind==='land'&&!p.owner&&(p.reg==='v'||p.reg==='d')).sort((a,b)=>sc(a)-sc(b))[0];};
 let recLand=null;
 let camStart=null;
-const TUT=[
-  {t:'Здорово, сосед! Я Петрович, местный завхоз. Человечек с твоим ником — это ты. Приехал(а) налегке: 150💰 и койка в общаге. Покажу, как тут всё устроено — займёт пару минут.',btn:'Поехали',enter(){const m=world.me;m&&world.flyTo(m.x,m.y,mobile?9:11);}},
-  {t:mobile?'Сначала научимся смотреть по сторонам: <b>проведи пальцем</b> по карте, чтобы её подвинуть. Двумя пальцами — приблизить/отдалить.':'Сначала научимся смотреть по сторонам: <b>потяни карту мышкой</b>. Колесо — приблизить/отдалить, Q/E — повернуть.',
-    enter(){camStart={x:world.camT.x,z:world.camT.z};},done:()=>camStart&&Math.hypot(world.camT.x-camStart.x,world.camT.z-camStart.z)>8},
-  {t:'Отлично! Нажми 📍 справа, если потеряешься — камера вернётся к тебе. А теперь к делу: без денег никуда. Над ПВЗ «Коробас» стрелка — нажми на него и «Устроиться».',arrow:()=>pvzPlot,enter(){world.flyTo(pvzPlot.x,pvzPlot.y,mobile?10:12);},done:()=>me.job_prop!=null},
-  {t:`Ты на работе! Человечек сам дойдёт до ПВЗ. Каждая смена (${SHIFT_SEC} сек) — 💰 и ⭐ опыт (кольцо вокруг уровня слева сверху). Подожди первую смену.`,hl:['rank'],enter(){const m=world.me;m&&world.flyTo(m.x,m.y);},done:()=>me.shifts>=1},
-  {t:'Есть первая зарплата! Ещё деньги и опыт дают <b>задания в округе</b>: вкладка «💼 Дела» → например, «Найти кота бабы Зины». Сходи — заодно погуляешь по городу.',hl:['tabs'],enter(){tab='work';sheetOpen=true;},done:()=>[...qlog.values()].some(q=>q.cnt>0)||(LV()>=2&&me.money>=200)},
-  {t:'Молодец! Игра открывается постепенно: новые вкладки и здания появляются с уровнем (их отмечу ✨). Набери <b>2 уровень</b> и <b>200💰</b> — тогда купим землю. Смены идут, пока ты в игре.',hl:['money','rank'],done:()=>LV()>=2&&me.money>=200},
-  {t:'Пора своё дело! В деревнях и на дачах земля дешёвая. Отметил тебе участок стрелкой — нажми на него и «Купить».',arrow:()=>recLand&&plots[recLand.plot],enter(){recLand=cheapLand();if(recLand)world.flyTo(plots[recLand.plot].x,plots[recLand.plot].y,mobile?11:13);},
-    tick(){if(recLand&&props.get(recLand.id)?.owner&&props.get(recLand.id).owner!==me.id){recLand=cheapLand();}},done:()=>myPlots().length>0},
-  {t:'Твоя земля! Построй 🌾 <b>Ферму</b> — самый дешёвый старт. Есть ещё сад, огород, пасека, делянка, птичник. Работник выйдет сам.',enter(){const p=myPlots()[0];if(p){sel=plots[p.plot];world.select(sel);tab='obj';sheetOpen=true;}},done:()=>myPlots().some(p=>p.building)},
-  {t:'Стройка 20 секунд, потом работник начнёт добывать. Продукция копится на складе — кнопка 📦 справа. Пока ты в игре, бизнес работает на 100%, без тебя — на 25%.',hl:['inv'],done:()=>GK.some(g=>inv(me,g)>=5)},
-  {t:'Урожай есть! Продай его: вкладка «Рынок» → «Продать». Грузовик повезёт товар на оптовую базу — это увидят все игроки.',hl:['tabs'],enter(){tab='market';sheetOpen=true;},done:()=>me.sold>0},
-  {t:'Почти всё! Жми 🏠 справа — это твоя койка в общаге. Мебель покупается за товар игроков, потом можно купить квартиру и звать друзей в гости.',hl:['topbtns'],done:()=>tutFlags.room},
-  {t:'Ты готов(а)! Во вкладке «💼 Дела» всегда есть карточка <b>🎯 Что делать дальше</b> — она подскажет следующий шаг. Дальше: найм, магазин, переработка, биржа, квартиры, выборы мэра. Удачи!',btn:'Погнали!',enter(){tab='work';sel=null;world.select(null);sheetOpen=true;}},
+const TUT=[];
+// ================= ОБУЧЕНИЕ: остров «Учебный» (всё понарошку, только у клиента) =================
+let ob=null;const IS=world.ISLAND,OB_SHIFT=4;
+const OBH={pvz:{x:IS.pvz.x,y:IS.pvz.y},alko:{x:IS.alko.x,y:IS.alko.y},lavka:{x:IS.lavka.x,y:IS.lavka.y},pier:{x:IS.pier.x+.5,y:IS.pier.y},plot:{x:IS.plot.x0+1.5,y:IS.plot.y0+1.5}};
+const OB=[
+  {t:'Добро пожаловать на остров «Учебный»! Я Петрович. Тут всё понарошку: научу работать, строить и торговать, а потом паром отвезёт тебя в Пиксельград.',btn:'Начнём'},
+  {t:mobile?'Проведи пальцем по экрану, чтобы двигать карту. Двумя пальцами — приблизить или отдалить.':'Потяни карту мышкой. Колесо — приблизить или отдалить.',enter(){camStart={x:world.camT.x,z:world.camT.z};},done:()=>Math.hypot(world.camT.x-camStart.x,world.camT.z-camStart.z)>5},
+  {t:'Первая работа — <b>ПВЗ «Коробас»</b> (стрелка). Нажми на здание и «Работать». Каждая смена — деньги и минус ⚡ энергии.',arrow:'pvz',done:()=>ob.shifts.pvz>=3},
+  {t:'В <b>Алкомаркете «Градус»</b> платят больше. Отработай там 2 смены.',arrow:'alko',done:()=>ob.shifts.alko>=2},
+  {t:'Энергия ⚡ сверху тратится на смены и сама восстанавливается. Теперь купи <b>учебный участок</b> — своя земля, свой бизнес.',arrow:'plot',done:()=>ob.plot},
+  {t:'Построй на участке <b>ферму</b>. Стройка займёт пару секунд (в настоящем мире — минуты).',arrow:'plot',done:()=>ob.farm},
+  {t:'Работник сам собирает урожай. Загляни на склад — круглая кнопка <b>📦</b> справа.',done:()=>tab==='inv'&&sheetOpen&&(ob.inv.wheat||0)>=3},
+  {t:'Отнеси урожай в <b>Лавку скупщика</b> и продай. Совет: в большом мире сырьё дешёвое, а переработка (мука, хлеб) приносит в разы больше.',arrow:'lavka',done:()=>ob.sold},
+  {t:'Ты готов(а)! Иди к <b>пристани</b> — паром отвезёт тебя в Пиксельград. Начни с работы в ПВЗ или «Градусе» в своей деревне. Удачи!',arrow:'pier'},
 ];
+function startOnboarding(){ob={i:-1,money:0,en:20,inv:{},shifts:{pvz:0,alko:0},job:null,shiftT:0,plot:false,farm:false,farmT:0,sold:false,sel:null};
+  world.tutReset();world.setMe(me.nick,me.color,IS.spawn.x,IS.spawn.y+2,me.skin,me.look);world.jump(IS.spawn.x,IS.spawn.y+2);tab='ob';sheetOpen=false;obGo(0);}
+function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter();$('coach').style.display='flex';$('coach').classList.remove('mini');coachMin=false;
+  $('cwho').textContent=`ОСТРОВ «УЧЕБНЫЙ» · ${i+1}/${OB.length}`;$('ctxt').innerHTML=st.t;$('cbtn').innerHTML=st.btn?`<span class="btn gold" data-ob="next">${st.btn}</span>`:'<span class="mut">▶ выполни — и продолжим</span>';
+  if(st.arrow){const h=OBH[st.arrow];world.flyTo(h.x,h.y,mobile?11:13);}dirty=true;}
+function obUpdate(dt){if(!ob)return;const st=OB[ob.i];world.arrow=st&&st.arrow?OBH[st.arrow]:null;if(st&&st.done&&st.done())obGo(ob.i+1);
+  const m=world.me;if(ob.job&&m){const h=OBH[ob.job],tx=Math.round(h.x),ty=Math.round(h.y)+1;if(m.goal!==ob.job){m.goal=ob.job;world.goMe(tx,ty);ob.shiftT=0;}
+    const at=!m.path.length&&Math.hypot(m.x-tx,m.y-ty)<1.3;m.working=at;
+    if(at){ob.shiftT+=dt;if(ob.shiftT>=OB_SHIFT){ob.shiftT=0;const pay=ob.job==='pvz'?10:15;ob.money+=pay;ob.en=Math.max(0,ob.en-1);ob.shifts[ob.job]++;world.float(`+${pay}💰  −1⚡`,m.x,1.6,m.y);dirty=true;}}
+    const b=$('obbar');if(b)b.style.width=Math.min(100,ob.shiftT/OB_SHIFT*100)+'%';}
+  if(ob.farm&&Date.now()>ob.farmReady){ob.farmT+=dt;if(ob.farmT>=2.5){ob.farmT=0;if((ob.inv.wheat||0)<12){ob.inv.wheat=(ob.inv.wheat||0)+1;dirty=true;}}}}
+function obHotspot(g){if(!g)return null;let best=null,bd=3.2;for(const[k,h]of Object.entries(OBH)){const d=Math.hypot(g.x-h.x,g.z-h.y);if(d<bd){bd=d;best=k;}}return best;}
+function obHTML(){const k=ob.sel,mny=n=>`<b>${n}💰</b>`;
+  if(k==='pvz'||k==='alko'){const n=k==='pvz'?'ПВЗ «Коробас»':'Алкомаркет «Градус»',pay=k==='pvz'?10:15;
+    return`<h3>${k==='pvz'?'📦':'🍾'} ${n}</h3><div>Работа: ${k==='pvz'?'выдача посылок':'грузчик-кассир'} · ${mny(pay)} за смену · ⚡1</div>`+
+      (ob.job===k?`<div style="margin-top:6px">✅ Ты работаешь здесь<div class="bar"><i id="obbar" style="width:0"></i></div></div><span class="btn red" data-ob="quit">Уйти с работы</span>`:`<span class="btn gold" data-ob="job" data-k="${k}">Работать</span>`);}
+  if(k==='plot'){if(!ob.plot)return`<h3>🌱 Учебный участок</h3><div>Своя земля — свой бизнес. Цена ${mny(60)}, у тебя ${mny(ob.money)}.</div><span class="btn gold ${ob.money>=60?'':'dis'}" data-ob="buy">Купить участок</span>${ob.money<60?'<div class="mut">Поработай ещё — не хватает денег</div>':''}`;
+    if(!ob.farm)return`<h3>🌱 Твой участок</h3><div>Построй ферму: пшеница растёт сама, работник собирает урожай. Цена ${mny(40)}.</div><span class="btn gold ${ob.money>=40?'':'dis'}" data-ob="build">Построить ферму</span>`;
+    return`<h3>🌾 Ферма</h3><div>Работник собирает урожай → склад (кнопка 📦). Пшеницы: <b>${Math.floor(ob.inv.wheat||0)}</b></div>`;}
+  if(k==='lavka')return`<h3>🧺 Лавка скупщика</h3><div>Пшеница по ${mny(3)} за штуку. У тебя: ${Math.floor(ob.inv.wheat||0)}🌾</div><span class="btn gold ${(ob.inv.wheat||0)>=1?'':'dis'}" data-ob="sell">Продать всё</span><div class="mut">В большом мире есть оптовая база, биржа игроков и свои магазины.</div>`;
+  if(k==='pier')return`<h3>⛴ Пристань</h3>`+(ob.i>=OB.length-1?`<div>Паром в Пиксельград готов. Учебные деньги останутся тут, а в городе тебя ждут 150💰 и работа в деревне.</div><span class="btn gold" data-ob="sail">Отплыть в Пиксельград →</span>`:'<div>Паром ждёт, пока ты закончишь обучение.</div>');
+  return`<h3>🏝 Остров «Учебный»</h3><div>Нажимай на здания — следуй подсказкам Петровича сверху.</div>`;}
+function obInvHTML(){const q=Math.floor(ob.inv.wheat||0);return`<h3>📦 Склад</h3><div class="mut">Здесь копится всё, что производят твои бизнесы. У склада есть лимит — излишек пропадает.</div><div class="row">🌾 Пшеница — ${q}/100<div class="bar"><i style="width:${q}%"></i></div></div>`;}
+async function obAction(a,t){
+  if(a==='next')obGo(ob.i+1);
+  if(a==='job'){ob.job=t.dataset.k;if(mobile)sheetOpen=false;}
+  if(a==='quit'){ob.job=null;if(world.me)world.me.goal=null;}
+  if(a==='buy'&&ob.money>=60){ob.money-=60;ob.plot=true;world.tutPlotState({owner:'me',color:me.color,nick:me.nick});toast('🌱 Участок твой!');}
+  if(a==='build'&&ob.money>=40){ob.money-=40;ob.farm=true;ob.farmReady=Date.now()+5000;ob.job=null;world.tutPlotState({owner:'me',color:me.color,nick:me.nick,building:'farm',workers:1,builtAt:Date.now()+5000});toast('🏗 Стройка пошла!');}
+  if(a==='sell'){const q=Math.floor(ob.inv.wheat||0);ob.money+=q*3;ob.inv.wheat=0;ob.sold=true;toast(`🧺 Продано ${q}🌾 за ${q*3}💰`);}
+  if(a==='sail'){ob.job=null;sheetOpen=false;$('coach').style.display='none';world.arrow=null;const sp=villageSpawn();
+    toast('⛴ Паром отчаливает в Пиксельград…',6000);
+    world.ferry({x:171.5,y:170},async()=>{const r=await act('finish_onboarding',{p_x:sp.x,p_y:sp.y});if(!r)return;ob=null;world.tutReset();
+      me.last_x=sp.x;me.last_y=sp.y;enterWorld();toast('🏡 Добро пожаловать в Пиксельград! Начни с работы в ПВЗ или «Градусе» рядом — нажми на здание.',9000);});}
+  dirty=true;}
 function tutGo(i){document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));
   if(i>=TUT.length){tutEnd();return;}tutI=i;if(me&&me.tut!==i){me.tut=i;act('set_tut',{p_n:i},true);}
   const s=TUT[i];s.enter&&s.enter();(s.hl||[]).forEach(id=>$(id)?.classList.add('hl'));
@@ -576,7 +627,7 @@ function tutCheck(){if(!me||tutI<0||tutI>=TUT.length)return;const s=TUT[tutI];s.
 let last=performance.now(),uiT=0,settleT=10,lastSaved='';
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
   if(mode==='city')world.frameUpdate(dt);else room.render(dt);
-  if(me){updateJob(dt);trackPos(false);if((settleT-=dt)<=0){settleT=15;act('settle',{},true);const m=world.me;if(m){const k=Math.round(m.x)+','+Math.round(m.y);if(k!==lastSaved){lastSaved=k;rpc('set_pos',{p_x:m.x,p_y:m.y}).catch(()=>{});}}}}
+  if(me){if(ob)obUpdate(dt);else updateJob(dt);trackPos(false);if((settleT-=dt)<=0){settleT=15;act('settle',{},true);const m=world.me;if(m){const k=Math.round(m.x)+','+Math.round(m.y);if(k!==lastSaved){lastSaved=k;rpc('set_pos',{p_x:m.x,p_y:m.y}).catch(()=>{});}}}}
   if((uiT-=dt)<=0||dirty){uiT=.5;renderUI();}}
 requestAnimationFrame(loop);
 renderUI();
