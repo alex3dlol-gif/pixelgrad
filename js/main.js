@@ -9,15 +9,22 @@ const $=id=>document.getElementById(id);
 const fmt=n=>Math.floor(n).toLocaleString('ru-RU');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mobile=matchMedia('(pointer:coarse)').matches||innerWidth<820;
-// встроенный браузер Instagram/TikTok/Facebook: просим открыть игру в обычном браузере (там не теряется вход и всё быстрее)
-{const ua=navigator.userAgent,inApp=/Instagram|FBAN|FBAV|musical_ly|BytedanceWebview|TikTok/i.test(ua),android=/Android/i.test(ua);
-  if(inApp&&!sessionStorage.getItem('pg_inapp')){const app=/Instagram/i.test(ua)?'Инстаграма':/FBAN|FBAV/i.test(ua)?'Фейсбука':'ТикТока';
+// встроенный браузер Instagram/TikTok/Facebook: уводим в обычный браузер (там не теряется вход и всё быстрее)
+// iPhone (iOS 17+): ссылка x-safari-https:// открывает Safari; Android: intent:// открывает Chrome. Не сработало — инструкция со стрелкой к меню.
+{const ua=navigator.userAgent,inApp=/Instagram|FBAN|FBAV|musical_ly|BytedanceWebview|TikTok/i.test(ua),android=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua);
+  if(inApp&&!sessionStorage.getItem('pg_inapp')){
+    const url=location.host+location.pathname+location.search;
+    const go=android?`intent://${url}#Intent;scheme=https;package=com.android.chrome;end`:ios?`x-safari-https://${url}`:null;
     const d=document.createElement('div');d.id='inapp';
-    d.innerHTML=`<div class="ia-arrow">⬈</div><div class="ia-box"><b>Открой игру в браузере</b><div>Во встроенном браузере ${app} игра работает хуже и может забыть твой вход.</div>
-      <div class="ia-step">Нажми <span class="ia-dots">${android?'⋮':'⋯'}</span> вверху справа → <b>«Открыть в ${android?'Chrome':'браузере'}»</b></div>
-      ${android?`<a class="btn gold" href="intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;end">Открыть в Chrome</a>`:''}
+    d.innerHTML=`<div class="ia-arrow" style="display:none">⬈</div><div class="ia-box"><b style="font-size:20px">Пиксельград лучше в браузере</b>
+      ${go?`<a class="btn gold ia-go" href="${go}" style="font-size:20px;padding:12px">▶ Играть в ${android?'Chrome':'Safari'}</a>`:''}
+      <div class="ia-help" style="${go?'display:none':''}"><div class="ia-step">Нажми <span class="ia-dots">${android?'⋮':'⋯'}</span> вверху справа → <b>«Открыть в ${android?'Chrome':'браузере'}»</b></div></div>
       <span class="ia-stay">остаться здесь</span></div>`;
-    document.body.appendChild(d);d.querySelector('.ia-stay').onclick=()=>{sessionStorage.setItem('pg_inapp','1');d.remove();};}}
+    document.body.appendChild(d);
+    const help=()=>{d.querySelector('.ia-help').style.display='';d.querySelector('.ia-arrow').style.display='';};
+    if(!go)help();
+    const btn=d.querySelector('.ia-go');if(btn)btn.addEventListener('click',()=>{setTimeout(()=>{if(!document.hidden)help();},1500);});
+    d.querySelector('.ia-stay').onclick=()=>{sessionStorage.setItem('pg_inapp','1');d.remove();};}}
 const world=createWorld($('c'),{mobile});
 const room=createRoom(world.renderer);
 const plots=world.plots;
