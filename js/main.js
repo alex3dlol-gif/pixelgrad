@@ -603,7 +603,8 @@ function obGo(i){if(i>=OB.length)return;ob.i=i;const st=OB[i];st.enter&&st.enter
 function obUpdate(dt){if(!ob)return;const st=OB[ob.i];world.arrow=st&&st.arrow?OBH[st.arrow]:null;if(st&&st.done&&st.done())obGo(ob.i+1);
   const m=world.me;if(ob.job&&m){const h=OBH[ob.job],tx=Math.round(h.x),ty=Math.round(h.y)+1;if(m.goal!==ob.job){m.goal=ob.job;world.goMe(tx,ty);ob.shiftT=0;}
     const at=!m.path.length&&Math.hypot(m.x-tx,m.y-ty)<1.3;m.working=at;
-    if(at){ob.shiftT+=dt;if(ob.shiftT>=OB_SHIFT){ob.shiftT=0;const pay=ob.job==='pvz'?10:15;ob.money+=pay;ob.en=Math.max(0,ob.en-1);ob.shifts[ob.job]++;world.float(`+${pay}💰  −1⚡`,m.x,1.6,m.y);dirty=true;}}
+    if(at){ob.shiftT+=dt;if(ob.shiftT>=OB_SHIFT){ob.shiftT=0;const pay=ob.job==='pvz'?10:15;ob.money+=pay;ob.en=Math.max(0,ob.en-1);ob.shifts[ob.job]++;world.float(`+${pay}💰  −1⚡`,m.x,1.6,m.y);dirty=true;
+      if((ob.job==='pvz'&&ob.shifts.pvz>=3)||(ob.job==='alko'&&ob.shifts.alko>=2)){ob.job=null;m.goal=null;m.working=false;toast('✅ Смена окончена — хватит на сегодня!');}}}
     const b=$('obbar');if(b)b.style.width=Math.min(100,ob.shiftT/OB_SHIFT*100)+'%';}
   if(ob.farm&&Date.now()>ob.farmReady){ob.farmT+=dt;if(ob.farmT>=2.5){ob.farmT=0;if((ob.inv.wheat||0)<12){ob.inv.wheat=(ob.inv.wheat||0)+1;dirty=true;}}}}
 function obHotspot(g){if(!g)return null;let best=null,bd=3.2;for(const[k,h]of Object.entries(OBH)){const d=Math.hypot(g.x-h.x,g.z-h.y);if(d<bd){bd=d;best=k;}}return best;}

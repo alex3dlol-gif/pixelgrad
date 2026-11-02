@@ -487,6 +487,13 @@ export function createWorld(canvas,{mobile}){
   const tutPlot={id:-1,sp:null,reg:'v',x0:ISLAND.plot.x0,y0:ISLAND.plot.y0,x:ISLAND.plot.x0+1.5,y:ISLAND.plot.y0+1.5,door:{x:ISLAND.plot.x0+1,y:ISLAND.plot.y0+3},stock:{x:ISLAND.plot.x0+3,y:ISLAND.plot.y0+3},
     crops:[],wk:[],owner:null,color:'#ffd166',building:null,workers:0,builtAt:0,level:1,mat:false,fast:true};
   const plotsX=[...plots,tutPlot];
+  // деревянный забор и табличка «Продаётся» вокруг учебного участка (до покупки)
+  const tutFence=new THREE.Group();{const x0=tutPlot.x0-.45,x1=tutPlot.x0+3.45,z0=tutPlot.y0-.45,z1=tutPlot.y0+3.45,c=0x9c6b3e;
+    for(const y of[.15,.35]){B(tutFence,x1-x0,.06,.06,c,(x0+x1)/2,y,z0);B(tutFence,.06,.06,z1-z0,c,x0,y,(z0+z1)/2);B(tutFence,.06,.06,z1-z0,c,x1,y,(z0+z1)/2);
+      B(tutFence,1.4,.06,.06,c,x0+.7,y,z1);B(tutFence,1.4,.06,.06,c,x1-.7,y,z1);}
+    for(let k=0;k<=4;k++){B(tutFence,.1,.5,.1,0x7a4a24,x0+k*(x1-x0)/4,0,z0);B(tutFence,.1,.5,.1,0x7a4a24,x0+k*(x1-x0)/4,0,z1);B(tutFence,.1,.5,.1,0x7a4a24,x0,0,z0+k*(z1-z0)/4);B(tutFence,.1,.5,.1,0x7a4a24,x1,0,z0+k*(z1-z0)/4);}
+    const cx=tutPlot.x0+1.5,cz=tutPlot.y0+1.5;B(tutFence,.08,.9,.08,0x6b4a2f,cx,0,cz+1);B(tutFence,.9,.5,.06,0xf4ecd8,cx,.75,cz+1);B(tutFence,.9,.1,.07,0xc0392b,cx,1.15,cz+1);B(tutFence,.5,.12,.07,0x2e7d32,cx,.85,cz+1.01,true);
+    scene.add(shadow(tutFence));}
   function setPlotState(id,st){
     const p=plots[id];if(!p||p.sp)return;
     const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0)||(p.level||1)!==(st.level||1);
@@ -740,9 +747,9 @@ export function createWorld(canvas,{mobile}){
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
     marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
-    tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
+    tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);tutFence.visible=!tutPlot.owner;if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
     setFog(on){fog.visible=!!on;camBounds=on?{x0:ISLAND.x0-2,y0:ISLAND.y0-2,x1:ISLAND.x1+2,y1:ISLAND.y1+2}:null;clampCam();},
-    tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},
+    tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutFence.visible=true;tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},
     ferry(to,onDone){fog.visible=false;camBounds=null;const boat={kind:'boat',mesh:makeShip(false,0xffd166),x:ISLAND.pier.x+.5,y:ISLAND.pier.y-8,wp:[[ISLAND.pier.x+.5,ISLAND.pier.y-16],[to.x,to.y+10],[to.x,to.y+2]],wait:0,speed:6,ferry:true};
       scene.add(boat.mesh);ships.push(boat);if(me)me.mesh.visible=false;const f=()=>{camFly=null;camT.x+=(boat.x-camT.x)*.1;camT.z+=(boat.y-camT.z)*.1;
         if(boat.wp&&boat.wp.length)requestAnimationFrame(f);else{scene.remove(boat.mesh);ships.splice(ships.indexOf(boat),1);if(me)me.mesh.visible=true;onDone&&onDone();}};f();},walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
