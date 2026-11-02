@@ -100,11 +100,11 @@ function trackPos(force){const m=world.me;if(!m||!cityCh)return;const pos=`${m.x
   cityCh.track({nick:me.nick,color:me.color,skin:me.skin||null,look:me.look||null,x:+m.x.toFixed(2),y:+m.y.toFixed(2),working:!!m.working});}
 
 // ================= АВТОРИЗАЦИЯ =================
-const COLORS=['#ffd166','#06d6a0','#118ab2','#ef476f','#ffffff','#ff7f11','#9b5de5','#8ac926'];let myColor=COLORS[0],authMode='login';
+const COLORS=['#ffd166','#06d6a0','#118ab2','#ef476f','#ffffff','#ff7f11','#9b5de5','#8ac926'];let myColor=COLORS[Math.floor(Math.random()*COLORS.length)],authMode='login'; // цвет ника выбирается сам
 function showAuth(m,msg=''){authMode=m;$('auth').style.display='flex';const b=$('authbox');
   if(m==='noserver'){b.innerHTML=`<h3 style="font-size:16px">ПИКСЕЛЬГРАД</h3><div>Сервер ещё не подключён (нет ключа Supabase). Город можно посмотреть, но играть пока нельзя.</div>`;return;}
   const tabs=`<div class="atabs"><div class="tab ${m==='login'?'on':''}" data-auth="login">Вход</div><div class="tab ${m==='register'?'on':''}" data-auth="register">Регистрация</div></div>`;
-  const sw=`<div>${COLORS.map(c=>`<span class="sw ${c===myColor?'on':''}" style="background:${c}" data-color="${c}"></span>`).join('')}</div>`;
+  const sw='';
   b.innerHTML=`<h3 style="font-size:16px">ПИКСЕЛЬГРАД</h3><div class="mut" style="margin-bottom:8px">Онлайн-город: работай, копи, покупай землю, строй бизнес, обставляй квартиру и зови друзей в гости.</div>`+
     (m==='nick'?`<div>Почти готово! Как тебя звать в городе?</div><input id="a_nick" maxlength="16" placeholder="Ник (2–16 символов)">${sw}<span class="btn gold" data-auth="mknick" style="font-size:17px">Въехать в город →</span>`:
     tabs+`<input id="a_email" type="email" placeholder="Почта" autocomplete="email"><input id="a_pass" type="password" placeholder="Пароль (от 6 символов)" autocomplete="${m==='login'?'current-password':'new-password'}">`+
