@@ -16,9 +16,9 @@ const mobile=matchMedia('(pointer:coarse)').matches||innerWidth<820;
     const url=location.host+location.pathname+location.search;
     const go=android?`intent://${url}#Intent;scheme=https;package=com.android.chrome;end`:ios?`x-safari-https://${url}`:null;
     const d=document.createElement('div');d.id='inapp';
-    d.innerHTML=`<div class="ia-arrow" style="display:none">⬈</div><div class="ia-box"><b style="font-size:20px">Пиксельград лучше в браузере</b>
-      ${go?`<a class="btn gold ia-go" href="${go}" style="font-size:20px;padding:12px">▶ Играть в ${android?'Chrome':'Safari'}</a>`:''}
-      <div class="ia-help" style="${go?'display:none':''}"><div class="ia-step">Нажми <span class="ia-dots">${android?'⋮':'⋯'}</span> вверху справа → <b>«Открыть в ${android?'Chrome':'браузере'}»</b></div></div>
+    d.innerHTML=`<div class="ia-arrow" style="display:none">⬈</div><div class="ia-box"><b style="font-size:20px">Пиксельград</b>
+      ${go?`<a class="btn gold ia-go" href="${go}" style="font-size:20px;padding:12px">▶ Играть</a>`:''}
+      <div class="ia-help" style="${go?'display:none':''}"><div class="ia-step">Нажми <span class="ia-dots">${android?'⋮':'⋯'}</span> вверху справа → <b>«Открыть в браузере»</b></div></div>
       <span class="ia-stay">остаться здесь</span></div>`;
     document.body.appendChild(d);
     const help=()=>{d.querySelector('.ia-help').style.display='';d.querySelector('.ia-arrow').style.display='';};
