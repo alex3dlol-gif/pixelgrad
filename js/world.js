@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GOODS,BLD,EMP,RES,BCT,SKINS} from './config.js';
-import {W,H,STEP,HY,BLOCKS,RING,buildLayout,hash} from './layout.js';
+import {W,H,STEP,HY,BLOCKS,RING,OX,OY,LAKES,POIS,buildLayout,hash} from './layout.js';
 
 const rand=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -15,43 +15,46 @@ export const T={GRASS:0,ROAD:1,WATER:2,FOREST:3,ROCK:4,PLOT:5,SAND:6,BRIDGE:7,AS
 export function createWorld(canvas,{mobile}){
   // ================= КАРТА =================
   const grid=new Uint8Array(W*H);
-  const coast=x=>136+Math.round(Math.sin(x*.08)*2+vnoise(x*.2,7)*2);
-  const inLake=(x,y,k=1)=>((x-34)/21)**2+((y-142)/7)**2<k;
+  const coast=x=>161+Math.round(Math.sin(x*.08)*2+vnoise(x*.2,7)*2);
+  const inLake=(L,x,y,k=1)=>((x-L.x)/L.rx)**2+((y-L.y)/L.ry)**2<k;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-    let t=T.GRASS;const n=vnoise(x*.1,y*.1),n2=vnoise(x*.25+40,y*.25+9);
-    if(n>.62)t=T.FOREST;
-    if(x<14&&(n>.2||x<5))t=T.FOREST;
-    if(y<24){if(x>=48&&x<=152)t=(n2>.34||y<5)?T.ROCK:(n>.35?T.FOREST:T.GRASS);else if(n>.3)t=T.FOREST;}
-    if(x>178&&y<60&&n>.3)t=T.FOREST;
-    if(y>78&&y<108&&x>12&&x<52&&n2>.45)t=T.FIELD;
-    if(y>152&&x<96&&n>.4)t=T.FOREST;
-    if(y<136){const rx=9+Math.round(Math.sin(y*.11)*2.5);if(x===rx||x===rx+1)t=T.WATER;else if((x===rx-1||x===rx+2)&&t!==T.FOREST)t=T.SAND;}
-    if(inLake(x,y))t=T.WATER;else if(inLake(x,y,1.3))t=T.SAND;
-    const c=coast(x);if(x>=96){if(y>=c)t=T.SEA;else if(y>=c-2)t=T.SAND;}
-    if(y>=40&&x>=196+Math.round(Math.sin(y*.1)*2))t=T.SEA;
+    let t=T.GRASS;const n=vnoise(x*.09,y*.09),n2=vnoise(x*.22+40,y*.22+9);
+    if(n>.6)t=T.FOREST;
+    if(x<48&&(n>.3||x<8))t=T.FOREST;                       // западный бор
+    if(y<49){if(x>=83&&x<=187)t=(n2>.36||y<6)?T.ROCK:(n>.38?T.FOREST:T.GRASS);else if(n>.32)t=T.FOREST;} // горы
+    if(x>213&&y<85&&n>.35)t=T.FOREST;
+    if(y>103&&y<133&&x>47&&x<87&&n2>.45)t=T.FIELD;
+    if(y>182&&x<131&&n>.36)t=T.FOREST;
+    if(t===T.FOREST&&n2>.78)t=T.GRASS;                       // полянки
+    if(y<160){const rx=44+Math.round(Math.sin(y*.11)*2.5);if(x===rx||x===rx+1)t=T.WATER;else if((x===rx-1||x===rx+2)&&t!==T.FOREST)t=T.SAND;}
+    for(const L of LAKES){if(inLake(L,x,y))t=T.WATER;else if(inLake(L,x,y,1.3)&&t!==T.WATER)t=T.SAND;}
+    const c=coast(x);if(x>=131){if(y>=c)t=T.SEA;else if(y>=c-2)t=T.SAND;}
+    if(y>=65&&x>=256+Math.round(Math.sin(y*.1)*2))t=T.SEA;else if(y>=65&&x>=254+Math.round(Math.sin(y*.1)*2)&&t!==T.SEA)t=T.SAND;
     grid[I(x,y)]=t;
   }
   const clearRect=(x0,y0,x1,y1,t=T.GRASS)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(inb(x,y)&&grid[I(x,y)]!==T.WATER&&grid[I(x,y)]!==T.SEA)grid[I(x,y)]=t;};
   for(const b of BLOCKS)clearRect(b.x-2,b.y-2,b.x+b.cols*STEP+2,b.y+b.rows*STEP+2);
   clearRect(RING.x0-2,RING.y0-2,RING.x1+2,RING.y1+2);
-  clearRect(116,130,154,135,T.YARD); // портовая площадка
+  clearRect(151,155,189,160,T.YARD); // портовая площадка
+  for(const k in POIS){const P=POIS[k];clearRect(P.x-2,P.y-2,P.x+2,P.y+2);}
   const setRoad=(x,y,t)=>{if(!inb(x,y))return;const g=grid[I(x,y)];grid[I(x,y)]=(g===T.WATER||g===T.SEA||g===T.BRIDGE)?T.BRIDGE:(t??(x>=RING.x0-3?T.ASPH:T.ROAD));};
+  const carve=(x0,y0,x1,y1,t=T.ROAD)=>{const sx=Math.sign(x1-x0)||1,sy=Math.sign(y1-y0)||1;for(let x=x0;x!==x1+sx;x+=sx)setRoad(x,y0,t);for(let y=y0;y!==y1+sy;y+=sy)setRoad(x1,y,t);};
   for(const b of BLOCKS){const rt=(b.reg==='v'||b.reg==='d')?T.ROAD:T.ASPH;
     for(let k=0;k<=b.cols;k++)for(let t=b.y;t<=b.y+b.rows*STEP;t++)setRoad(b.x+STEP*k,t,rt);
     for(let k=0;k<=b.rows;k++)for(let t=b.x;t<=b.x+b.cols*STEP;t++)setRoad(t,b.y+STEP*k,rt);}
   for(let x=0;x<W;x++)if(grid[I(x,HY)]!==T.SEA)setRoad(x,HY);
-  for(let y=0;y<RING.y0;y++)setRoad(100,y);
-  for(let y=75;y<=112;y++)setRoad(28,y,T.ROAD);
-  for(let y=RING.y1;y<=115;y++)setRoad(125,y);
-  for(let y=70;y<=115;y++)setRoad(165,y);for(let x=150;x<=165;x++)setRoad(x,115);
+  for(let y=0;y<RING.y0;y++)setRoad(135,y);
+  carve(63,100,63,137);carve(160,RING.y1,160,140,T.ASPH);carve(200,95,200,140,T.ASPH);carve(185,140,200,140,T.ASPH);
+  // тропинки к местам заданий
+  carve(POIS.mush.x,POIS.mush.y,53,POIS.mush.y);carve(POIS.forester.x,POIS.forester.y,53,POIS.forester.y);carve(POIS.pier.x+1,POIS.pier.y,53,POIS.pier.y);carve(53,POIS.pier.y,53,70);
+  carve(POIS.camp.x,POIS.camp.y,63,POIS.camp.y);carve(63,POIS.camp.y,63,152);carve(POIS.spring.x,POIS.spring.y,POIS.spring.x,70);
+  carve(POIS.lighthouse.x,POIS.lighthouse.y,200,POIS.lighthouse.y);carve(200,POIS.lighthouse.y,200,140);carve(POIS.fire.x,POIS.fire.y,POIS.fire.x,HY);
   for(let x=RING.x0;x<=RING.x1;x++){grid[I(x,RING.y0)]=T.RING;grid[I(x,RING.y1)]=T.RING;}
   for(let y=RING.y0;y<=RING.y1;y++){grid[I(RING.x0,y)]=T.RING;grid[I(RING.x1,y)]=T.RING;}
-  const PIERS=[124,136,148];
-  for(const px of PIERS)for(let y=130;y<=147;y++)for(let x=px;x<=px+1;x++)grid[I(x,y)]=grid[I(x,y)]===T.SEA?T.BRIDGE:T.YARD;
-  // фоновые высотки за кольцевой
-  const BG=[];
-  for(let x=60;x<=114;x+=9)BG.push([x,106,9+(x%3)*3]);
-  for(let y=30;y<=98;y+=8)if(Math.abs(y-HY)>4){BG.push([146,y,12+(y%4)*2]);BG.push([50,y,9+(y%3)*3]);}
+  const PIERS=[159,171,183];
+  for(const px of PIERS)for(let y=155;y<=172;y++)for(let x=px;x<=px+1;x++)grid[I(x,y)]=grid[I(x,y)]===T.SEA?T.BRIDGE:T.YARD;
+  // немного высоток за кольцевой — только на юге, у промзоны
+  const BG=[];for(let x=98;x<=150;x+=18)BG.push([x,131,9+(x%3)*3]);
   for(const[bx,by]of BG)for(let y=by;y<by+3;y++)for(let x=bx;x<bx+5;x++)if(inb(x,y)&&grid[I(x,y)]===T.GRASS)grid[I(x,y)]=T.YARD;
 
   const {plots,units:layoutUnits}=buildLayout();
@@ -100,15 +103,16 @@ export function createWorld(canvas,{mobile}){
       if(p.sp==='park'&&((dx===1||dx===2)||(dy===1||dy===2))&&!((dx===1||dx===2)&&(dy===1||dy===2)))c=0xd9c99a;
       if(p.sp==='yard'&&dy===3)c=0x8a8d92;if(p.sp==='yard'&&dx<2&&dy<2)c=0xe3d29b;return c;}
     if(p&&p.sp==='parking'){const dx=x-p.x0;return dx%2?0x55585e:0x5d6066;}
+    if(p&&!p.sp&&p.reg==='c'){const dx=x-p.x0,dy=y-p.y0;return(dx===0||dy===0||dx===3||dy===3)?0x9cc779:0x8cc06a;}
     if(p&&p.sp==='market')c=0xb9b2a5;else if(p&&(p.reg==='p'||p.reg==='o'))c=0x9c9a92;else if(p&&p.reg==='c'&&p.demand>30)c=0xb4b4ac;
     if(t===T.RING&&((x+y)%3===0))c=0xd8d8d0;if(t===T.FIELD&&x%2)c=0x9fbf4a;return c;}
-  {const tiles=new THREE.InstancedMesh(BOX,new THREE.MeshLambertMaterial({color:0xffffff}),W*H);tiles.receiveShadow=true;
-    const m4=new THREE.Matrix4(),col=new THREE.Color();
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const t=grid[I(x,y)],top=(t===T.WATER||t===T.SEA)?-.14:(t===T.BRIDGE?.03:0);
-      m4.makeScale(1,1,1).setPosition(x,top-.5,y);tiles.setMatrixAt(I(x,y),m4);
-      let j=.93+hash(x,y)*.12;if((t===T.PLOT||t===T.YARD)&&(x+y)%2)j*=.96;tiles.setColorAt(I(x,y),col.setHex(tileColor(x,y)).multiplyScalar(j));}
-    tiles.instanceColor.needsUpdate=true;scene.add(tiles);}
-
+  {const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d');const img=cx.createImageData(W,H),col=new THREE.Color();
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const t=grid[I(x,y)];let j=.93+hash(x,y)*.12;if((t===T.PLOT||t===T.YARD)&&(x+y)%2)j*=.96;
+      col.setHex(tileColor(x,y)).multiplyScalar(j).convertLinearToSRGB();const k=(y*W+x)*4;img.data[k]=Math.min(255,col.r*255);img.data[k+1]=Math.min(255,col.g*255);img.data[k+2]=Math.min(255,col.b*255);img.data[k+3]=255;}
+    cx.putImageData(img,0,0);const tex=new THREE.CanvasTexture(cv);tex.magFilter=tex.minFilter=THREE.NearestFilter;tex.generateMipmaps=false;tex.colorSpace=THREE.SRGBColorSpace;
+    const gm=new THREE.Mesh(new THREE.PlaneGeometry(W,H),new THREE.MeshLambertMaterial({map:tex}));gm.rotation.x=-Math.PI/2;gm.position.set(W/2-.5,0,H/2-.5);gm.receiveShadow=true;scene.add(gm);
+    // вода чуть ниже — тёмная подложка по краям для глубины
+    const wm=new THREE.Mesh(new THREE.PlaneGeometry(W+400,H+400),new THREE.MeshLambertMaterial({color:0x2f6fae}));wm.rotation.x=-Math.PI/2;wm.position.set(W/2,-.2,H/2);scene.add(wm);}
   // --- деревья ---
   const trees=[];
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const t=grid[I(x,y)],inPlot=plotIdx[I(x,y)]>=0;
@@ -286,11 +290,11 @@ export function createWorld(canvas,{mobile}){
   // порт: краны, контейнеры
   const cranes=[];
   for(const px of PIERS){const g=new THREE.Group();B(g,.15,3,.15,0xf39c12,0,0,0);const arm=new THREE.Group();arm.position.y=3;B(arm,2.4,.12,.12,0xf39c12,.8,0,0);B(arm,.04,.8,.04,0x333333,1.8,-.8,0);g.add(arm);
-    g.position.set(px+.5,0,145);scene.add(shadow(g));cranes.push(arm);}
-  for(let k=0;k<26;k++){const x=118+Math.floor(srnd()*34),y=131+Math.floor(srnd()*3);if(grid[I(x,y)]!==T.YARD)continue;const g=new THREE.Group();
+    g.position.set(px+.5,0,170);scene.add(shadow(g));cranes.push(arm);}
+  for(let k=0;k<26;k++){const x=153+Math.floor(srnd()*34),y=156+Math.floor(srnd()*3);if(grid[I(x,y)]!==T.YARD)continue;const g=new THREE.Group();
     const h=1+Math.floor(srnd()*3);for(let s=0;s<h;s++)B(g,.9,.45,.4,pick([0xc0392b,0x2980b9,0x27ae60,0xf39c12,0x8e44ad]),0,s*.45,0);g.position.set(x,0,y+.3);statics.add(g);walk[I(x,y)]=0;}
   // деревенские домики и дачные домики-декор
-  for(let k=0;k<30;k++){const x=Math.floor(srnd()*40)+12,y=Math.floor(srnd()*30)+78;if(grid[I(x,y)]!==T.GRASS||plotAt(x,y))continue;
+  for(let k=0;k<30;k++){const x=Math.floor(srnd()*40)+47,y=Math.floor(srnd()*30)+103;if(grid[I(x,y)]!==T.GRASS||plotAt(x,y))continue;
     const g=new THREE.Group();B(g,.9,.55,.8,pick([0x8b5a2b,0x7a4a24,0x9c6b3e]));GR(g,1.05,.45,.95,pick([0x3d6b35,0x8a3a2a,0x5a6a7a]),0,.55,0);B(g,.2,.18,.03,0x2e86ab,0,.25,.41);
     g.position.set(x,0,y);statics.add(g);walk[I(x,y)]=0;}
 
@@ -304,6 +308,28 @@ export function createWorld(canvas,{mobile}){
     for(const{m,gs}of buckets.values()){const mesh=new THREE.Mesh(mergeGeometries(gs),m);mesh.castShadow=mesh.receiveShadow=true;scene.add(mesh);gs.forEach(g=>g.dispose());}
     for(const o of keep){const c=new THREE.Mesh(o.geometry,o.material);o.matrixWorld.decompose(c.position,c.quaternion,c.scale);c.castShadow=c.receiveShadow=true;scene.add(c);}
   }
+
+  // ---------- места для локальных заданий ----------
+  const fires=[];
+  function makePOI(k,P){const g=new THREE.Group();
+    switch(k){
+    case 'mush':for(let i=0;i<9;i++){const x=hash(i,7)*3-1.5,z=hash(i,9)*3-1.5;B(g,.08,.18,.08,0xf4ecd8,x,0,z);B(g,.24,.1,.24,i%3?0xc0392b:0x8b5a2b,x,.18,z);}decoTree(g,-2,-1.5,1.1);decoTree(g,2,1.8,1);break;
+    case 'pier':for(let i=0;i<4;i++)B(g,.9,.08,.9,0x9c6b3e,-i*.9,0,0);B(g,.06,.5,.06,0x6b4a2f,-3.2,-.3,.4);B(g,.06,.5,.06,0x6b4a2f,-3.2,-.3,-.4);{const bt=B(g,.4,.14,1,0x8b5a2b,-2.5,-.15,1);bt.rotation.y=.3;}bench(g,.6,0,Math.PI/2);break;
+    case 'forester':B(g,1.6,.9,1.3,0x7a4a24);GR(g,1.8,.7,1.5,0x3d6b35,0,.9,0);B(g,.3,.5,.05,0x4a2f1a,0,0,.66);B(g,.3,.5,.3,0x6b4a2f,1.3,0,.9);
+      for(let i=0;i<6;i++){const l=CY(g,.1,.1,.7,6,0x7a4a24);l.rotation.z=Math.PI/2;l.position.set(-1.4,.1+Math.floor(i/3)*.2,.6+(i%3)*.22);}B(g,.25,.6,.25,0x555555,-.4,.9,-.3);fires.push([P.x-.4,1.6,P.y-.3,1]);break;
+    case 'camp':for(const[x,z]of[[-1.6,-1],[1.6,-1],[-1.6,1.2]]){B(g,1.1,.6,.8,0xc0d6c8,x,0,z);GR(g,1.2,.4,.9,0x8e3b46,x,.6,z);}
+      B(g,.1,1.6,.1,0xdddddd,1.2,0,1.2);B(g,.5,.3,.03,0xe63946,1.47,1.3,1.2);B(g,.1,1.3,.1,0x9c6b3e,-.9,0,2.1);B(g,.1,1.3,.1,0x9c6b3e,.9,0,2.1);B(g,2,.35,.08,0xf1c40f,0,1.2,2.1);break;
+    case 'spring':CY(g,.6,.65,.45,8,0x9a958c);{const w=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.04,8),mat(0x5dade2));w.position.y=.43;g.add(w);}B(g,.08,1.1,.08,0x6b4a2f,-.55,0,0);B(g,.08,1.1,.08,0x6b4a2f,.55,0,0);PY(g,1.4,.4,.9,0x6b4a2f,0,1.1,0);B(g,.2,.2,.2,0x888888,.2,.5,.65);break;
+    case 'lighthouse':for(let i=0;i<6;i++)CY(g,.55-i*.04,.6-i*.04,.6,8,i%2?0xe63946:0xf4f4f4,0,i*.6,0);CY(g,.42,.42,.4,8,0x333333,0,3.6,0);{const l=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.35,8),bmat(0xfff1b0));l.position.y=3.8;g.add(l);}PY(g,1,.5,1,0xe63946,0,4,0);B(g,1.2,.6,1,0xf4f4f4,1.3,0,0);break;
+    case 'lookout':for(const[x,z]of[[-.6,-.6],[.6,-.6],[-.6,.6],[.6,.6]])B(g,.12,3,.12,0x8b5a2b,x,0,z);B(g,1.6,.1,1.6,0x9c6b3e,0,3,0);PY(g,1.9,.7,1.9,0x6b4226,0,3.7,0);B(g,1.6,.4,.06,0x9c6b3e,0,3.1,.8);break;
+    case 'fire':for(const[x,z,c]of[[-1.4,-.6,0xf39c12],[1.4,-.4,0x27ae60]]){const t=new THREE.Mesh(new THREE.ConeGeometry(.6,.9,4),mat(c));t.position.set(x,.45,z);t.rotation.y=Math.PI/4;g.add(t);}
+      for(let i=0;i<5;i++)B(g,.18,.1,.18,0x666666,Math.cos(i*1.25)*.35,0,Math.sin(i*1.25)*.35+.6);bench(g,0,1.5,0);bench(g,-1,.7,Math.PI/2);fires.push([P.x,.25,P.y+.6,3]);break;
+    case 'cat':{const c=new THREE.Group();B(c,.3,.15,.15,0xf39c12,0,.12,0);B(c,.14,.14,.14,0xf39c12,.18,.22,0);B(c,.04,.06,.04,0xf39c12,.15,.32,-.04);B(c,.04,.06,.04,0xf39c12,.21,.32,.04);B(c,.04,.2,.04,0xf39c12,-.16,.18,0);c.position.set(.6,0,-.6);g.add(c);}break;
+    }
+    g.position.set(P.x,0,P.y);return shadow(g);}
+  for(const k in POIS)if(k!=='harvest')(k==='cat'?scene:statics).add(makePOI(k,POIS[k]));
+  // утки и лебеди на озёрах
+  const birds=[];for(const L of LAKES)for(let i=0;i<5;i++){const b=new THREE.Group();const c=L.name.startsWith('ЛЕБ')?0xffffff:0x8d6e4b;B(b,.3,.16,.18,c,0,0,0);B(b,.08,.2,.08,c,.14,.1,0);B(b,.08,.05,.06,0xf39c12,.2,.2,0);scene.add(b);birds.push({b,L,a:Math.random()*6,r:.3+Math.random()*.4,s:.05+Math.random()*.08});}
   bake(statics);
 
   // ================= ЛЮДИ И ТРАНСПОРТ =================
@@ -374,8 +400,8 @@ export function createWorld(canvas,{mobile}){
   function updateWorker(u,dt){
     const p=u.plot,d=BLD[u.type];u.working=false;u.fishing=false;if(!d)return;
     if(d.res==='boat'){ // судно: матрос стоит у причала, корабль ходит в море
-      if(!u.boat){const px=nearPier(p.x)+.5;u.boat={mesh:makeShip(false,new THREE.Color(p.color).getHex()),x:px,y:147,home:{x:px,y:147},wp:null,wait:rand(2,6),kind:'boat'};scene.add(u.boat.mesh);ships.push(u.boat);}
-      if(u.state==='idle'){u.path=pathTo(u,nearPier(p.x),140);u.state='go';}if(u.state==='go'&&stepMove(u,dt))u.state='stand';u.working=u.state==='stand'&&Math.sin(time+u.ox*9)>.5;return;}
+      if(!u.boat){const px=nearPier(p.x)+.5;u.boat={mesh:makeShip(false,new THREE.Color(p.color).getHex()),x:px,y:172,home:{x:px,y:172},wp:null,wait:rand(2,6),kind:'boat'};scene.add(u.boat.mesh);ships.push(u.boat);}
+      if(u.state==='idle'){u.path=pathTo(u,nearPier(p.x),165);u.state='go';}if(u.state==='go'&&stepMove(u,dt))u.state='stand';u.working=u.state==='stand'&&Math.sin(time+u.ox*9)>.5;return;}
     if(d.kind==='gather'&&d.res){
       switch(u.state){
       case 'idle':if((u.timer-=dt)>0)return;
@@ -428,11 +454,11 @@ export function createWorld(canvas,{mobile}){
     if(v.phase==='go'){v.phase='back';if(v.kind==='van'){v.target.parcels+=12;v.path=pathTo(v,sortPlot.door.x,sortPlot.door.y);}else{v.mesh.userData.cargo.visible=false;v.path=pathTo(v,v.home.x,v.home.y);}}
     else{scene.remove(v.mesh);vehicles.splice(vehicles.indexOf(v),1);}}
   // корабли
-  function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:W+6,y:155+rand(-3,3),wp:[[px+3.5,150],[px+3.5,142]],wait:25,out:[[px+3.5,152],[W+8,160]],speed:2.2};scene.add(s.mesh);ships.push(s);}
-  function spawnFishing(){const px=pick(PIERS);const s={kind:'fishing',mesh:makeShip(false),x:px+.5,y:147,wp:[[px+rand(-12,12),rand(152,166)],[px+rand(-15,15),rand(150,166)],[px+.5,147]],wait:0,speed:1.5};scene.add(s.mesh);ships.push(s);}
+  function spawnCargo(){const px=pick(PIERS);const s={kind:'cargo',mesh:makeShip(true),x:W+6,y:182+rand(-3,3),wp:[[px+3.5,177],[px+3.5,168]],wait:25,out:[[px+3.5,179],[W+8,190]],speed:2.2};scene.add(s.mesh);ships.push(s);}
+  function spawnFishing(){const px=pick(PIERS);const s={kind:'fishing',mesh:makeShip(false),x:px+.5,y:172,wp:[[px+rand(-12,12),rand(178,200)],[px+rand(-15,15),rand(176,200)],[px+.5,172]],wait:0,speed:1.5};scene.add(s.mesh);ships.push(s);}
   function updateShip(s,dt){
     if(s.kind==='boat'){ // судно игрока
-      if(!s.wp){if((s.wait-=dt)>0)return;s.wp=[[s.home.x+rand(-14,14),rand(152,166)],[s.home.x+rand(-14,14),rand(152,166)],[s.home.x,s.home.y]];}
+      if(!s.wp){if((s.wait-=dt)>0)return;s.wp=[[s.home.x+rand(-14,14),rand(178,200)],[s.home.x+rand(-14,14),rand(178,200)],[s.home.x,s.home.y]];}
       if(!s.wp.length){s.wp=null;s.wait=rand(4,8);return;}}
     const tgt=s.wp&&s.wp[0];
     if(!tgt){if(s.kind==='cargo'){if((s.wait-=dt)>0)return;s.wp=s.out;s.out=null;if(!s.wp){scene.remove(s.mesh);ships.splice(ships.indexOf(s),1);}return;}
@@ -456,12 +482,13 @@ export function createWorld(canvas,{mobile}){
   function wlabel(text,x,y,z,cls='',color=''){const el=document.createElement('div');el.className='wlab '+cls;el.textContent=text;if(color)el.style.color=color;labelsEl.appendChild(el);const L={el,p:new THREE.Vector3(x,y,z)};wlabels.push(L);return L;}
   function float(text,x,y,z,color='#ffd166'){const el=document.createElement('div');el.className='float';el.textContent=text;el.style.color=color;floatsEl.appendChild(el);floats.push({el,p:new THREE.Vector3(x,y,z),t:0});}
   for(const b of BLOCKS)wlabel(b.name,b.x+b.cols*STEP/2,0,b.y-3,'big');
-  wlabel('КАРЬЕР',100,2,10,'big');wlabel('ОЗЕРО',34,0,142,'big');wlabel('МОРЕ',160,0,158,'big');
+  wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
+  for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
   for(const p of plots)if(p.sp&&EMP[p.sp]){const e=EMP[p.sp];wlabel(p.sp==='bc'?'Бизнес-центр':p.name||e.n,p.x,p.sp==='bc'?9.5:2.4,p.y,'emp','#ffe9a8');}
 
   // ================= КАМЕРА =================
   const cam=new THREE.OrthographicCamera(-1,1,1,-1,.1,800);
-  const camT=new THREE.Vector3(100,0,66);let camA=Math.PI/4,camAT=camA,zoom=mobile?14:20,zoomT=zoom,camFly=null,PX=3;
+  const camT=new THREE.Vector3(135,0,91);let camA=Math.PI/4,camAT=camA,zoom=mobile?14:20,zoomT=zoom,camFly=null,PX=3;
   function updateCam(){const asp=innerWidth/innerHeight;cam.left=-zoom*asp;cam.right=zoom*asp;cam.top=zoom;cam.bottom=-zoom;cam.updateProjectionMatrix();
     const D=120;cam.position.set(camT.x+Math.sin(camA)*D,D*.95,camT.z+Math.cos(camA)*D);cam.lookAt(camT);
     const sx=Math.round(camT.x/2)*2,sz=Math.round(camT.z/2)*2;sun.position.set(sx-30,60,sz+20);sun.target.position.set(sx,0,sz);}
@@ -525,6 +552,8 @@ export function createWorld(canvas,{mobile}){
     for(const v of[...vehicles]){updateVehicle(v,dt);v.mesh.position.set(v.x,0,v.y);v.mesh.rotation.y=v.face;}
     for(const s of[...ships]){updateShip(s,dt);s.mesh.position.set(s.x,0,s.y);s.mesh.rotation.y=s.face||0;s.mesh.position.y=Math.sin(time*2+s.x)*.04;}
     cranes.forEach((c,k)=>c.rotation.y=Math.sin(time*.4+k*2)*1.2);
+    for(const q of birds){q.a+=q.s*dt;q.b.position.set(q.L.x+Math.cos(q.a)*q.L.rx*q.r,-.08,q.L.y+Math.sin(q.a)*q.L.ry*q.r);q.b.rotation.y=-q.a;}
+    for(const f of fires)if(near(f[0],f[2])&&Math.random()<dt*f[3]*2)puff(f[0],f[1],f[2],f[3]>1?0xff8c1a:0xcfcfcf,1,.6,.08);
     if((vanT-=dt)<=0){vanT=rand(3,6);if(vehicles.filter(v=>v.kind==='van').length<8)spawnVan();}
     if((resT-=dt)<=0){resT=rand(.3,.7);if(residents.length<(mobile?35:60))spawnResident();}
     if((cargoT-=dt)<=0){cargoT=rand(35,60);if(ships.filter(s=>s.kind==='cargo').length<3)spawnCargo();}
@@ -556,5 +585,5 @@ export function createWorld(canvas,{mobile}){
     set arrow(p){arrowTarget=p;},
     setMe,goMe,get me(){return me;},setOther,removeOther,avatars,
     jump(x,z){camFly=null;camT.set(x,0,z);clampCam();updateCam();},
-    marketTile:()=>marketTiles[6],resize,W,H};
+    marketTile:()=>marketTiles[6],resize,W,H,POIS,walkable:(x,y)=>inb(x,y)&&walk[I(x,y)]===1};
 }

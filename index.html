@@ -33,7 +33,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
 .tab.on{background:#3a3148;color:#ffd166}.tab .ic{font-size:17px;display:block}
 #tabbody{flex:1;overflow:auto;padding:10px;-webkit-overflow-scrolling:touch;touch-action:pan-y}
 #mmbox{position:fixed;left:6px;bottom:6px;padding:4px;z-index:4}
-#mm{display:block;width:252px;height:204px;image-rendering:pixelated;touch-action:none}
+#mm{display:block;width:252px;height:198px;image-rendering:pixelated;touch-action:none}
 #ticker{position:fixed;left:8px;bottom:224px;width:420px;font-size:13px;line-height:1.35;z-index:3;pointer-events:none;text-shadow:1px 1px 0 #000,0 0 3px #000}
 #coach{position:fixed;left:calc(50% - 200px);transform:translateX(-50%);bottom:12px;width:min(560px,calc(100vw - 720px));min-width:380px;display:none;z-index:7;gap:10px;align-items:flex-start;border-color:#ffd166}
 #coach .face{font-size:38px;line-height:1;background:#2b2438;border:3px solid #0e0b14;padding:4px}
@@ -47,6 +47,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
 .wlab{position:fixed;pointer-events:none;transform:translate(-50%,-100%);white-space:nowrap;font-size:12px;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;font-weight:700;z-index:1}
 .wlab.big{font-family:'Press Start 2P',monospace;font-size:16px;opacity:.6;letter-spacing:3px;color:#fff;font-weight:400}
 .wlab.me{background:#ffd166;color:#1a1622;text-shadow:none;padding:0 4px;border:2px solid #0e0b14}
+.wlab.poi{background:rgba(20,40,20,.7);padding:0 4px;border:1px solid #2e7d32}
 .wlab.other{background:rgba(14,11,20,.75);padding:0 3px}
 .bubble{position:fixed;transform:translate(-50%,-100%);background:#fff;color:#111;padding:3px 7px;border:2px solid #0e0b14;font-size:14px;max-width:220px;white-space:normal;z-index:3;pointer-events:none}
 #tip{position:fixed;pointer-events:none;display:none;font-size:13px;z-index:5;max-width:260px}
@@ -66,12 +67,17 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
   .logo{display:none}
   #top .box{padding:5px 7px}
   #inv{order:5;flex-basis:100%;padding:3px}
-  #sheet{left:0;right:0;bottom:0;top:auto;width:auto;height:56vh;flex-direction:column-reverse;padding-bottom:env(safe-area-inset-bottom)}
+  #sheet{left:0;right:0;bottom:0;top:auto;width:auto;height:auto;max-height:44vh;flex-direction:column-reverse;padding-bottom:env(safe-area-inset-bottom)}
+  #tabbody{max-height:calc(44vh - 80px)}
+  #sheetbar{display:block!important;text-align:center;font-size:13px;color:#a99fb8;padding:3px;border-bottom:2px solid #0e0b14;cursor:pointer}
+  #sheet.collapsed #sheetbar{display:none!important}
+  #coach.mini .txt,#coach.mini #cbtn{display:none}#coach.mini{padding:4px 8px}#coach.mini .face{font-size:20px}
+  #coach .txt{font-size:14px!important}#inv:has(.mut:only-child){display:none}
   #sheet.collapsed{height:auto}#sheet.collapsed #tabbody{display:none}
   #tabs{border-bottom:0;border-top:3px solid #0e0b14}
   .tab{padding:6px 2px;font-size:11px}
   #mmbox{display:none;left:50%;transform:translateX(-50%);top:104px;bottom:auto}#mmbox.show{display:block}
-  #mm{width:min(92vw,420px);height:auto;aspect-ratio:210/170}
+  #mm{width:min(92vw,420px);height:auto;aspect-ratio:280/220}
   #ticker{display:none}
   #coach{left:6px;right:6px;transform:none;top:104px;bottom:auto;width:auto;min-width:0}
   #coach .face{font-size:26px}#coach .txt{font-size:15px}
@@ -95,10 +101,10 @@ window.addEventListener('unhandledrejection',e=>{const b=document.getElementById
   <div class="box" id="inv"><span class="mut">склад пуст</span></div>
   <div class="box" id="topbtns"><span class="btn sm blue" data-act="home" title="Домой">🏠</span><span class="btn sm blue" data-act="findme" title="Где я">📍</span><span class="btn sm blue mobonly" data-act="map">🗺</span><span class="mut" id="online"></span></div>
 </div>
-<div class="box" id="sheet"><div id="tabs"></div><div id="tabbody"></div></div>
-<div class="box" id="mmbox"><canvas id="mm" width="210" height="170"></canvas></div>
+<div class="box" id="sheet"><div id="tabs"></div><div id="sheetbar" class="mobonly" data-act="closesheet">▾ свернуть</div><div id="tabbody"></div></div>
+<div class="box" id="mmbox"><canvas id="mm" width="280" height="220"></canvas></div>
 <div id="ticker"></div>
-<div class="box" id="coach"><div class="face">👷</div><div style="flex:1"><div class="who" id="cwho"></div><div class="txt" id="ctxt"></div><div id="cbtn" style="margin-top:6px"></div></div></div>
+<div class="box" id="coach"><div class="face" data-act="coachmin">👷</div><div style="flex:1"><div class="who" id="cwho"></div><div class="txt" id="ctxt"></div><div id="cbtn" style="margin-top:6px"></div></div></div>
 <div class="box" id="toast"></div>
 <div class="box" id="tip"></div>
 <div id="roomui"><div class="box"><b id="roomTitle"></b></div><span class="btn red" data-act="leave">← В город</span><span id="hand"><span class="btn blue" data-act="rot">↻ Повернуть</span><span class="btn" data-act="drop">✖ В запас</span></span></div>

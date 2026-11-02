@@ -1,4 +1,4 @@
-import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS} from './config.js';
+import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS} from './config.js';
 import {createWorld} from './world.js';
 import {createRoom} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
@@ -14,7 +14,7 @@ const plots=world.plots;
 // ================= СОСТОЯНИЕ =================
 let me=null,mode='city',sel=null,tab='obj',sheetOpen=!mobile,dirty=true;
 const props=new Map(),profiles=new Map(),goods=new Map(),events=[],unitsByPlot=new Map();
-let city=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
+let city=null;const qlog=new Map();let quest=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
 const LV=()=>me?lvlOf(me.xp||0):1;const lock=n=>`<span class="mut">🔒 откроется на ${n} уровне</span>`;
 const DECOR={park:'🌳 Сквер — тут гуляют жители',yard:'🛝 Двор с детской площадкой',parking:'🚗 Парковка'};
 const inv=(p,g)=>Number(p?.inv?.[g]||0);
@@ -68,6 +68,7 @@ async function loadWorld(){
     .on('postgres_changes',{event:'*',schema:'public',table:'candidates'},()=>loadGov())
     .subscribe();
 }
+async function loadQuestLog(){if(!me)return;const {data}=await sb.from('quest_log').select('*').eq('uid',me.id);qlog.clear();(data||[]).forEach(r=>qlog.set(r.quest,r));dirty=true;}
 async function loadGov(){const [c,g,e,k]=await Promise.all([sb.from('city').select('*').eq('id',1).maybeSingle(),sb.from('government').select('*'),sb.from('elections').select('*').eq('status','open'),sb.from('candidates').select('*')]);
   city=c.data;gov.clear();(g.data||[]).forEach(r=>gov.set(r.position,r));elections.clear();(e.data||[]).forEach(r=>elections.set(r.position,r));
   cands.length=0;cands.push(...(k.data||[]).filter(x=>[...elections.values()].some(el=>el.id===x.election_id)));
@@ -113,7 +114,7 @@ async function afterLogin(){
   const {data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();if(!data)return showAuth('nick');
   $('auth').style.display='none';setMe(data);
   const h=homePlot();world.setMe(me.nick,me.color,h.x0+1,h.y0+3,me.skin);world.jump(h.x,h.y);
-  joinPresence();act('settle',{},true);
+  joinPresence();act('settle',{},true);loadQuestLog();
   if(me.tut<TUT.length)tutGo(me.tut);else $('coach').style.display='none';
   if(me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
   dirty=true;
@@ -124,7 +125,13 @@ function homePlot(){const u=me?.home_unit&&props.get(me.home_unit);return u?plot
 let shiftT=0,shiftBusy=false;
 function jobTarget(){const p=me&&me.job_prop!=null&&props.get(me.job_prop);if(!p)return null;const pl=plots[p.plot];
   if(pl.sp==='market'){const t=world.marketTile();return{x:t[0],y:t[1]};}return pl.door;}
-function updateJob(dt){const m=world.me;if(!m||!me)return;const t=jobTarget();
+function updateQuest(dt){const m=world.me;if(!quest||!m)return false;const Q=QUESTS[quest.id],P=world.POIS[Q.poi];
+  if(quest.phase==='go'){if(!m.path.length&&Math.hypot(m.x-P.x,m.y-P.y)<2.5){quest.phase='start';act('start_quest',{p_id:quest.id}).then(r=>{if(r){quest.phase='do';quest.t=0;}else quest=null;dirty=true;});}
+    else if(!m.path.length&&!quest.retry){quest.retry=1;world.goMe(P.x,P.y);}}
+  if(quest&&quest.phase==='do'){m.working=true;quest.t+=dt;const b=$('questbar');if(b)b.style.width=Math.min(100,quest.t/Q.dur*100)+'%';
+    if(quest.t>=Q.dur&&!quest.busy){quest.busy=true;const id=quest.id;act('finish_quest',{p_id:id}).then(r=>{if(r){const rw=[Q.money&&`+${Q.money}💰`,Q.gems&&`+${Q.gems}💎`,Q.good&&`+${Q.qty}${GOODS[Q.good].ic}`,`+${Q.xp} XP`].filter(Boolean).join(' ');world.float(rw,m.x,1.7,m.y,'#c8ffb0');toast(`✅ ${Q.n}: ${rw}`);}quest=null;m.goal=null;loadQuestLog();});}}
+  return true;}
+function updateJob(dt){const m=world.me;if(!m||!me)return;if(updateQuest(dt))return;const t=jobTarget();
   if(t){const key=t.x+','+t.y;if(m.goal!==key){m.goal=key;world.goMe(t.x,t.y);shiftT=0;}
     const at=!m.path.length&&Math.round(m.x)===t.x&&Math.round(m.y)===t.y;m.working=at;
     if(at&&!document.hidden){shiftT+=dt;if(shiftT>=SHIFT_SEC&&!shiftBusy){shiftBusy=true;const before=me.money;
@@ -166,7 +173,7 @@ $('chatin').addEventListener('keydown',e=>{if(e.key!=='Enter'||!roomCh)return;co
   addEventListener('keydown',e=>{if(mode==='room'&&e.code==='KeyR'&&e.target.tagName!=='INPUT')room.rotateHand();});}
 
 // ================= ВЫБОР НА КАРТЕ =================
-world.onTap=p=>{if(mode!=='city')return;sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
+world.onTap=p=>{if(mode!=='city')return;if(mobile&&sheetOpen){sheetOpen=false;sel=null;world.select(null);dirty=true;return;}sel=p;world.select(p);if(p){tab='obj';sheetOpen=true;}dirty=true;};
 world.onHover=(p,e)=>{const t=$('tip');if(!p||!e){t.style.display='none';return;}t.style.display='block';t.style.left=e.clientX+16+'px';t.style.top=e.clientY+12+'px';t.innerHTML=tipHTML(p);};
 function tipHTML(p){if(DECOR[p.sp])return DECOR[p.sp];if(p.sp==='shop')return`<b>${p.name}</b><br>работа: кассир, ${EMP.shop.pay}💰/смена`;if(p.sp==='res')return`🏢 ${RES[p.rt].n} · квартиры`;if(p.sp==='bc')return'🏙 Бизнес-центр · офисы и работа';if(p.sp)return`<b>${EMP[p.sp].n}</b><br>работа: ${EMP[p.sp].pay}💰/смена`;
   const pr=props.get(p.id);if(!pr)return'';if(!pr.owner)return`Участок · ${REGN[p.reg]}<br>Продаётся: <b>${pr.price}💰</b>`;return`${nm(pr.owner)}<br>${pr.building?BLD[pr.building].ic+' '+BLD[pr.building].n:'пустой участок'}`;}
@@ -219,7 +226,15 @@ function marketHTML(){let h=`<h3>🏭 Оптовая база</h3><div class="mu
   for(const g of GK){const pr=price(g),q=me?Math.floor(inv(me,g)):0;
     h+=`<tr><td>${GOODS[g].ic} ${GOODS[g].n}</td><td><b>${pr.toFixed(1)}</b></td><td class="mut">склад ${fmt(stock(g))}</td>${me?`<td>${q}</td><td><span class="btn sm ${q?'':'dis'}" data-act="sell" data-g="${g}">Продать</span><span class="btn sm blue ${stock(g)>=5&&LV()>=NEED.buyMarket?'':'dis'}" data-act="buy" data-g="${g}" title="закупка с ${NEED.buyMarket} ур.">+5</span></td>`:''}</tr>`;}
   return h+'</table>';}
-function workHTML(){if(!me)return'';let h=`<h3>💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
+function questsHTML(){const l=LV();let h=`<h3>🗺 Задания в округе</h3><div class="mut">Прогуляйся по живописным местам — за помощь местным дают деньги, опыт и кристаллы. Пока ты на задании, смены на работе не идут.</div>`;
+  if(quest){const Q=QUESTS[quest.id];h+=`<div class="row">▶ <b>${Q.n}</b> — ${quest.phase==='go'?'идёшь к месту…':Q.act+'…'}<div class="bar"><i id="questbar" style="width:0"></i></div><span class="btn sm red" data-act="qcancel">Отменить</span></div>`;}
+  for(const[id,Q]of Object.entries(QUESTS)){const P=world.POIS[Q.poi],lg=qlog.get(id),next=lg&&lg.done_at?Date.parse(lg.done_at)+Q.cd*60000:0,wait=Math.max(0,next-Date.now());
+    const rw=[Q.money&&`${Q.money}💰`,Q.gems&&`${Q.gems}💎`,Q.good&&`${Q.qty}${GOODS[Q.good].ic}`,`${Q.xp} XP`].filter(Boolean).join(' · ');
+    h+=`<div class="row">${P.ic} <b>${Q.n}</b> <span class="mut">${P.n}</span><br><span class="mut">Награда: ${rw}</span><br>`+
+      (l<Q.lvl?lock(Q.lvl):wait?`<span class="mut">⏳ снова через ${wait>=3600000?Math.ceil(wait/3600000)+' ч':Math.ceil(wait/60000)+' мин'}</span>`:`<span class="btn sm gold ${quest?'dis':''}" data-act="quest" data-q="${id}">Отправиться</span>`)+
+      ` <span class="btn sm blue" data-act="gopoi" data-q="${id}">На карте</span></div>`;}
+  return h;}
+function workHTML(){if(!me)return'';let h=questsHTML()+`<h3 style="margin-top:10px">💼 Карьера</h3><div>${careerOf(me.shifts)} · смен: <b>${me.shifts}</b></div>`;
   const cur=me.job_prop!=null&&props.get(me.job_prop);
   if(cur){const j=jobInfo(cur);h+=`<div class="row">Сейчас: <b>${j?.n}</b> · ${j?.pay}💰/смена<div class="bar"><i id="shiftbar" style="width:0"></i></div><span class="mut">Смена ${SHIFT_SEC} сек, идёт пока ты в игре</span><br><span class="btn sm blue" data-act="goto" data-plot="${cur.plot}">Показать</span><span class="btn sm red" data-act="quit">Уволиться</span></div>`;}
   else h+=`<div class="row">Ты без работы.</div>`;
@@ -320,6 +335,11 @@ document.addEventListener('click',async e=>{
     case 'run':{const sl=($('slogan')?.value||'').trim();if(await act('run_for',{p_pos:t.dataset.pos,p_slogan:sl}))toast('Ты в списке кандидатов!');loadGov();break;}
     case 'govset':{const raw=$('gv_'+t.dataset.k)?.value??t.dataset.v??'0';const v=parseFloat(String(raw).replace(',','.'))||0;if(await act('gov_set',{p_key:t.dataset.k,p_val:t.dataset.pct?v/100:v}))toast('Сохранено');break;}
     case 'moresec':moreSec=t.dataset.s;break;
+    case 'quest':{const Q=QUESTS[t.dataset.q],P=world.POIS[Q.poi];quest={id:t.dataset.q,phase:'go'};world.me.goal='quest';world.goMe(P.x,P.y);world.flyTo(P.x,P.y);if(mobile)sheetOpen=false;toast(`Идёшь: ${P.ic} ${P.n}`);break;}
+    case 'qcancel':quest=null;if(world.me)world.me.goal=null;break;
+    case 'gopoi':{const P=world.POIS[QUESTS[t.dataset.q].poi];world.flyTo(P.x,P.y,mobile?12:16);if(mobile)sheetOpen=false;break;}
+    case 'closesheet':sheetOpen=false;break;
+    case 'coachmin':$('coach').classList.toggle('mini');break;
     case 'buyland':await act('buy_land',{p_id:id});break;
     case 'build':await act('build',{p_id:id,p_type:t.dataset.t});break;
     case 'hire':await act('hire',{p_id:id,p_delta:1});break;
@@ -358,7 +378,7 @@ const cheapLand=()=>[...props.values()].filter(p=>p.kind==='land'&&!p.owner&&(p.
 let recLand=null;
 const TUT=[
   {t:'Здорово! Я Петрович, местный завхоз. Человечек с твоим ником — это ты. Приехал(а) налегке: 150💰 и койка в общаге.',btn:'Дальше',enter(){const m=world.me;m&&world.flyTo(m.x,m.y,mobile?9:11);}},
-  {t:`Город огромный: центр с небоскрёбами и бизнес-центрами, панельки, деревня, дачи у озера, промзона, морской порт и карьер. ${mobile?'Двигай карту пальцем, щипок — зум, 🗺 — миникарта.':'Тяни карту мышкой, колесо — зум, миникарта слева внизу.'} Все люди с никами — живые игроки.`,btn:'Понял',enter(){world.flyTo(100,66,mobile?26:30);}},
+  {t:`Город огромный: центр с небоскрёбами и бизнес-центрами, панельки, деревня, дачи у озера, промзона, морской порт и карьер. ${mobile?'Двигай карту пальцем, щипок — зум, 🗺 — миникарта.':'Тяни карту мышкой, колесо — зум, миникарта слева внизу.'} Все люди с никами — живые игроки.`,btn:'Понял',enter(){world.flyTo(135,91,mobile?26:30);}},
   {t:'Без денег никуда. Иди в ПВЗ «Коробас» — над ним стрелка. Нажми на него и «Устроиться».',arrow:()=>pvzPlot,enter(){world.flyTo(pvzPlot.x,pvzPlot.y,mobile?10:12);},done:()=>me.job_prop!=null},
   {t:`Ты на работе! Каждая смена (${SHIFT_SEC} сек) — деньги, пока ты в игре. Копим 200💰 на первый участок.`,hl:['money'],enter(){const m=world.me;m&&world.flyTo(m.x,m.y);},done:()=>me.money>=200},
   {t:'Пора своё дело! В деревне и на дачах земля дешёвая. Отметил тебе участок — нажми и купи.',arrow:()=>recLand&&plots[recLand.plot],enter(){recLand=cheapLand();if(recLand)world.flyTo(plots[recLand.plot].x,plots[recLand.plot].y,mobile?11:13);},
@@ -372,7 +392,7 @@ const TUT=[
 function tutGo(i){document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));
   if(i>=TUT.length){tutEnd();return;}tutI=i;if(me&&me.tut!==i){me.tut=i;act('set_tut',{p_n:i},true);}
   const s=TUT[i];s.enter&&s.enter();(s.hl||[]).forEach(id=>$(id)?.classList.add('hl'));
-  $('coach').style.display='flex';$('cwho').textContent=`ПЕТРОВИЧ · ${i+1}/${TUT.length}`;$('ctxt').innerHTML=s.t;
+  $('coach').style.display='flex';$('coach').classList.remove('mini');$('cwho').textContent=`ПЕТРОВИЧ · ${i+1}/${TUT.length}${mobile?' · нажми, чтобы свернуть':''}`;$('ctxt').innerHTML=s.t;
   $('cbtn').innerHTML=(s.btn?`<span class="btn gold" data-tut="next">${s.btn}</span>`:'<span class="mut">▶ выполни — и продолжим</span>')+(i<TUT.length-1?'<span class="skip" data-tut="skip">пропустить обучение</span>':'');}
 function tutEnd(){tutI=TUT.length;$('coach').style.display='none';world.arrow=null;document.querySelectorAll('.hl').forEach(e=>e.classList.remove('hl'));if(me)act('set_tut',{p_n:TUT.length},true);}
 function tutCheck(){if(!me||tutI<0||tutI>=TUT.length)return;const s=TUT[tutI];s.tick&&s.tick();world.arrow=s.arrow?s.arrow():null;if(s.done&&s.done())tutGo(tutI+1);}
@@ -385,6 +405,7 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
   if((uiT-=dt)<=0||dirty){uiT=.5;renderUI();}}
 requestAnimationFrame(loop);
 renderUI();
+{const c=new URLSearchParams(location.search).get('cam');if(c){const[x,y]=c.split(',').map(Number);setTimeout(()=>world.jump(x,y),50);}}
 
 if(!sb)showAuth('noserver');
 else{loadWorld().then(async()=>{const {data:{session}}=await sb.auth.getSession();if(session)afterLogin();else showAuth('login');}).catch(e=>{toast('Ошибка загрузки: '+esc(e.message),8000);showAuth('login');});}
