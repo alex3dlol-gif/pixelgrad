@@ -962,7 +962,7 @@ export function createWorld(canvas,{mobile}){
         c.lineWidth=3;c.strokeStyle='#0e0b14';c.strokeText(s.name,s.x*k,s.y*k-10);c.fillStyle='#fff';c.fillText(s.name,s.x*k,s.y*k-10);});},
     marketTile:()=>marketTiles[6],resize,W,H,POIS,makeAvatar,gameHour,ISLAND,
     // съёмочный режим: камера и время суток задаются сценарием
-    setCam(x,z,zm,a){camFly=null;camBounds=null;camT.set(x,0,z);if(zm){zoom=zoomT=zm;}if(a!=null)camA=camAT=a;updateCam();},setHour(h){HOV=h;},
+    setCam(x,z,zm,a){camFly=null;camBounds=null;camT.set(x,0,z);if(zm){zoom=zoomT=zm;}if(a!=null)camA=camAT=a;updateCam();},setHour(h){HOV=h;},get vehicles(){return vehicles;},
     tutPlotState(st){if(tutPlot.mat)dematerialize(tutPlot);Object.assign(tutPlot,st);tutFence.visible=!tutPlot.owner;if(tutPlot.building)blockFoot(tutPlot);if(tutPlot.owner)materialize(tutPlot);},
     setFog(on){fog.visible=!!on;camBounds=on?{x0:ISLAND.x0-2,y0:ISLAND.y0-2,x1:ISLAND.x1+2,y1:ISLAND.y1+2}:null;clampCam();},
     tutReset(){if(tutPlot.mat)dematerialize(tutPlot);tutFence.visible=true;tutPlot.owner=null;tutPlot.building=null;tutPlot.workers=0;},

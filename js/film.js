@@ -1,5 +1,6 @@
 // Съёмочный режим для рекламных роликов: ?offline&film=1|2|3
 // Камера, персонажи и подписи идут по сценарию; время задаёт рендер-скрипт (window.__step), поэтому кадры ровные.
+import {hash} from './layout.js';
 export function run({world,room,CLUBS,setMode,$}){
   const N=+new URLSearchParams(location.search).get('film')||1;
   document.body.classList.add('film');
@@ -38,7 +39,7 @@ export function run({world,room,CLUBS,setMode,$}){
   const plotBy=(fn)=>P.find(fn);
   const center=p=>({x:p.x0+1.5,y:p.y0+1.5});
   const near=(x,y,fn)=>P.filter(fn).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0];
-  const pvz=near(60,72,p=>p.sp==='pvzCity'&&p.reg==='v'),alko=near(60,72,p=>p.sp==='alko'),dk=near(60,72,p=>p.sp==='dk');
+  const pvz=near(60,72,p=>p.sp==='pvzCity'&&p.reg==='v'),alko=near(60,72,p=>p.sp==='alko'&&Math.floor(hash(p.id,77)*3)===0)||near(60,72,p=>p.sp==='alko'),dk=near(60,72,p=>p.sp==='dk');
   const farm=near(62,85,p=>p.reg==='v'&&!p.sp),farm2=near(70,85,p=>p.reg==='v'&&!p.sp&&p!==farm);
   const cityBiz=near(118,88,p=>p.reg==='c'&&!p.sp),cityBiz2=near(108,80,p=>p.reg==='c'&&!p.sp&&p!==cityBiz);
   const tower=P[71],bc=P[70],market=plotBy(p=>p.sp==='market');
@@ -61,9 +62,9 @@ export function run({world,room,CLUBS,setMode,$}){
   const SH={
     hook:(hour,txt)=>({d:1.7,hook:txt,hour,on(){toCity();clearCrowd();},cam:cam(tower.x-14,tower.y+10,26,Q-.5,tower.x+2,tower.y-2,13,Q+.25)}),
     pvz:()=>({d:1.7,cap:'работать<br>в <b>ПВЗ</b>',hour:11,on(){toCity();meAt(pvz.x0+1,pvz.y0+3,true,Math.PI);},cam:cam(pvz.x+1,pvz.y+2,5.5,Q+.3,pvz.x+.5,pvz.y+1.5,4.2,Q)}),
-    fight:()=>({d:1.6,cap:'смотреть, как дерутся<br>у <b>«Градуса»</b>',hour:20,on(){toCity();},cam:cam(alko.x+2,alko.y+2.5,4,Q-.2,alko.x+1.6,alko.y+2.2,3.3,Q+.15)}),
+    fight:()=>({d:1.6,cap:'смотреть на разборки<br>у <b>«Градуса»</b>',hour:18,on(){toCity();},cam:cam(alko.x0+3.4,alko.y0+3.6,3.6,Q-.25,alko.x0+3,alko.y0+3.3,2.8,Q+.15)}),
     farm:()=>({d:1.9,cap:'купить землю<br>и построить <b>ферму</b>',hour:9,on(){toCity();own(farm,'farm',3,3);own(farm2,'orchard',2,2);meAt(farm.x0+1,farm.y0+4);},cam:cam(farm.x+6,farm.y+6,9,Q-.6,farm.x+1,farm.y+1,5.5,Q)}),
-    truck:()=>({d:1.8,cap:'возить урожай<br><b>грузовиками</b>',hour:10,on(){toCity();own(farm,'farm',3,3);world.spawnTruck(farm.id,'wheat','#ffd166');world.spawnTruck(farm.id,'wheat','#ffd166');},cam:cam(farm.x+1,farm.y+3,6,Q,farm.x+2,farm.y+7,7,Q+.4)}),
+    truck:()=>({d:1.8,cap:'возить урожай<br><b>грузовиками</b>',hour:10,on(){toCity();own(farm,'farm',3,3);world.spawnTruck(farm.id,'wheat','#ffd166');for(let k=0;k<25;k++)world.frameUpdate(.04);},step:t=>{const v=world.vehicles[world.vehicles.length-1];if(v)world.setCam(v.x,v.y,lerp(4.5,6,t),Q+t*.4);},cam:null}),
     bus:()=>({d:2.2,cap:'гонять на <b>автобусе</b><br>по всему городу',hour:17,on(){toCity();meAt(S[stopC].x,S[stopC].y);world.busRide(stopC,S.findIndex(s=>s.name==='Деловой квартал'),()=>{});},cam:null}),
     cinema:()=>({d:2,cap:'ходить в <b>кино</b><br>с друзьями',on(){inRoom({...CLUBS.cinema,title:''},ppl(4));const st=room.state;let k=0;for(const[,p]of st.people){if(k++>3)break;}},cam:null}),
     dk:()=>({d:2,cap:'тусить в<br><b>Доме культуры</b>',on(){inRoom({...CLUBS.dk,title:''},ppl(5));room.say('p0','го танцевать 🕺');},cam:null}),
