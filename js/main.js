@@ -159,7 +159,8 @@ const okColor=c=>/^#[0-9a-f]{3,6}$/i.test(c||'')?c:'#ffd166';
 const chatLine=m=>`<div class="cl"><b style="color:${okColor(m.color)}">${esc(clean(m.nick))}:</b> ${esc(clean(m.text))}</div>`;
 function drawChat(){$('cclist').innerHTML=(chatOpen?chatMsgs.slice(-40):chatMsgs.slice(-3)).map(chatLine).join('')||'<div class="cl mut">Пока тихо — напиши первым 💬</div>';
   $('cchat').classList.toggle('open',chatOpen);if(chatOpen){const l=$('cclist');l.scrollTop=l.scrollHeight;}}
-function onChat(m){if(!m||chatMsgs.some(x=>x.id===m.id))return;chatMsgs.push(m);if(chatMsgs.length>60)chatMsgs.shift();drawChat();}
+function onChat(m){if(!m||chatMsgs.some(x=>x.id===m.id))return;chatMsgs.push(m);if(chatMsgs.length>60)chatMsgs.shift();drawChat();
+  if(mode==='city')world.say(me&&m.uid===me.id?'me':m.uid,clean(m.text));}
 async function loadChat(){if(!sb)return;const{data}=await sb.from('chat').select('*').order('id',{ascending:false}).limit(40);if(data){chatMsgs.length=0;chatMsgs.push(...data.reverse());}drawChat();}
 async function sendChat(){const i=$('ccin'),t=i.value.trim();if(!t||!sb)return;i.value='';if(!await act('say',{p_text:t}))i.value=t;}
 $('cclist').onclick=()=>{if(chatOpen)return;chatOpen=true;if(mobile&&sheetOpen){sheetOpen=false;dirty=true;}drawChat();setTimeout(()=>$('ccin').focus(),50);};

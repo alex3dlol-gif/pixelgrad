@@ -777,6 +777,11 @@ export function createWorld(canvas,{mobile}){
   // ================= DOM-метки =================
   const labelsEl=document.getElementById('labels'),floatsEl=document.getElementById('floats'),wlabels=[],floats=[];
   function wlabel(text,x,y,z,cls='',color=''){const el=document.createElement('div');el.className='wlab '+cls;el.textContent=text;if(color)el.style.color=color;labelsEl.appendChild(el);const L={el,p:new THREE.Vector3(x,y,z)};wlabels.push(L);return L;}
+  // реплика из чата над персонажем (6 с, потом тает)
+  const bubbles=[];
+  function say(uid,text){const a=uid==='me'?me:avatars.get(uid);if(!a||!text)return;let b=bubbles.find(b=>b.a===a);
+    if(!b){const el=document.createElement('div');el.className='bubble wbub';labelsEl.appendChild(el);b={a,el,t:0,p:new THREE.Vector3()};bubbles.push(b);}
+    b.el.textContent=text.length>70?text.slice(0,68)+'…':text;b.t=6;}
   function float(text,x,y,z,color='#ffd166'){const el=document.createElement('div');el.className='float';el.textContent=text;el.style.color=color;floatsEl.appendChild(el);floats.push({el,p:new THREE.Vector3(x,y,z),t:0});}
   for(const b of BLOCKS)wlabel(b.name,b.x+b.cols*STEP/2,0,b.y-3,'big');
   wlabel('ОСТРОВ «УЧЕБНЫЙ»',(ISLAND.x0+ISLAND.x1)/2,0,ISLAND.y1+3,'big');wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');
@@ -954,9 +959,12 @@ export function createWorld(canvas,{mobile}){
     renderer.render(scene,cam);
     for(let i=floats.length-1;i>=0;i--){const f=floats[i];f.t+=dt;f.p.y+=dt*.7;project(f.p,f.el);f.el.style.opacity=1-f.t/1.6;if(f.t>1.6){f.el.remove();floats.splice(i,1);}}
     for(const L of wlabels){if(L.zMax&&zoom>L.zMax){L.el.style.display='none';continue;}project(L.p,L.el);}
+    for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i],a=b.a;b.t-=dt;
+      if(b.t<=0||!a.mesh.parent||(a!==me&&![...avatars.values()].includes(a))){b.el.remove();bubbles.splice(i,1);continue;}
+      if(zoom>20||!a.mesh.visible){b.el.style.display='none';continue;}b.p.set(a.x,1.2,a.y);project(b.p,b.el);b.el.style.opacity=Math.min(1,b.t/.6);}
   }
 
-  return worldApi={renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,
+  return worldApi={renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,say,
     get camT(){return camT;},get zoom(){return zoom;},set onTap(f){onTap=f;},set onHover(f){onHover=f;},
     select(p){if(p){selF.visible=true;selF.position.set(p.x,0,p.y);}else selF.visible=false;},
     set arrow(p){arrowTarget=p;},
