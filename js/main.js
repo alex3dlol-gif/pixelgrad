@@ -150,7 +150,7 @@ function enterWorld(){world.setFog(false);
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
   joinPresence();act('settle',{},true);loadQuestLog();loadChat();loadShips();if(me.club)act('club_leave',{},true);
   if(longOn()&&longLeft()<=0)toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);tab='work';
-  if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();
+  if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();else setTimeout(maybeTg,1500);
   dirty=true;
 }
 // ================= ЧАТ ГОРОДА =================
@@ -619,6 +619,14 @@ function showGems(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 s
   <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию и покупают редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
   ${[[100,'99 ₽'],[550,'449 ₽ · +10%'],[1200,'899 ₽ · +20%'],[3000,'1990 ₽ · +50%']].map(([g,p])=>`<div class="row">💎 <b>${g}</b> — ${p} <span class="btn sm dis">Скоро</span></div>`).join('')}
   <div class="mut">Скоро</div><span class="btn" data-act="closedaily">Закрыть</span>`;}
+// при входе: предложить подписку на TG, пока награда не забрана (раз за сессию, после ежедневной награды)
+function maybeTg(){if(!me||me.tg_bonus||!me.look||ob||sessionStorage.getItem('pg_tg')||$('auth').style.display==='flex')return;sessionStorage.setItem('pg_tg','1');showTg();}
+function showTg(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:15px">📣 +${TG.gems}💎 за подписку</h3>
+  <div>Подпишись на наш Telegram <b>${TG.handle}</b> и забери <b>${TG.gems} кристаллов</b>. Это больше, чем за неделю ежедневных наград!</div>
+  <div class="mut" style="margin:8px 0">В канале — обновления, новые здания, выборы мэра, конкурсы и коды на кристаллы.<br>1) Открой канал и нажми «Подписаться». 2) Вернись сюда и забери награду.</div>
+  <a class="btn blue" href="${TG.url}" target="_blank" rel="noopener" data-act="tgopen" style="font-size:16px">Открыть ${TG.handle}</a>
+  <span class="btn gold ${tgOpened?'':'dis'}" id="tgclaimbtn" data-act="tgclaim" style="font-size:16px">Забрать ${TG.gems}💎</span>
+  <span class="btn" data-act="closedaily">Позже</span>`;}
 function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10),s=me.last_daily===y?(me.streak||0)+1:1;
   $('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:15px">🎁 Ежедневная награда</h3><div>День ${s} подряд: <b>+${DAILY[Math.min(s,7)-1]}💎</b> и +20 XP</div>
   <div style="display:flex;gap:4px;margin:10px 0;flex-wrap:wrap">${DAILY.map((g,i)=>`<div class="chip" style="${i+1===Math.min(s,7)?'outline:2px solid #ffd166;':''}opacity:${i+1<Math.min(s,7)?.5:1}">д${i+1}<br>${g}💎</div>`).join('')}</div>
@@ -662,11 +670,11 @@ document.addEventListener('click',async e=>{
   if(t.dataset.tab){newTabs.delete(t.dataset.tab);if(t.dataset.tab==='more')moreOpen=false;if(mobile&&t.dataset.tab===tab&&sheetOpen)sheetOpen=false;else{tab=t.dataset.tab;sheetOpen=true;}lastBody='';return renderUI();}
   const a=t.dataset.act,id=t.dataset.id!=null?+t.dataset.id:null;
   switch(a){
-    case 'daily':{const r=await act('claim_daily');if(r){$('auth').style.display='none';toast(`🎁 +${DAILY[Math.min(me.streak,7)-1]}💎 · серия ${me.streak} дн.`);}break;}
-    case 'closedaily':$('auth').style.display='none';break;
-    case 'tgopen':tgOpened=Date.now();setTimeout(()=>{dirty=true;},300);break;
+    case 'daily':{const r=await act('claim_daily');if(r){$('auth').style.display='none';toast(`🎁 +${DAILY[Math.min(me.streak,7)-1]}💎 · серия ${me.streak} дн.`);setTimeout(maybeTg,1200);}break;}
+    case 'closedaily':$('auth').style.display='none';setTimeout(maybeTg,800);break;
+    case 'tgopen':tgOpened=Date.now();setTimeout(()=>{dirty=true;$('tgclaimbtn')?.classList.remove('dis');},300);break;
     case 'tgclaim':{if(!tgOpened){toast('Сначала открой канал и подпишись');break;}if(Date.now()-tgOpened<5000){toast('Подпишись на канал и вернись 🙂');break;}
-      const r=await act('claim_tg');if(r)toast(`📣 Спасибо за подписку! +${TG.gems}💎`);break;}
+      const r=await act('claim_tg');if(r){if($('tgclaimbtn'))$('auth').style.display='none';}if(r)toast(`📣 Спасибо за подписку! +${TG.gems}💎`);break;}
     case 'buyskin':await act('buy_skin',{p_item:t.dataset.it});break;
     case 'equip':await act('equip_skin',{p_item:t.dataset.it||null});break;
     case 'vote':if(await act('vote',{p_election:+t.dataset.e,p_cand:t.dataset.c}))toast('🗳 Голос принят');loadGov();break;
