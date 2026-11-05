@@ -69,7 +69,8 @@ async function fetchProfile(id){const {data}=await sb.from('profiles').select('i
 function onEvent(e){events.push(e);if(events.length>60)events.shift();
   if(e.kind==='sell'&&e.data&&e.data.plot!=null)world.spawnTruck(e.data.plot,e.data.good,profiles.get(e.uid)?.color);
   if(e.kind==='join'&&e.uid)fetchProfile(e.uid);renderTicker();dirty=true;}
-function renderTicker(){$('ticker').innerHTML=events.slice(-6).reverse().map((e,i)=>`<div style="opacity:${1-i*.14}">${esc(e.txt)}</div>`).join('');}
+const evIc=e=>e.kind==='online'?'🟢 ':e.kind==='offline'?'⚪ ':'';
+function renderTicker(){$('ticker').innerHTML=events.slice(-6).reverse().map((e,i)=>`<div style="opacity:${1-i*.14}">${evIc(e)}${esc(e.txt)}</div>`).join('');}
 
 // ================= ЗАГРУЗКА И REALTIME =================
 async function loadWorld(){
@@ -148,7 +149,7 @@ async function afterLogin(){
 function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);loadQuestLog();loadChat();loadShips();if(me.club)act('club_leave',{},true);
+  joinPresence();act('settle',{},true);rpc('hello').catch(()=>{});loadQuestLog();loadChat();loadShips();if(me.club)act('club_leave',{},true);
   if(longOn()&&longLeft()<=0)toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);tab='work';
   if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();else setTimeout(maybeTg,1500);
   dirty=true;
@@ -490,7 +491,7 @@ function goalsHTML(){if(!me)return'';return`<h3>📋 Цели</h3><div class="mu
   GOALS.map(([t,f])=>{const ok=f();return`<div class="row" style="${ok?'color:#7bd389':''}">${ok?'✔':'▫'} ${t}</div>`;}).join('');}
 function topHTML(){const list=[...profiles.values()].sort((a,b)=>b.money-a.money).slice(0,20);
   return`<h3>🏆 Самые богатые</h3>`+list.map((p,i)=>`<div class="row" style="${me&&p.id===me.id?'background:#3a3148':''}">${i+1}. <span style="color:${p.color}">■</span> ${esc(p.nick)} — <b>${fmt(p.money)}💰</b> <span class="mut">${careerOf(p.shifts||0)}</span></div>`).join('');}
-function feedHTML(){return`<h3>📰 Что происходит</h3>`+events.slice().reverse().map(e=>`<div class="row">${esc(e.txt)}</div>`).join('');}
+function feedHTML(){return`<h3>📰 Что происходит</h3>`+events.slice().reverse().map(e=>`<div class="row">${evIc(e)}${esc(e.txt)}</div>`).join('');}
 function furnHTML(){const st=room.state;if(!st)return'';
   if(!st.editable)return`<h3>🛋 В гостях</h3><div>Нажми на пол — пойдёшь туда, на стул, диван или кровать — сядешь. Пиши в чат сверху.</div>`;
   let h=`<h3>${st.edit?'🛠 Ремонт':'🛋 Дом'}</h3><span class="btn ${st.edit?'on':'gold'}" data-act="redit">${st.edit?'✔ Готово':'🛠 Режим ремонта'}</span>`;
@@ -908,3 +909,6 @@ if(new URLSearchParams(location.search).has('fog'))setTimeout(()=>{world.setFog(
 
 if(!sb)showAuth('noserver');
 else{loadWorld().then(async()=>{const {data:{session}}=await sb.auth.getSession();if(session)afterLogin();else showAuth('login');}).catch(e=>{toast('Ошибка загрузки: '+esc(e.message),8000);showAuth('login');});}
+
+// вернулся на вкладку после долгого отсутствия — снова «зашёл в город»
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&me&&sb)rpc('hello').catch(()=>{});});
