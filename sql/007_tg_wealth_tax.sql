@@ -1,5 +1,5 @@
 -- 007: награда за подписку на Telegram-канал @pixel_grad + прогрессивный налог на роскошь.
--- Применять в Supabase → SQL Editor целиком. Значения синхронны с js/config.js (TG, WEALTH_TAX).
+-- Применено в базе 2026-11-05. Значения синхронны с js/config.js (TG, WEALTH_TAX).
 
 -- ===== 1. Разовая награда за подписку на канал =====
 alter table public.profiles add column if not exists tg_bonus boolean not null default false;
@@ -76,8 +76,7 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists props_limit on public.props;
-create trigger props_limit before update on public.props for each row execute function public._prop_limit();
+create or replace trigger props_limit before update on public.props for each row execute function public._prop_limit();
 
 -- раз в сутки, сразу после базового налога (city_daily в 00:00 UTC)
 select cron.schedule('pixelgrad_wealth_tax', '10 0 * * *', 'select public.wealth_tax()');
