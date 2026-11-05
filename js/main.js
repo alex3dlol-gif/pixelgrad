@@ -54,7 +54,8 @@ const myProps=()=>me?[...props.values()].filter(p=>p.owner===me.id):[];
 // налоги игрока в сутки: базовый (мэр, за каждый объект) + прогрессивный (за объекты сверх WEALTH_TAX.free, дом не считается)
 function myTax(){const own=myProps().filter(p=>p.kind==='land'||p.kind==='apt'||p.kind==='office'),c=city||{};
   const flat=c.newbie_exempt&&LV()<4?0:(c.prop_tax||0)*own.length,taxed=own.filter(p=>p.id!==me.home_unit);
-  return{n:own.length,taxed:taxed.length,flat,prog:Math.round(wealthTax(taxed.map(p=>p.price)))};}
+  return{n:own.length,taxed:taxed.length,flat,prog:Math.round(wealthTax(taxed.map(taxBase))),debt:+me.tax_debt||0};}
+const taxBase=p=>Math.max(p.price,WEALTH_TAX.minBase)+(p.building&&BLD[p.building]?BLD[p.building].cost*(p.level||1):0);
 let tgOpened=0;
 const myPlots=()=>myProps().filter(p=>p.kind==='land').map(p=>({...plots[p.plot],...p,x:plots[p.plot].x,y:plots[p.plot].y}));
 
@@ -335,7 +336,7 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
   return`<h3>👤 Профиль</h3><div class="row"><span style="color:${me.color};font-size:20px;font-weight:700">${esc(me.nick)}</span><br>
     <span class="mut">${careerOf(me.shifts)} · уровень ${l} (${me.xp||0}/${x1} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
-  ${(()=>{const t=myTax();return t.n?`<div class="row">🧾 Налоги в сутки: <b>${fmt(t.flat+t.prog)}💰</b>${t.prog?` <span class="mut">(из них за много имущества ${fmt(t.prog)}💰)</span>`:''} <span class="btn sm blue" data-act="psec" data-s="tax">Подробнее</span></div>`:'';})()}
+  ${(()=>{const t=myTax();return t.n?`<div class="row">🧾 Налоги в сутки: <b>${fmt(t.flat+t.prog)}💰</b>${t.prog?` <span class="mut">(из них за много имущества ${fmt(t.prog)}💰)</span>`:''} <span class="btn sm blue" data-act="psec" data-s="tax">Подробнее</span>${t.debt?`<br><b style="color:#ff8a80">Налоговый долг: ${fmt(t.debt)}💰</b> — пока не погашен, новые объекты не купить`:''}</div>`:'';})()}
   ${me.tg_bonus?'':`<div class="row" style="background:#1f3a5a">📣 Подпишись на наш Telegram ${TG.handle} — <b>+${TG.gems}💎</b> <span class="btn sm gold" data-act="psec" data-s="tg">Забрать</span></div>`}
   <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}</div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
@@ -397,7 +398,7 @@ function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>На�
   if(p.sp==='res'){const r=RES[p.rt];return`<h3>🏢 ${r.n}</h3><div class="mut">${r.floors} этажей · комната ${r.room[0]}×${r.room[1]}. Купи квартиру, обставь мебелью и зови друзей.</div>${unitsHTML(p)}`;}
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3>`;
   if(p.sp==='cityhall'){const c=city||{};return`<h3>🏛 Мэрия</h3><div style="font-size:20px;margin:6px 0">💰 В казне: <b>${fmt(c.treasury||0)}</b></div>
-    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}, плюс налог на роскошь — с 4-го объекта ${WEALTH_TAX.tiers.map(([,r])=>r*100+'%').join('/')} стоимости в сутки.</div><span class="btn sm blue" data-act="psec" data-s="tax">🧾 Подробнее о налогах</span>`;}
+    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}, плюс налог на роскошь с 4-го объекта (лимит ${WEALTH_TAX.max} объектов) — ${WEALTH_TAX.tiers.map(([,r])=>r*100+'%').join('/')} стоимости в сутки.</div><span class="btn sm blue" data-act="psec" data-s="tax">🧾 Подробнее о налогах</span>`;}
   if(CLUBS[p.sp]){const C=CLUBS[p.sp];return`<h3>${C.ic} ${C.n}</h3><div>⚡ Внутри энергия копится <b>×3</b></div><span class="btn gold" data-act="club" data-id="${p.id}">Войти</span>`;}
   const pr=props.get(p.id);if(!pr)return'<div class="mut">Загрузка…</div>';
   if(p.sp==='bc')return`<h3>🏙 Бизнес-центр</h3><div class="mut">Офисная карьера и офисы для кофеен и ресторанов. Клерк: 12💰 · с 100 смен менеджер 20💰 · с 300 директор 30💰.</div>${jobBtn(pr)}<h3 style="margin-top:10px">Офисы</h3>${unitsHTML(p)}`;
@@ -511,16 +512,18 @@ function tgHTML(){const got=me&&me.tg_bonus;
     (got?'':`<span class="btn gold ${tgOpened?'':'dis'}" data-act="tgclaim">Я подписался — забрать ${TG.gems}💎</span>`)+'</div>';}
 function taxHTML(){if(!me)return'';const c=city||{},t=myTax(),W=WEALTH_TAX;let lo=W.free+1;
   const tiers=W.tiers.map(([m,r])=>{const s=`${lo}${m===Infinity?'+':'–'+m}`;lo=m+1;return`<div>• ${s}-й объект — <b>${r*100}%</b> его стоимости в сутки</div>`;}).join('');
-  const own=myProps().filter(p=>(p.kind==='land'||p.kind==='apt'||p.kind==='office')&&p.id!==me.home_unit).sort((a,b)=>a.price-b.price);
+  const own=myProps().filter(p=>(p.kind==='land'||p.kind==='apt'||p.kind==='office')&&p.id!==me.home_unit).sort((a,b)=>taxBase(a)-taxBase(b));
   return`<h3>🧾 Налоги</h3>
   <div class="row"><b>1. Налог на имущество</b> — ${c.prop_tax||0}💰 в сутки за каждый объект (ставку выбирает мэр).${c.newbie_exempt?' Новички до 4 ур. не платят.':''}</div>
   <div class="row"><b>2. Налог на роскошь</b> — для тех, у кого много недвижимости. Чтобы один игрок не скупил весь город.<br>
+    <div class="mut">База = цена объекта (не меньше ${fmt(W.minBase)}💰) + стоимость стройки × уровень здания.</div>
     <div>• твоя квартира-дом — не считается</div><div>• первые ${W.free} объекта — <b>0%</b></div>${tiers}
     <div class="mut">Объекты считаются от дешёвых к дорогим: дорогие попадают в высокую ставку. Списывается раз в сутки ночью и идёт в казну.</div></div>
+  <div class="row"><b>Лимит:</b> не больше <b>${W.max}</b> объектов на игрока (вместе с домом). Не хватило денег на налог — остаток становится <b>долгом</b>, и пока он есть, купить новое нельзя.</div>
   <div class="row"><b>3. Налог с продаж</b> — ${Math.round((c.sales_tax||0)*100)}% с продаж на базе.</div>
-  <div class="row">Твои объекты: <b>${t.n}</b> (облагаются роскошью: ${t.taxed})<br>Базовый: <b>${fmt(t.flat)}💰</b> · роскошь: <b>${fmt(t.prog)}💰</b> · итого <b>${fmt(t.flat+t.prog)}💰/сутки</b></div>`+
-  (own.length>W.free?own.map((p,i)=>`<div class="mut">${i+1}. ${p.kind==='apt'?'🚪 Квартира':p.kind==='office'?'🏢 Офис':'🟩 Участок'} ${fmt(p.price)}💰 → ${wealthRate(i+1)?fmt(p.price*wealthRate(i+1))+'💰 ('+wealthRate(i+1)*100+'%)':'0'}</div>`).join(''):'')+
-  `<div class="mut" style="margin-top:6px">Не хватает денег на налог — спишется сколько есть. Продай лишнее, если налог съедает доход.</div>`;}
+  <div class="row">Твои объекты: <b>${t.n}/${W.max}</b> (облагаются роскошью: ${t.taxed})${t.debt?`<br><b style="color:#ff8a80">Долг: ${fmt(t.debt)}💰</b>`:''}<br>Базовый: <b>${fmt(t.flat)}💰</b> · роскошь: <b>${fmt(t.prog)}💰</b> · итого <b>${fmt(t.flat+t.prog)}💰/сутки</b></div>`+
+  (own.length>W.free?own.map((p,i)=>`<div class="mut">${i+1}. ${p.kind==='apt'?'🚪 Квартира':p.kind==='office'?'🏢 Офис':'🟩 Участок'} база ${fmt(taxBase(p))}💰 → ${wealthRate(i+1)?fmt(taxBase(p)*wealthRate(i+1))+'💰 ('+wealthRate(i+1)*100+'%)':'0'}</div>`).join(''):'')+
+  `<div class="mut" style="margin-top:6px">Налог съедает доход — продай лишнее: держать пустые участки и квартиры невыгодно.</div>`;}
 function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=`<h3>🦺 Рабочая экипировка</h3><div class="mut">Даёт бонусы к производству. Получить трудно: за многократные задания, стаж или дорого. Один предмет на слот.</div>`;
   for(const[slot,sn]of Object.entries(SLOTS)){h+=`<div class="row"><b>${sn}:</b> ${eq[slot]&&GEAR[eq[slot]]?GEAR[eq[slot]].ic+' '+GEAR[eq[slot]].n+` <span class="btn sm red" data-act="unequip" data-slot="${slot}">Снять</span>`:'<span class="mut">пусто</span>'}</div>`;}
   for(const[id,G]of Object.entries(GEAR)){const has=own.includes(id),on=eq[G.slot]===id;let how='',can=true;

@@ -124,10 +124,10 @@ export const TG={url:'https://t.me/pixel_grad',handle:'@pixel_grad',gems:50};
 
 // ===== Прогрессивный налог на имущество (сервер: wealth_tax, sql/007; держать в синхроне!) =====
 // Квартира-«дом» не считается. Объекты сортируются от дешёвого к дорогому: первые FREE — без доп. налога,
-// дальше каждый следующий платит % своей стоимости в сутки по ступеням.
-export const WEALTH_TAX={free:3,tiers:[[6,0.01],[10,0.02],[Infinity,0.03]]};
+// дальше каждый следующий платит % базы в сутки. База = max(цена, minBase) + стоимость стройки × уровень. Лимит max объектов.
+export const WEALTH_TAX={free:3,minBase:1000,max:15,tiers:[[6,0.01],[10,0.02],[Infinity,0.03]]};
 export const wealthRate=n=>n<=WEALTH_TAX.free?0:WEALTH_TAX.tiers.find(([m])=>n<=m)[1];
-export const wealthTax=prices=>[...prices].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*wealthRate(i+1),0);
+export const wealthTax=bases=>[...bases].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*wealthRate(i+1),0);
 
 // ===== Ежедневная награда и скины (кристаллы 💎) =====
 export const DAILY=[5,5,10,10,15,20,40];
