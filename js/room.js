@@ -142,7 +142,7 @@ export function createRoom(renderer){
       function pickc(){return cols[Math.floor(Math.random()*cols.length)];}}
     return fx;}
   function close(){if(!st)return;for(const[,p]of st.people){p.label.remove();p.bubble&&p.bubble.remove();}st=null;root.clear();}
-  function resize(){if(!st)return;const asp=innerWidth/innerHeight,s=Math.max(st.w,st.d)*.85+1;const z=asp<1?s/asp*.75:s;cam.left=-z*asp;cam.right=z*asp;cam.top=z;cam.bottom=-z;cam.updateProjectionMatrix();
+  function resize(){if(!st)return;const asp=innerWidth/innerHeight,s=Math.max(st.w,st.d)*.85+1;const z=(asp<1?s/asp*.75:s)*(window.ROOM_ZOOM||1);cam.left=-z*asp;cam.right=z*asp;cam.top=z;cam.bottom=-z;cam.updateProjectionMatrix();
     cam.position.set(st.w/2+30,32,st.d/2+30);cam.lookAt(st.w/2,.6,st.d/2);}
   addEventListener('resize',resize);
   const _v=new THREE.Vector3();
