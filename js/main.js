@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,WEALTH_TAX,wealthRate,wealthTax} from './config.js';
+import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,WEALTH_TAX,wealthRate,wealthTax,BLV,MODS,titleOf,MAX_LVL} from './config.js';
 import {createWorld} from './world.js';
 import {createRoom,WALL_COLORS,FLOOR_COLORS} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
@@ -28,7 +28,7 @@ let me=null,mode='city',sel=null,tab='work',sheetOpen=!mobile,dirty=true;
 const props=new Map(),profiles=new Map(),goods=new Map(),events=[],unitsByPlot=new Map();
 let city=null;const qlog=new Map();let quest=null;const listings=new Map(),auctions=new Map();let mkSec='base',aucDraft=null;const gov=new Map(),elections=new Map(),cands=[],voteN=new Map();
 const LV=()=>me?lvlOf(me.xp||0):1;
-const EMAX=()=>Math.min(ENERGY.cap,ENERGY.base+ENERGY.perLvl*(LV()-1));
+const EMAX=()=>{const l=LV();return l<=10?ENERGY.base+ENERGY.perLvl*(l-1):Math.min(ENERGY.cap2,ENERGY.cap+ENERGY.perLvl2*(l-10));};
 const EN=()=>me?Math.min(EMAX(),Number(me.energy??EMAX())+(Date.now()-Date.parse(me.energy_at||Date.now()))/60000/ENERGY.regenMin*(roomCtx&&roomCtx.club?3:1)):0;
 const CAP=()=>100+50*myProps().filter(p=>p.building).length;const lock=n=>`<span class="mut">🔒 откроется на ${n} уровне</span>`;
 const DECOR={park:'🌳 Сквер — тут гуляют жители',yard:'🛝 Двор с детской площадкой',parking:'🚗 Парковка'};
@@ -62,7 +62,7 @@ const myPlots=()=>myProps().filter(p=>p.kind==='land').map(p=>({...plots[p.plot]
 function applyProp(r){const old=props.get(r.id);const n={...old,...r};props.set(r.id,n);
   if(!old&&(n.kind==='apt'||n.kind==='office')){if(!unitsByPlot.has(n.plot))unitsByPlot.set(n.plot,[]);unitsByPlot.get(n.plot).push(n.id);}
   if(n.kind==='land'){const pr=n.owner?profiles.get(n.owner):null;
-    world.setPlotState(n.plot,{nick:pr?.nick,owner:n.owner,color:pr?.color||'#ffffff',building:n.building,workers:n.workers,builtAt:n.built_at?Date.parse(n.built_at):0,level:n.level||1});
+    world.setPlotState(n.plot,{nick:pr?.nick,owner:n.owner,color:pr?.color||'#ffffff',building:n.building,workers:n.workers,builtAt:n.built_at?Date.parse(n.built_at):0,level:n.level||1,mods:n.mods||[]});
     if(n.owner&&!pr)fetchProfile(n.owner).then(()=>applyProp(props.get(n.id)));}
   dirty=true;}
 async function fetchProfile(id){const {data}=await sb.from('profiles').select('id,nick,color,money,shifts').eq('id',id).maybeSingle();if(data)profiles.set(id,data);}
@@ -74,7 +74,7 @@ function renderTicker(){$('ticker').innerHTML=events.slice(-6).reverse().map((e,
 // ================= ЗАГРУЗКА И REALTIME =================
 async function loadWorld(){
   const [g,pr,ps,ev]=await Promise.all([selectAll('goods'),selectAll('profiles','id,nick,color,money,shifts'),
-    selectAll('props','id,kind,plot,reg,sp,tier,floor,price,demand,owner,building,workers,built_at,premium,level'),
+    selectAll('props','id,kind,plot,reg,sp,tier,floor,price,demand,owner,building,workers,built_at,premium,level,mods'),
     sb.from('events').select('*').order('id',{ascending:false}).limit(40)]);
   g.forEach(x=>goods.set(x.good,x));pr.forEach(p=>profiles.set(p.id,p));ps.forEach(applyProp);
   (ev.data||[]).reverse().forEach(e=>events.push(e));renderTicker();
@@ -334,7 +334,7 @@ function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),
   return{t:'Ты освоился!',d:'Торгуй на бирже, собирай экипировку, иди на выборы мэра. Следующая цель — офис в бизнес-центре и ресторан.',a:'tab',v:'more',b:'Ещё'};}
 function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),biz=myPlots().filter(p=>p.building).length,apt=myProps().filter(p=>p.kind==='apt').length;
   return`<h3>👤 Профиль</h3><div class="row"><span style="color:${me.color};font-size:20px;font-weight:700">${esc(me.nick)}</span><br>
-    <span class="mut">${careerOf(me.shifts)} · уровень ${l} (${me.xp||0}/${x1} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
+    <span class="mut">${careerOf(me.shifts)} · уровень ${l}${titleOf(l)?` · <b style="color:#ffd166">${titleOf(l)}</b>`:''} (${fmt(me.xp||0)}/${fmt(x1)} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
   ${(()=>{const t=myTax();return t.n?`<div class="row">🧾 Налоги в сутки: <b>${fmt(t.flat+t.prog)}💰</b>${t.prog?` <span class="mut">(из них за много имущества ${fmt(t.prog)}💰)</span>`:''} <span class="btn sm blue" data-act="psec" data-s="tax">Подробнее</span>${t.debt?`<br><b style="color:#ff8a80">Налоговый долг: ${fmt(t.debt)}💰</b> — пока не погашен, новые объекты не купить`:''}</div>`:'';})()}
   ${me.tg_bonus?'':`<div class="row" style="background:#1f3a5a">📣 Подпишись на наш Telegram ${TG.handle} — <b>+${TG.gems}💎</b> <span class="btn sm gold" data-act="psec" data-s="tg">Забрать</span></div>`}
@@ -354,14 +354,22 @@ function invHTML(){if(!me)return'';const c=CAP(),gs=GK.filter(g=>inv(me,g)>=1);l
   return h;}
 function nextHTML(){const n=nextStep();if(!n)return'';return`<div class="box" style="border-color:#7bd389;padding:8px"><div class="mut" style="color:#7bd389">🎯 ЧТО ДЕЛАТЬ ДАЛЬШЕ</div><b>${n.t}</b><div style="font-size:14px;margin:4px 0">${n.d}</div><span class="btn gold sm" data-act="next" data-a="${n.a}" data-v="${n.v??''}">${n.b} →</span></div>`;}
 function bizHTML(pr){const b=BLD[pr.building],building=pr.built_at&&Date.parse(pr.built_at)>Date.now();
-  const lv=pr.level||1,mx=MAX_WORKERS+(lv>=3?1:0)+(lv>=5?1:0);
-  let h=`<h3>${b.ic} ${b.n} <span style="color:#f1c40f">${'★'.repeat(lv)}${'☆'.repeat(5-lv)}</span></h3><div class="mut">${b.desc}</div><div style="margin:6px 0">${ioText(b)} на работника · зарплата ${b.wage}💰/мин каждому</div><div class="mut">🟢 Пока ты в игре — 100% выработки, офлайн — ${Math.round(OFFLINE_RATE*100)}% (до 8 ч).</div>`;
+  const lv=pr.level||1,mx=BLV.workers(lv),mods=pr.mods||[];
+  let h=`<h3>${b.ic} ${b.n} <span style="color:${lv>=6?'#ff9f43':'#f1c40f'}">${'★'.repeat(lv)}</span><span class="mut">${'☆'.repeat(BLV.max-lv)}</span></h3><div class="mut">${BLV.tier(lv)} · ${b.desc}</div><div style="margin:6px 0">${ioText(b)} на работника · зарплата ${b.wage}💰/мин каждому${mods.includes('brig')?' (−30% с бригадиром)':''}</div><div class="mut">🟢 Пока ты в игре — 100% выработки, офлайн — ${mods.includes('auto')?50:Math.round(OFFLINE_RATE*100)}% (до 8 ч).</div>`;
   if(b.kind==='service'||b.kind==='retail')h+=`<div class="mut">Спрос района: ~${pr.demand} клиентов/мин (делится с конкурентами рядом)</div>`;
-  if(building){const left=Math.max(0,Math.ceil((Date.parse(pr.built_at)-Date.now())/1000)),gc=Math.max(1,Math.ceil(left/120));h+=`<div>🏗 Строится… <b>${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}</b> <span class="btn sm gold" data-act="speedup" data-id="${pr.id}">⚡ Ускорить за ${gc}💎</span></div>`;}
-  h+=`<div style="margin:6px 0">Работники: <b>${pr.workers}/${mx}</b> · уровень здания <b>${lv}</b> (выпуск ×${(1+.4*(lv-1)).toFixed(1)})</div>`;
-  if(!building&&lv<5){const nl=lv+1,cost=b.cost*[1,2,4,8][nl-2],mins=({gather:3,retail:10,proc:15,service:30}[b.kind]||3)*(pr.kind==='office'?4:1)*[3,8,20,60][nl-2],mat={planks:6*nl,...(nl>=3?{bricks:5*(nl-2)}:{})},m=missCost(mat);
-    h+=`<div class="row">⬆ <b>Улучшить до ${nl} уровня</b>: выпуск ×${(1+.4*(nl-1)).toFixed(1)}${nl===3||nl===5?', +1 место для работника':''}, склад +50<br><span class="mut">${fmt(cost)}💰 + ${costText(mat)} · ⏱ ${mins>=60?Math.round(mins/60*10)/10+' ч':mins+' мин'} · нужен ${nl} ур. игрока</span><br>`+
-      (LV()>=nl?`<span class="btn gold ${me.money>=cost+m.c&&m.ok?'':'dis'}" data-act="upgrade" data-id="${pr.id}">Улучшить · ${fmt(cost+m.c)}💰</span>`:lock(nl))+'</div>';}
+  if(building){const left=Math.max(0,Math.ceil((Date.parse(pr.built_at)-Date.now())/1000)),gc=Math.max(1,Math.ceil(left/120));h+=`<div>🏗 Строится… <b>${left<3600?Math.floor(left/60)+':'+String(left%60).padStart(2,'0'):hm(left*1000)}</b> <span class="btn sm gold" data-act="speedup" data-id="${pr.id}">⚡ Ускорить за ${gc}💎</span></div>`;}
+  h+=`<div style="margin:6px 0">Работники: <b>${pr.workers}/${mx}</b> · уровень здания <b>${lv}/${BLV.max}</b> (выпуск ×${BLV.mult(lv).toFixed(1)})</div>`;
+  if(!building&&lv<BLV.max){const nl=lv+1,cost=b.cost*BLV.costMul[nl-2],mins=({gather:3,retail:10,proc:15,service:30}[b.kind]||3)*(pr.kind==='office'?4:1)*BLV.timeMul[nl-2],mat=BLV.mat(nl),m=missCost(mat),need=BLV.need(nl);
+    const perks=[`выпуск ×${BLV.mult(nl).toFixed(1)}`,BLV.workers(nl)>mx?'+1 место для работника':'','склад +50',BLV.tier(nl)!==BLV.tier(lv)?`новый вид: «${BLV.tier(nl)}»`:''].filter(Boolean).join(', ');
+    h+=`<div class="row">⬆ <b>Улучшить до ${nl} уровня</b>: ${perks}<br><span class="mut">${fmt(cost)}💰 + ${costText(mat)} · ⏱ ${mins>=60?Math.round(mins/60*10)/10+' ч':mins+' мин'} · нужен ${need} ур. игрока</span><br>`+
+      (LV()>=need?`<span class="btn gold ${me.money>=cost+m.c&&m.ok?'':'dis'}" data-act="upgrade" data-id="${pr.id}">Улучшить · ${fmt(cost+m.c)}💰</span>`:lock(need))+'</div>';}
+  if(!building){h+=`<div class="row"><b>🧩 Модули</b> <span class="mut">— по одному каждого вида, видны на здании</span>`;
+    for(const[k,M]of Object.entries(MODS)){if(M.kinds&&!M.kinds.includes(b.kind))continue;
+      if(mods.includes(k)){h+=`<div style="color:#7bd389">✔ ${M.ic} ${M.n} — ${M.eff}</div>`;continue;}
+      const c=b.cost*M.k,mm=missCost(M.mat),okL=LV()>=M.pl,okB=lv>=M.bl;
+      h+=`<div>${M.ic} <b>${M.n}</b> — ${M.eff}<br><span class="mut">${fmt(c)}💰 + ${costText(M.mat)} · здание от ${M.bl} ур.</span> `+
+        (!okL?lock(M.pl):!okB?`<span class="mut">🔒 улучши здание до ${M.bl} ур.</span>`:`<span class="btn sm gold ${me.money>=c+mm.c&&mm.ok?'':'dis'}" data-act="addmod" data-id="${pr.id}" data-m="${k}">Поставить · ${fmt(c+mm.c)}💰</span>`)+'</div>';}
+    h+='</div>';}
   if(LV()>=NEED.hire)h+=`<span class="btn ${pr.workers<mx?'':'dis'}" data-act="hire" data-id="${pr.id}">Нанять (+${HIRE_FEE}💰)</span><span class="btn red ${pr.workers?'':'dis'}" data-act="fire" data-id="${pr.id}">Уволить</span>`;
   h+=`<div class="mut" style="margin-top:6px">Живые игроки тоже могут устроиться к тебе: ты платишь им ${OWNER_JOB_PAY}💰 за смену, а их смена даёт продукцию.</div>`;
   h+=`<div style="margin-top:8px">${LV()>=2?aucBtn(pr):''}<span class="btn red sm" data-act="sellprop" data-id="${pr.id}">Продать городу (~50%)</span></div>`;return h;}
@@ -372,7 +380,7 @@ function buildListHTML(pr){let h=`<div class="mut">Выбери, что пост
     <span class="btn ${can?'':'dis'}" data-act="build" data-id="${pr.id}" data-t="${k}">Построить · ${c}💰</span>${m.ok?'':'<span class="mut"> нет материалов на базе</span>'}</div>`;}
   if(locked.length){const nx=Math.min(...locked.map(([k,b])=>needFor(b)));h+=`<div class="row mut">✨ Ещё ${locked.length} видов зданий откроются позже. На ${nx} уровне: ${locked.filter(([k,b])=>needFor(b)===nx).map(([k,b])=>b.ic+' '+b.n).join(', ')}</div>`;}return h;}
 // ===== Долгая смена: 2–4 часа реального времени, награда в конце (для тех, кто заходит редко) =====
-const LONG={2:{n:15,en:15},3:{n:21,en:20},4:{n:28,en:25}};
+const LONG={2:{n:15,en:15},3:{n:21,en:20},4:{n:28,en:25},6:{n:40,en:35,lvl:NEED.long6}};
 const longOn=()=>me&&me.long_until;const longLeft=()=>longOn()?new Date(me.long_until)-Date.now():0;
 const hm=ms=>{const m=Math.ceil(ms/60000);return m>=60?`${Math.floor(m/60)} ч ${m%60} мин`:`${m} мин`;};
 let longDone=false;setInterval(()=>{if(!longOn()){longDone=false;return;}if(longLeft()<=0&&!longDone){longDone=true;toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);}dirty=true;},20000);
@@ -383,7 +391,7 @@ function longStatusHTML(){if(!longOn())return'';const pr=props.get(me.long_prop)
          :`<span class="btn gold" data-act="longclaim">Забрать награду</span>`)+`</div>`;}
 function longBtns(pr){const j=jobInfo(pr);if(!j||!me||pr.kind!=='npc')return'';if(longOn())return me.long_prop===pr.id?longStatusHTML():'';const ok=me.shifts>=j.req;
   return`<div style="margin-top:8px"><b>🕒 Долгая смена</b><br>`+
-  Object.entries(LONG).map(([h,L])=>`<span class="btn sm ${ok?'gold':'dis'}" data-act="longstart" data-id="${pr.id}" data-h="${h}">${h} ч · ${fmt(j.pay*L.n)}💰</span>`).join('')+`</div>`;}
+  Object.entries(LONG).map(([h,L])=>L.lvl&&LV()<L.lvl?`<span class="btn sm dis">🔒 ${h} ч — с ${L.lvl} ур.</span>`:`<span class="btn sm ${ok?'gold':'dis'}" data-act="longstart" data-id="${pr.id}" data-h="${h}">${h} ч · ${fmt(j.pay*L.n)}💰 · ⚡${L.en}</span>`).join('')+`</div>`;}
 function jobBtn(pr){const j=jobInfo(pr);if(!j||!me)return'';if(pr.kind!=='npc'&&LV()<NEED.playerJob&&me.job_prop!==pr.id)return'';if(me.job_prop===pr.id)return`<div style="margin-top:6px">✅ Ты работаешь здесь<div class="bar"><i id="shiftbar" style="width:0"></i></div></div><span class="btn red" data-act="quit">Уволиться</span>`;
   const ok=me.shifts>=j.req;return`<div style="margin-top:6px"><span class="btn ${ok?'':'dis'}" data-act="job" data-id="${pr.id}">Устроиться · ${j.pay}💰/смена</span>${ok?'':`<div class="mut">Нужен опыт: ${j.req} смен (у тебя ${me.shifts})</div>`}</div>`;}
 function unitsHTML(p){const ids=unitsByPlot.get(p.id)||[];let h='';
@@ -534,8 +542,8 @@ function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=
     h+=`<div class="row">${G.ic} <b>${G.n}</b> <span class="mut">[${SLOTS[G.slot]}]</span><br>${G.eff}<br><span class="mut">Как получить: ${how}</span><br>`+
       (has?(on?'<span class="mut">✔ надето</span>':`<span class="btn sm" data-act="equipgear" data-slot="${G.slot}" data-id="${id}">Надеть</span>`):`<span class="btn sm gold ${can?'':'dis'}" data-act="getgear" data-id="${id}">Получить</span>`)+'</div>';}
   return h;}
-function levelsHTML(){if(!me)return'<div class="mut">Войди в игру</div>';const l=LV();return`<h3>⭐ Уровни</h3><div class="mut">Опыт: ${me.xp||0}. Даётся за смены, стройку, продажи, покупки и ежедневный вход.</div>`+
-  Object.entries(UNLOCKS).map(([k,t])=>`<div class="row" style="${+k<=l?'color:#7bd389':''}">${+k<=l?'✔':'🔒'} <b>Ур. ${k}</b> (${xpFor(+k)} XP) — ${t}</div>`).join('');}
+function levelsHTML(){if(!me)return'<div class="mut">Войди в игру</div>';const l=LV();return`<h3>⭐ Уровни (1–${MAX_LVL})</h3><div class="mut">Ты на <b>${l}</b> уровне${titleOf(l)?` · титул «${titleOf(l)}»`:''}. Опыт: ${fmt(me.xp||0)}. Даётся за смены, стройку, улучшения, продажи, покупки и ежедневный вход. После 10 уровня расти дольше, зато открываются модули, здания до 10 ур. и титулы.</div>`+
+  Object.entries(UNLOCKS).map(([k,t])=>`<div class="row" style="${+k<=l?'color:#7bd389':''}">${+k<=l?'✔':'🔒'} <b>Ур. ${k}</b> (${fmt(xpFor(+k))} XP) — ${t}</div>`).join('');}
 function skinsHTML(){if(!me)return'';const own=me.skins||[];let h=`<h3>💎 Скины</h3><div class="mut">Кристаллы дают за ежедневный вход (серия до 7 дней — до 40💎 в день). Скины видят все игроки.</div>`;
   for(const[k,s]of Object.entries(SKINS)){const has=own.includes(k);h+=`<div class="row">${s.n} · <b>${s.price}💎</b> ${has?(me.skin===k?'<span class="mut">надето</span>':`<span class="btn sm" data-act="equip" data-it="${k}">Надеть</span>`):`<span class="btn sm gold ${(me.gems||0)>=s.price?'':'dis'}" data-act="buyskin" data-it="${k}">Купить</span>`}</div>`;}
   return h+(me.skin?`<span class="btn sm red" data-act="equip" data-it="">Снять головной убор</span>`:'');}
@@ -681,6 +689,7 @@ document.addEventListener('click',async e=>{
     case 'bidx':{const v=prompt('Твоя ставка, 💰 (минимум '+t.dataset.v+')',t.dataset.v);if(v&&await act('bid',{p_auction:id,p_amount:+v}))toast('🔨 Ставка принята');break;}
     case 'openauc':tab='market';mkSec='auc';sheetOpen=true;break;
     case 'upgrade':if(await act('upgrade',{p_id:id}))toast('⬆ Улучшение началось');break;
+    case 'addmod':{const M=MODS[t.dataset.m];if(await act('add_module',{p_id:id,p_mod:t.dataset.m}))toast(`${M.ic} «${M.n}» установлен`);break;}
     case 'speedup':if(await act('speedup',{p_id:id}))toast('🏗 Готово!');break;
     case 'energy':showEnergy();return;
     case 'refill':if(await act('refill_energy')){$('auth').style.display='none';toast('⚡ Энергия восполнена');}return;

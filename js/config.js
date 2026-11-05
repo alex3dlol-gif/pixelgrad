@@ -64,7 +64,7 @@ export const ECON={rate:.3,svc:.4,wage:.35,cost:2.5,mat:3};
 for(const b of Object.values(BLD)){b.rate=Math.round(b.rate*((b.kind==='service'||b.kind==='retail')?ECON.svc:ECON.rate)*100)/100;
   b.wage=Math.round(b.wage*ECON.wage*100)/100;b.cost=Math.round(b.cost*({gather:b.cost<200?1.5:3,proc:6,retail:5,service:6}[b.kind]||ECON.cost)/10)*10;for(const k in b.mat)b.mat[k]=Math.ceil(b.mat[k]*ECON.mat);}
 export const BUILD_MIN={gather:3,retail:10,proc:15,service:30,office:60};
-export const ENERGY={base:60,perLvl:10,cap:150,regenMin:3,shift:1,quest:2,refillGems:20};
+export const ENERGY={base:60,perLvl:10,cap:150,cap2:250,perLvl2:5,regenMin:3,shift:1,quest:2,refillGems:20};
 export const HIRE_FEE=100, MAX_WORKERS=3, SHIFT_SEC=20, BUILD_SEC=20, START_MONEY=150, OWNER_JOB_PAY=7;
 
 // Городские работодатели (NPC-фирмы). out — что фирма сама производит в склад базы в минуту.
@@ -112,11 +112,31 @@ export const FURN={
 };
 
 // ===== Уровни: функции открываются постепенно =====
-export const lvlOf=xp=>Math.floor(Math.sqrt(Math.max(0,xp)/100))+1;
-export const xpFor=l=>100*(l-1)**2;
-export const NEED={land:2,gather:2,furn:2,hire:3,buyMarket:3,proc:4,apt:4,service:5,playerJob:5,vote:6,office:7,run:8};
-export const UNLOCKS={1:'Работа и продажа на базе',2:'Своя земля, ферма/сад/пасека/делянка, мебель, биржа игроков',3:'Найм работников, закупки на базе, свой магазин',4:'Переработка (мельница, пилорама…), покупка квартир',
-  5:'Точки в городе (ПВЗ, шаурма), работа у других игроков',6:'Голосование на выборах',7:'Офисы в бизнес-центрах',8:'Можно баллотироваться в мэры и начальники'};
+// XP(L) = 100·(L−1)² + 20·max(0,L−10)³ (сервер: _xp_for/_lvl, sql/008). После 10-го уровня расти заметно дольше.
+export const xpFor=l=>100*(l-1)**2+20*Math.max(0,l-10)**3;
+export const lvlOf=xp=>{let l=1;while(l<60&&xpFor(l+1)<=Math.max(0,xp))l++;return l;};
+export const MAX_LVL=30;
+export const NEED={land:2,gather:2,furn:2,hire:3,buyMarket:3,proc:4,apt:4,service:5,playerJob:5,vote:6,office:7,run:8,long6:14};
+export const UNLOCKS={1:'Работа и продажа на базе',2:'Своя земля, ферма/сад/пасека/делянка, мебель, биржа игроков · здания до 2 ур.',
+  3:'Найм работников, закупки на базе, свой магазин · здания до 3 ур.',4:'Переработка (мельница, пилорама…), покупка квартир · здания до 4 ур.',
+  5:'Точки в городе (ПВЗ, шаурма), работа у других игроков · здания до 5 ур. · модуль 📦 «Склад»',6:'Голосование на выборах',7:'Офисы в бизнес-центрах',
+  8:'Можно баллотироваться в мэры и начальники',9:'Здания до 6 ур. · модуль 👷 «Бригадир» (−30% зарплат)',10:'Здания до 7 ур. (+1 работник) · энергия 150',
+  11:'Модули 🚜 «Техника» (+15% выпуска) и 📣 «Реклама» (+30% спроса) · дальше +5⚡ к максимуму за каждый уровень',12:'Здания до 8 ур.',
+  13:'Модуль 🤖 «Автоматика» (офлайн 50% вместо 25%)',14:'Долгая смена на 6 часов',15:'Здания до 9 ур.',16:'Титул «Предприниматель»',
+  18:'Здания до 10 ур. (+1 работник, максимум)',20:'Титул «Магнат»',25:'Титул «Олигарх»',30:'Титул «Легенда Пиксельграда» · энергия 250'};
+export const TITLES={16:'Предприниматель',20:'Магнат',25:'Олигарх',30:'Легенда Пиксельграда'};
+export const titleOf=l=>{let t='';for(const[k,v]of Object.entries(TITLES))if(l>=+k)t=v;return t;};
+// ===== Уровни зданий 1..10 (сервер: upgrade/_blv_*, sql/008) =====
+export const BLV={max:10,need:l=>l<=5?l:[9,10,12,15,18][l-6],mult:l=>l<=5?1+.4*(l-1):2.6+.2*(l-5),workers:l=>3+(l>=3)+(l>=5)+(l>=7)+(l>=10),
+  costMul:[1,2,4,8,12,16,24,32,48],timeMul:[3,8,20,60,90,120,180,240,360],
+  mat:l=>({planks:6*l,...(l>=3?{bricks:5*(l-2)}:{}),...(l>=6?{stone:20*(l-5)}:{})}),
+  tier:l=>l<=3?'Мастерская':l<=5?'Предприятие':l<=7?'Фабрика':l<=9?'Комбинат':'Флагман'};
+// ===== Модули зданий (сервер: add_module) =====
+export const MODS={store:{n:'Склад',ic:'📦',pl:5,bl:2,k:2,mat:{planks:10},eff:'+200 к складу'},
+  brig:{n:'Бригадир',ic:'👷',pl:9,bl:3,k:3,mat:{planks:8,bricks:5},eff:'зарплаты работникам −30%'},
+  tech:{n:'Техника',ic:'🚜',pl:11,bl:4,k:5,mat:{bricks:10,stone:20},eff:'+15% выпуска',kinds:['gather','proc']},
+  ads:{n:'Реклама',ic:'📣',pl:11,bl:4,k:5,mat:{planks:10,bricks:10},eff:'+30% спроса',kinds:['service','retail']},
+  auto:{n:'Автоматика',ic:'🤖',pl:13,bl:5,k:8,mat:{bricks:20,stone:30},eff:'офлайн 50% вместо 25%'}};
 export const needFor=b=>b.reg==='B'?NEED.office:b.kind==='service'?NEED.service:b.kind==='proc'?NEED.proc:b.kind==='retail'?3:NEED.gather;
 
 // ===== Telegram-канал: разовая награда за подписку (сервер: claim_tg, sql/007) =====

@@ -627,25 +627,47 @@ export function createWorld(canvas,{mobile}){
     scene.add(shadow(tutFence));}
   function setPlotState(id,st){
     const p=plots[id];if(!p||p.sp)return;
-    const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0)||(p.level||1)!==(st.level||1);
+    const changed=p.owner!==st.owner||p.color!==st.color||p.building!==st.building||p.builtAt!==(st.builtAt||0)||(p.level||1)!==(st.level||1)||String(p.mods||[])!==String(st.mods||[]);
     if(p.building&&!st.building)for(let y=p.y0+1;y<=p.y0+2;y++)for(let x=p.x0+1;x<=p.x0+2;x++)walk[I(x,y)]=1;
-    Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0,level:st.level||1,nick:st.nick||p.nick});
+    Object.assign(p,{owner:st.owner,color:st.color,building:st.building,workers:st.building?st.workers:0,builtAt:st.builtAt||0,level:st.level||1,mods:st.mods||[],nick:st.nick||p.nick});
     setSign(p,!p.owner);if(p.building)blockFoot(p);
     if(changed&&p.mat){dematerialize(p);materialize(p);}else if(p.mat)syncWorkers(p);
   }
-  // украшения по уровню здания: растёт, пристройки, огни, табличка со звёздами
-  function levelDecor(g,lv,col){if(lv<=1)return;const k=1+.07*(lv-1);for(const c of g.children)if(!c.userData.ld){c.scale.multiplyScalar(k);c.position.x*=k;c.position.z*=k;}
-    const add=m=>{m.userData.ld=1;return m;};
+  // украшения по уровню здания: 1–5 растёт и обрастает пристройками, 6+ «Фабрика» (асфальт, труба), 7 склад с солнечными панелями,
+  // 8 стеклянная надстройка, 9 неоновая вывеска, 10 «Флагман» (золото); табличка со звёздами. Модули — отдельные объекты.
+  function levelDecor(g,lv,col,mods=[]){const add=m=>{m.userData.ld=1;return m;};
+    if(lv>1){const k=1+.07*(Math.min(lv,5)-1);for(const c of g.children)if(!c.userData.ld){c.scale.multiplyScalar(k);c.position.x*=k;c.position.z*=k;}}
     if(lv>=2){for(const[x,z]of[[-1.5,1.6],[-1.1,1.6],[-.7,1.6]]){add(B(g,.22,.12,.22,0x8b5a2b,x,0,z));add(B(g,.16,.08,.16,[0xff8fab,0xffe066,0xb388eb][Math.abs(x*10|0)%3],x,.12,z));}}
     if(lv>=3){add(B(g,.9,.6,.8,0xd9cbb0,-1.25,0,-1.1));add(GR(g,1,.35,.9,col,-1.25,.6,-1.1));}
     if(lv>=4){add(B(g,.08,1.4,.08,0x555555,1.3,0,-1.2));add(B(g,.18,.18,.18,0xfff1b0,1.3,1.4,-1.2,true));add(B(g,.5,.04,.4,0x2c3e50,1.2,.62,-1.15));}
-    if(lv>=5){add(B(g,.06,1.8,.06,0xdddddd,-1.6,0,-1.6));add(B(g,.5,.3,.03,0xf1c40f,-1.33,1.5,-1.6));}
-    add(B(g,.05,.7,.05,0x6b4a2f,-1.65,0,1.25));add(B(g,.12+.11*(lv-1),.16,.04,0x2b2438,-1.65+.05*(lv-1),.62,1.25));
-    for(let i=0;i<lv-1;i++)add(B(g,.08,.08,.05,0xf1c40f,-1.65+i*.11,.66,1.28,true));}
+    if(lv>=5){add(B(g,.06,1.8,.06,0xdddddd,-1.6,0,-1.6));add(B(g,.5,.3,.03,lv>=10?0xffd700:0xf1c40f,-1.33,1.5,-1.6));}
+    if(lv>=6){add(B(g,3.3,.03,3.3,lv>=10?0x8a7a5a:0x5d6166,0,0,0));add(CY(g,.16,.22,2.4,8,0x8e3b2f,.55,0,-1.55));add(B(g,.36,.1,.36,0x333333,.55,2.4,-1.55));
+      for(let i=0;i<3;i++){const sm=add(B(g,.22+i*.08,.22+i*.08,.22+i*.08,0xdddddd,.55+i*.12,2.6+i*.3,-1.55-i*.05));sm.material=new THREE.MeshLambertMaterial({color:0xeeeeee,transparent:true,opacity:.55-i*.12});}}
+    if(lv>=7){add(B(g,.55,.85,1.1,0xb0b7bd,1.35,0,-.15));add(B(g,.6,.06,1.15,0x7f8c8d,1.35,.85,-.15));
+      for(const z of[-.45,-.15,.15])add(B(g,.42,.04,.24,0x1f3a68,1.35,.92,z,true));}
+    if(lv>=8){const gl=add(B(g,.9,.7,.8,0x9fd3ff,-1.25,.95,-1.1));gl.material=new THREE.MeshLambertMaterial({color:0x9fd3ff,transparent:true,opacity:.75,emissive:0x16324f});
+      add(B(g,.95,.05,.85,0xdddddd,-1.25,1.65,-1.1));}
+    if(lv>=9){add(B(g,.05,.6,.05,0x333333,-.45,1.75,.2));add(B(g,.05,.6,.05,0x333333,.45,1.75,.2));add(B(g,1.15,.3,.06,col,0,2.3,.2,true));
+      add(B(g,1.25,.04,.08,0xffffff,0,2.62,.2,true));}
+    if(lv>=10){add(B(g,.08,3.2,.08,0xffd700,-1.6,0,-1.6));const st=new THREE.Mesh(new THREE.OctahedronGeometry(.2),bmat(0xffd700));st.position.set(-1.6,3.4,-1.6);add(st);g.add(st);
+      for(const[w,d,x,z]of[[3.3,.08,0,1.65],[3.3,.08,0,-1.65],[.08,3.3,1.65,0],[.08,3.3,-1.65,0]])add(B(g,w,.06,d,0xffd700,x,0,z));
+      add(B(g,.5,.02,1.2,0xc0392b,-.5,.03,1.1));}
+    // табличка: звёзды (6+ — оранжевые)
+    add(B(g,.05,.7,.05,0x6b4a2f,-1.65,0,1.25));add(B(g,.12+.11*Math.max(0,lv-1),.16,.04,0x2b2438,-1.65+.05*(lv-1),.62,1.25));
+    for(let i=0;i<lv-1;i++)add(B(g,.08,.08,.05,i>=5?0xff9f43:0xf1c40f,-1.65+i*.11,.66,1.28,true));
+    // модули
+    if(mods.includes('store')){add(B(g,.6,.06,.5,0x9c6b3e,1.25,0,1.3));add(B(g,.26,.26,.26,0xb5835a,1.13,.06,1.2));add(B(g,.26,.26,.26,0xa47148,1.4,.06,1.38));add(B(g,.24,.24,.24,0xc49464,1.2,.32,1.3));}
+    if(mods.includes('brig')){add(B(g,.38,.5,.38,0xe67e22,-1.55,0,.35));add(B(g,.44,.06,.44,0x333333,-1.55,.5,.35));const hh=add(B(g,.2,.1,.2,0xf1c40f,-1.55,.56,.35));hh.scale.y=.1;}
+    if(mods.includes('tech')){add(B(g,.5,.25,.3,0x2e8b57,.65,.12,1.5));add(B(g,.2,.22,.26,0x226b43,.5,.37,1.5));
+      for(const[x,z,r]of[[.45,1.35,.13],[.45,1.65,.13],[.85,1.35,.09],[.85,1.65,.09]])add(CY(g,r,r,.06,8,0x222222,x,r,z)).rotation.x=Math.PI/2;}
+    if(mods.includes('ads')){add(B(g,.05,1.1,.05,0x555555,1.25,0,.75));add(B(g,.05,1.1,.05,0x555555,1.7,0,.75));add(B(g,.6,.4,.05,col,1.48,.95,.78,true));add(B(g,.4,.08,.06,0xffffff,1.48,1.1,.8,true));}
+    if(mods.includes('auto')){add(B(g,.06,.9,.06,0x888888,-1.55,0,-.45));const d=add(CY(g,.25,.05,.08,10,0xdddddd,-1.5,.9,-.45));d.rotation.z=.6;
+      add(B(g,.06,.06,.06,0xff4444,-1.5,1.05,-.45,true));}
+  }
   function materialize(p){if(p.mat||!p.owner)return;p.mat=true;
     if(p.nick){p.lab=wlabel(p.nick,p.x0+3.2,1.6,p.y0-.2,'owner',p.color);p.lab.zMax=mobile?16:24;}
     p.fence=makeFence(p,p.color);scene.add(p.fence);
-    if(p.building){const b=makeBuilding(p.building,new THREE.Color(p.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);levelDecor(b.g,p.level||1,new THREE.Color(p.color||'#fff').getHex());scene.add(b.g);p.group=b.g;p.anim=b.a;
+    if(p.building){const b=makeBuilding(p.building,new THREE.Color(p.color||'#fff').getHex());b.g.position.set(p.x0+1.5,0,p.y0+1.5);levelDecor(b.g,p.level||1,new THREE.Color(p.color||'#fff').getHex(),p.mods||[]);scene.add(b.g);p.group=b.g;p.anim=b.a;
       if(p.building==='farm')makeCrops(p,'wheat');if(p.building==='garden')makeCrops(p,'veg');}
     syncWorkers(p);}
   function dematerialize(p){if(!p.mat)return;p.mat=false;
