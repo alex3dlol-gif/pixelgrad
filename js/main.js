@@ -314,7 +314,7 @@ const CITY_TABS=[['work','💼','Дела'],['market','🏪','Рынок'],['hom
 let coachMin=false,lastInvOpen=false;
 const newTabs=new Set();
 const ROOM_TABS=[['furn','🛋','Мебель'],['guests','👥','Гости']],CLUB_TABS=[['club','⚡','Клуб']];
-function ioText(b){if(b.kind==='retail')return'твой товар со склада → розница ×1.6';if(b.kind==='gather')return`→ ${b.rate}${Object.keys(b.out).map(g=>GOODS[g].ic).join('')}/мин`;
+function ioText(b){if(b.kind==='retail')return'твой товар со склада → жителям по рыночной цене ×1.2';if(b.kind==='gather')return`→ ${b.rate}${Object.keys(b.out).map(g=>GOODS[g].ic).join('')}/мин`;
   if(b.kind==='proc')return`${costText(b.in)} → ${Object.entries(b.out).map(([g,q])=>q+GOODS[g].ic).join('')} · ${b.rate}/мин`;
   return`${Object.keys(b.in).length?costText(b.in):'📦'} → ${b.pay}💰/клиент`;}
 function nextStep(){if(!me)return null;const l=LV(),mp=myPlots(),cl=cheapLand(),xpBar=(n)=>`<div class="bar"><i style="width:${Math.min(100,(me.xp||0)/xpFor(n)*100)}%"></i></div>`;
