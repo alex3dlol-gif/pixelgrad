@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN} from './config.js';
+import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,WEALTH_TAX,wealthRate,wealthTax} from './config.js';
 import {createWorld} from './world.js';
 import {createRoom,WALL_COLORS,FLOOR_COLORS} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
@@ -51,6 +51,11 @@ function setMe(p){const old=me;me={...me,...p};profiles.set(p.id,{...profiles.ge
   if(old&&old.inv)for(const g of GK){const d=Math.floor(inv(me,g))-Math.floor(inv(old,g));if(d>0){const pl=myPlots().find(x=>x.building&&BLD[x.building].out&&BLD[x.building].out[g]);if(pl)world.float(`+${d}${GOODS[g].ic}`,pl.x,2.2,pl.y,'#fff');}}
   dirty=true;}
 const myProps=()=>me?[...props.values()].filter(p=>p.owner===me.id):[];
+// налоги игрока в сутки: базовый (мэр, за каждый объект) + прогрессивный (за объекты сверх WEALTH_TAX.free, дом не считается)
+function myTax(){const own=myProps().filter(p=>p.kind==='land'||p.kind==='apt'||p.kind==='office'),c=city||{};
+  const flat=c.newbie_exempt&&LV()<4?0:(c.prop_tax||0)*own.length,taxed=own.filter(p=>p.id!==me.home_unit);
+  return{n:own.length,taxed:taxed.length,flat,prog:Math.round(wealthTax(taxed.map(p=>p.price)))};}
+let tgOpened=0;
 const myPlots=()=>myProps().filter(p=>p.kind==='land').map(p=>({...plots[p.plot],...p,x:plots[p.plot].x,y:plots[p.plot].y}));
 
 function applyProp(r){const old=props.get(r.id);const n={...old,...r};props.set(r.id,n);
@@ -330,6 +335,8 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
   return`<h3>👤 Профиль</h3><div class="row"><span style="color:${me.color};font-size:20px;font-weight:700">${esc(me.nick)}</span><br>
     <span class="mut">${careerOf(me.shifts)} · уровень ${l} (${me.xp||0}/${x1} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
+  ${(()=>{const t=myTax();return t.n?`<div class="row">🧾 Налоги в сутки: <b>${fmt(t.flat+t.prog)}💰</b>${t.prog?` <span class="mut">(из них за много имущества ${fmt(t.prog)}💰)</span>`:''} <span class="btn sm blue" data-act="psec" data-s="tax">Подробнее</span></div>`:'';})()}
+  ${me.tg_bonus?'':`<div class="row" style="background:#1f3a5a">📣 Подпишись на наш Telegram ${TG.handle} — <b>+${TG.gems}💎</b> <span class="btn sm gold" data-act="psec" data-s="tg">Забрать</span></div>`}
   <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}</div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
 // ===== Грузы в пути: товар едет на базу несколько минут, деньги — по прибытии =====
@@ -390,7 +397,7 @@ function objHTML(){const p=sel;if(!p)return`<h3>📍 Объект</h3><div>На�
   if(p.sp==='res'){const r=RES[p.rt];return`<h3>🏢 ${r.n}</h3><div class="mut">${r.floors} этажей · комната ${r.room[0]}×${r.room[1]}. Купи квартиру, обставь мебелью и зови друзей.</div>${unitsHTML(p)}`;}
   if(DECOR[p.sp])return`<h3>${DECOR[p.sp]}</h3>`;
   if(p.sp==='cityhall'){const c=city||{};return`<h3>🏛 Мэрия</h3><div style="font-size:20px;margin:6px 0">💰 В казне: <b>${fmt(c.treasury||0)}</b></div>
-    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}.</div>`;}
+    <div class="mut">Сюда идут налоги: ${Math.round((c.sales_tax||0)*100)}% с продаж и ${c.prop_tax||0}💰 в сутки с недвижимости${c.newbie_exempt?' (новички освобождены)':''}, плюс налог на роскошь — с 4-го объекта ${WEALTH_TAX.tiers.map(([,r])=>r*100+'%').join('/')} стоимости в сутки.</div><span class="btn sm blue" data-act="psec" data-s="tax">🧾 Подробнее о налогах</span>`;}
   if(CLUBS[p.sp]){const C=CLUBS[p.sp];return`<h3>${C.ic} ${C.n}</h3><div>⚡ Внутри энергия копится <b>×3</b></div><span class="btn gold" data-act="club" data-id="${p.id}">Войти</span>`;}
   const pr=props.get(p.id);if(!pr)return'<div class="mut">Загрузка…</div>';
   if(p.sp==='bc')return`<h3>🏙 Бизнес-центр</h3><div class="mut">Офисная карьера и офисы для кофеен и ресторанов. Клерк: 12💰 · с 100 смен менеджер 20💰 · с 300 директор 30💰.</div>${jobBtn(pr)}<h3 style="margin-top:10px">Офисы</h3>${unitsHTML(p)}`;
@@ -492,10 +499,28 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
 let moreSec='goals';
 let moreOpen=false;
 function moreHTML(){const items=[['goals','📋','Цели','Чего добиться в игре'],...(LV()>=3?[['gear','🦺','Экипировка','Бонусы к производству']]:[]),['levels','⭐','Уровни','Что открывается дальше'],
-    ['top','🏆','Рейтинг','Самые богатые игроки'],['feed','📰','Лента','Что происходит в городе'],['gov','🏛','Мэрия','В разработке']];
+    ['top','🏆','Рейтинг','Самые богатые игроки'],['feed','📰','Лента','Что происходит в городе'],['tax','🧾','Налоги','Сколько платишь и почему'],['tg','📣','Telegram-канал',me&&!me.tg_bonus?`Подпишись — +${TG.gems}💎`:'Новости и обновления'],['gov','🏛','Мэрия','В разработке']];
   if(!moreOpen)return'<h3>☰ Меню</h3>'+items.map(([k,ic,n,d])=>`<div class="mitem" data-act="moresec" data-s="${k}"><span class="mic">${ic}</span><span><b>${n}</b><br><span class="mut">${d}</span></span><span class="mgo">›</span></div>`).join('');
-  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
+  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,tax:taxHTML,tg:tgHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
   return'<span class="btn sm blue" data-act="moreback">← Меню</span>'+body();}
+function tgHTML(){const got=me&&me.tg_bonus;
+  return`<h3>📣 Канал Пиксельграда</h3><div class="row">В канале ${TG.handle}: обновления, новые здания, выборы мэра, конкурсы и коды на кристаллы.</div>`+
+    (got?'<div class="row" style="color:#7bd389">✔ Награда за подписку получена. Спасибо!</div>':`<div class="row">Награда за подписку: <b>+${TG.gems}💎</b> (один раз)</div>
+    <div class="mut">1) Открой канал и нажми «Подписаться». 2) Вернись сюда и забери награду.</div>`)+
+    `<div style="margin-top:6px"><a class="btn blue" href="${TG.url}" target="_blank" rel="noopener" data-act="tgopen">Открыть ${TG.handle}</a>`+
+    (got?'':`<span class="btn gold ${tgOpened?'':'dis'}" data-act="tgclaim">Я подписался — забрать ${TG.gems}💎</span>`)+'</div>';}
+function taxHTML(){if(!me)return'';const c=city||{},t=myTax(),W=WEALTH_TAX;let lo=W.free+1;
+  const tiers=W.tiers.map(([m,r])=>{const s=`${lo}${m===Infinity?'+':'–'+m}`;lo=m+1;return`<div>• ${s}-й объект — <b>${r*100}%</b> его стоимости в сутки</div>`;}).join('');
+  const own=myProps().filter(p=>(p.kind==='land'||p.kind==='apt'||p.kind==='office')&&p.id!==me.home_unit).sort((a,b)=>a.price-b.price);
+  return`<h3>🧾 Налоги</h3>
+  <div class="row"><b>1. Налог на имущество</b> — ${c.prop_tax||0}💰 в сутки за каждый объект (ставку выбирает мэр).${c.newbie_exempt?' Новички до 4 ур. не платят.':''}</div>
+  <div class="row"><b>2. Налог на роскошь</b> — для тех, у кого много недвижимости. Чтобы один игрок не скупил весь город.<br>
+    <div>• твоя квартира-дом — не считается</div><div>• первые ${W.free} объекта — <b>0%</b></div>${tiers}
+    <div class="mut">Объекты считаются от дешёвых к дорогим: дорогие попадают в высокую ставку. Списывается раз в сутки ночью и идёт в казну.</div></div>
+  <div class="row"><b>3. Налог с продаж</b> — ${Math.round((c.sales_tax||0)*100)}% с продаж на базе.</div>
+  <div class="row">Твои объекты: <b>${t.n}</b> (облагаются роскошью: ${t.taxed})<br>Базовый: <b>${fmt(t.flat)}💰</b> · роскошь: <b>${fmt(t.prog)}💰</b> · итого <b>${fmt(t.flat+t.prog)}💰/сутки</b></div>`+
+  (own.length>W.free?own.map((p,i)=>`<div class="mut">${i+1}. ${p.kind==='apt'?'🚪 Квартира':p.kind==='office'?'🏢 Офис':'🟩 Участок'} ${fmt(p.price)}💰 → ${wealthRate(i+1)?fmt(p.price*wealthRate(i+1))+'💰 ('+wealthRate(i+1)*100+'%)':'0'}</div>`).join(''):'')+
+  `<div class="mut" style="margin-top:6px">Не хватает денег на налог — спишется сколько есть. Продай лишнее, если налог съедает доход.</div>`;}
 function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=`<h3>🦺 Рабочая экипировка</h3><div class="mut">Даёт бонусы к производству. Получить трудно: за многократные задания, стаж или дорого. Один предмет на слот.</div>`;
   for(const[slot,sn]of Object.entries(SLOTS)){h+=`<div class="row"><b>${sn}:</b> ${eq[slot]&&GEAR[eq[slot]]?GEAR[eq[slot]].ic+' '+GEAR[eq[slot]].n+` <span class="btn sm red" data-act="unequip" data-slot="${slot}">Снять</span>`:'<span class="mut">пусто</span>'}</div>`;}
   for(const[id,G]of Object.entries(GEAR)){const has=own.includes(id),on=eq[G.slot]===id;let how='',can=true;
@@ -530,7 +555,7 @@ function govHTML(){if(!city)return'<div class="mut">Загрузка…</div>';c
       if(me&&!cs.some(c=>c.uid===me.id))h+=l>=NEED.run?`<span class="btn sm gold" data-act="run" data-pos="${pos}">Выдвинуться (100💰)</span>`:`<div>${lock(NEED.run)} (выдвижение)</div>`;}
     h+='</div>';}
   if(me&&l>=NEED.run)h+=`<input id="slogan" maxlength="120" placeholder="Твой лозунг для выборов">`;
-  return h+`<div class="mut">Налоги идут в казну, из неё — зарплаты мэру и начальникам. Налог на имущество списывается раз в сутки.</div>`;}
+  return h+`<div class="mut">Налоги идут в казну, из неё — зарплаты мэру и начальникам. Налог на имущество и налог на роскошь (с 4-го объекта, дом не считается) списываются раз в сутки.</div>`;}
 let draft=null,cCat='body',pv=null,creatorFirst=false;
 const CATS=[['body','🧍','Тело'],['face','🙂','Лицо'],['hair','💇','Волосы'],['top','👕','Верх'],['bottom','👖','Низ'],['shoes','👟','Обувь'],['acc','🎒','Аксессуары']];
 function showCreator(first){draft={...DEFAULT_LOOK,...(me.look||{})};creatorFirst=first;cCat='body';
@@ -628,6 +653,9 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'daily':{const r=await act('claim_daily');if(r){$('auth').style.display='none';toast(`🎁 +${DAILY[Math.min(me.streak,7)-1]}💎 · серия ${me.streak} дн.`);}break;}
     case 'closedaily':$('auth').style.display='none';break;
+    case 'tgopen':tgOpened=Date.now();setTimeout(()=>{dirty=true;},300);break;
+    case 'tgclaim':{if(!tgOpened){toast('Сначала открой канал и подпишись');break;}if(Date.now()-tgOpened<5000){toast('Подпишись на канал и вернись 🙂');break;}
+      const r=await act('claim_tg');if(r)toast(`📣 Спасибо за подписку! +${TG.gems}💎`);break;}
     case 'buyskin':await act('buy_skin',{p_item:t.dataset.it});break;
     case 'equip':await act('equip_skin',{p_item:t.dataset.it||null});break;
     case 'vote':if(await act('vote',{p_election:+t.dataset.e,p_cand:t.dataset.c}))toast('🗳 Голос принят');loadGov();break;

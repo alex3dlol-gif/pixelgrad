@@ -119,6 +119,16 @@ export const UNLOCKS={1:'Работа и продажа на базе',2:'Сво
   5:'Точки в городе (ПВЗ, шаурма), работа у других игроков',6:'Голосование на выборах',7:'Офисы в бизнес-центрах',8:'Можно баллотироваться в мэры и начальники'};
 export const needFor=b=>b.reg==='B'?NEED.office:b.kind==='service'?NEED.service:b.kind==='proc'?NEED.proc:b.kind==='retail'?3:NEED.gather;
 
+// ===== Telegram-канал: разовая награда за подписку (сервер: claim_tg, sql/007) =====
+export const TG={url:'https://t.me/pixel_grad',handle:'@pixel_grad',gems:50};
+
+// ===== Прогрессивный налог на имущество (сервер: wealth_tax, sql/007; держать в синхроне!) =====
+// Квартира-«дом» не считается. Объекты сортируются от дешёвого к дорогому: первые FREE — без доп. налога,
+// дальше каждый следующий платит % своей стоимости в сутки по ступеням.
+export const WEALTH_TAX={free:3,tiers:[[6,0.01],[10,0.02],[Infinity,0.03]]};
+export const wealthRate=n=>n<=WEALTH_TAX.free?0:WEALTH_TAX.tiers.find(([m])=>n<=m)[1];
+export const wealthTax=prices=>[...prices].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*wealthRate(i+1),0);
+
 // ===== Ежедневная награда и скины (кристаллы 💎) =====
 export const DAILY=[5,5,10,10,15,20,40];
 export const SKINS={cap:{n:'Кепка',price:10,col:0xc0392b},ushanka:{n:'Ушанка',price:20,col:0x6b4a2f},helmet:{n:'Каска',price:25,col:0xf1c40f},
