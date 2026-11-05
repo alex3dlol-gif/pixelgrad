@@ -6,7 +6,7 @@ const WALLS={khrush:[0xc9b79c,0x8b5a2b],panel9:[0xb8c4c9,0x9c6b3e],panel16:[0xd6
 export const WALL_COLORS=['#c9b79c','#e8dcc0','#b8c4c9','#9fc5b0','#f4c7c3','#c3b1e1','#f6e7a1','#8fa3b8','#5d6d7e','#ffffff','#7a4a3a','#2f3640'];
 export const FLOOR_COLORS=['#8b5a2b','#a0743f','#c8a26b','#6b4a2f','#d9cbb0','#7f8c8d','#3b3b3b','#9c6b3e','#b5651d','#e8e2d4'];
 // где можно сесть/лечь: смещение внутри предмета (до поворота) и поза
-const SEATS={chair:[{x:.5,z:.55,pose:'sit',face:0}],sofa:[{x:.6,z:.55,pose:'sit',face:0},{x:1.4,z:.55,pose:'sit',face:0}],bed:[{x:1,z:.5,pose:'lie',face:0}]};
+const SEATS={chair:[{x:.5,z:.55,pose:'sit',face:0}],sofa:[{x:.6,z:.55,pose:'sit',face:0},{x:1.4,z:.55,pose:'sit',face:0}],lux_sofa:[{x:.6,z:.55,pose:'sit',face:0},{x:1.4,z:.55,pose:'sit',face:0}],bed:[{x:1,z:.5,pose:'lie',face:0}]};
 
 export function createRoom(renderer){
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x15121c);
@@ -29,6 +29,12 @@ export function createRoom(renderer){
     case 'lamp':B(g,.3,.05,.3,0x333333,.5,0,.5);B(g,.05,1.3,.05,0x333333,.5,0,.5);B(g,.4,.3,.4,0xfff1b0,.5,1.3,.5,true);break;
     case 'plant':B(g,.35,.35,.35,0xb5651d,.5,0,.5);for(let k=0;k<5;k++){const l=B(g,.12,.6,.12,0x2e7d32,.5+Math.cos(k*1.3)*.1,.3,.5+Math.sin(k*1.3)*.1);l.rotation.z=Math.cos(k*1.3)*.4;l.rotation.x=Math.sin(k*1.3)*.4;}break;
     case 'aquarium':{B(g,.9,.5,.5,0x6b4a2f,.5,0,.5);const w=B(g,.85,.5,.45,0x5dade2,.5,.5,.5);w.material=new THREE.MeshLambertMaterial({color:0x5dade2,transparent:true,opacity:.6});B(g,.12,.06,.04,0xf39c12,.4,.7,.5);B(g,.1,.05,.04,0xe74c3c,.65,.82,.45);}break;
+    // люкс: бархат + золото
+    case 'lux_sofa':B(g,1.95,.32,.88,0x1f6f6b,1,0,.5);B(g,1.95,.55,.24,0x1f6f6b,1,.32,.14);B(g,.18,.42,.88,0x18524f,.09,.32,.5);B(g,.18,.42,.88,0x18524f,1.91,.32,.5);
+      B(g,1.99,.05,.05,0xd4af37,1,.3,.94,true);B(g,1.99,.05,.05,0xd4af37,1,.85,.03,true);B(g,.06,.12,.06,0xd4af37,.12,0,.12,true);B(g,.06,.12,.06,0xd4af37,1.88,0,.12,true);B(g,.06,.12,.06,0xd4af37,.12,0,.88,true);B(g,.06,.12,.06,0xd4af37,1.88,0,.88,true);
+      B(g,.4,.3,.12,0xd4af37,.55,.45,.35);B(g,.4,.3,.12,0xe8c547,1.45,.45,.35);break;
+    case 'lux_lamp':B(g,.5,.04,.5,0xd4af37,.5,0,.5,true);B(g,.04,1.7,.04,0xd4af37,.5,0,.5,true);B(g,.7,.05,.7,0xd4af37,.5,1.7,.5,true);
+      for(let k=0;k<8;k++){const a=k/8*6.283;B(g,.07,.22,.07,0xe8f6ff,.5+Math.cos(a)*.3,1.48,.5+Math.sin(a)*.3,true);}B(g,.22,.3,.22,0xfff8d6,.5,1.42,.5,true);break;
     case 'rug':B(g,1.9,.03,1.9,0xd4a76a,1,0,1);B(g,1.5,.035,1.5,0xb5651d,1,0,1);B(g,1,.04,1,0xe8c547,1,0,1);break;
     }
     g.userData={it,w:f.w,d:f.d};return g;}

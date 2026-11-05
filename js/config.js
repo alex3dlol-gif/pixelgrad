@@ -21,8 +21,21 @@ export const GOODS={
   juice:{n:'Сок',ic:'🧃',base:14,target:150,col:0xf39c12},
   cake:{n:'Торт',ic:'🎂',base:95,target:40,col:0xff8fab},
   clothes:{n:'Одежда',ic:'👕',base:65,target:60,col:0x3d6ea6},
+  // ===== редкое (sql/011): падает с шансом на производстве, торгуется только между игроками =====
+  marble:{n:'Мрамор',ic:'🏛️',base:300,target:1,col:0xf2efe9,rare:true,from:'карьер, кирпичный завод'},
+  parts:{n:'Запчасти',ic:'⚙️',base:250,target:1,col:0x95a5a6,rare:true,from:'пилорама, мебельная мастерская'},
+  wine:{n:'Выдержанное вино',ic:'🍷',base:200,target:1,col:0x8e1c3a,rare:true,from:'сад, соковарня'},
+  truffle:{n:'Трюфели',ic:'🍄',base:200,target:1,col:0x5b4636,rare:true,from:'огород'},
+  dfurn:{n:'Дизайнерская мебель',ic:'🛋️',base:600,target:1,col:0xd4af37,rare:true,from:'мебельная мастерская 5+ ур.'},
+  lic_restaurant:{n:'Лицензия: ресторан',ic:'📜',base:5400,target:1,col:0xf4ecd8,rare:true,lic:'restaurant'},
+  lic_canteen:{n:'Лицензия: столовая',ic:'📜',base:1980,target:1,col:0xf4ecd8,rare:true,lic:'canteen'},
+  lic_cafe:{n:'Лицензия: кафе',ic:'📜',base:1620,target:1,col:0xf4ecd8,rare:true,lic:'cafe'},
+  lic_confectionery:{n:'Лицензия: кондитерская',ic:'📜',base:1080,target:1,col:0xf4ecd8,rare:true,lic:'confectionery'},
+  lic_tailor:{n:'Лицензия: ателье',ic:'📜',base:990,target:1,col:0xf4ecd8,rare:true,lic:'tailor'},
+  lic_workshop:{n:'Лицензия: мебельная мастерская',ic:'📜',base:900,target:1,col:0xf4ecd8,rare:true,lic:'workshop'},
 };
-export const GK=Object.keys(GOODS);
+export const GK=Object.keys(GOODS).filter(g=>!GOODS[g].rare);   // обычные товары (база)
+export const RK=Object.keys(GOODS).filter(g=>GOODS[g].rare);    // редкое и лицензии
 
 // Районы: c — город (земля), v — деревня, d — дачи, p — промзона, o — порт, B — офис в бизнес-центре
 export const REGN={c:'город',v:'деревня',d:'дачи',p:'промзона',o:'порт',B:'бизнес-центр'};
@@ -63,6 +76,10 @@ export const BLD={
 export const ECON={rate:.3,svc:.4,wage:.35,cost:2.5,mat:3};
 for(const b of Object.values(BLD)){b.rate=Math.round(b.rate*((b.kind==='service'||b.kind==='retail')?ECON.svc:ECON.rate)*100)/100;
   b.wage=Math.round(b.wage*ECON.wage*100)/100;b.cost=Math.round(b.cost*({gather:b.cost<200?1.5:3,proc:6,retail:5,service:6}[b.kind]||ECON.cost)/10)*10;for(const k in b.mat)b.mat[k]=Math.ceil(b.mat[k]*ECON.mat);}
+// топ-бизнесы: лицензия (город продаёт раз в сутки на аукционе) + редкое — только для новых построек
+const RARE_MAT={restaurant:{lic_restaurant:1,wine:2,truffle:2,marble:2},canteen:{lic_canteen:1,truffle:1},cafe:{lic_cafe:1,wine:1},
+  confectionery:{lic_confectionery:1},tailor:{lic_tailor:1},workshop:{lic_workshop:1}};
+for(const[k,m]of Object.entries(RARE_MAT))if(BLD[k])Object.assign(BLD[k].mat,m);
 export const BUILD_MIN={gather:3,retail:10,proc:15,service:30,office:60};
 export const ENERGY={base:60,perLvl:10,cap:150,cap2:250,perLvl2:5,regenMin:3,shift:1,quest:2,refillGems:20};
 export const HIRE_FEE=100, MAX_WORKERS=3, SHIFT_SEC=20, BUILD_SEC=20, START_MONEY=400, OWNER_JOB_PAY=7;
@@ -99,6 +116,8 @@ export const DORM_ROOM=[3,3];
 
 // Мебель для квартир — только из того, что делают игроки
 export const FURN={
+  lux_sofa:{n:'Дизайнерский диван',ic:'🛋️',cost:{dfurn:1,furniture:2},money:300,w:2,d:1,lux:true},
+  lux_lamp:{n:'Хрустальная люстра',ic:'💎',cost:{dfurn:1},money:200,w:1,d:1,lux:true},
   bed:{n:'Кровать',ic:'🛏️',cost:{furniture:3},money:20,w:2,d:1},
   sofa:{n:'Диван',ic:'🛋️',cost:{furniture:3},money:20,w:2,d:1},
   table:{n:'Стол',ic:'🟫',cost:{furniture:2},money:10,w:1,d:1},
@@ -129,14 +148,14 @@ export const titleOf=l=>{let t='';for(const[k,v]of Object.entries(TITLES))if(l>=
 // ===== Уровни зданий 1..10 (сервер: upgrade/_blv_*, sql/008) =====
 export const BLV={max:10,need:l=>l<=5?l:[9,10,12,15,18][l-6],mult:l=>l<=5?1+.4*(l-1):2.6+.2*(l-5),workers:l=>3+(l>=3)+(l>=5)+(l>=7)+(l>=10),
   costMul:[1,2,4,8,12,16,24,32,48],timeMul:[3,8,20,60,90,120,180,240,360],
-  mat:l=>({planks:6*l,...(l>=3?{bricks:5*(l-2)}:{}),...(l>=6?{stone:20*(l-5)}:{})}),
+  mat:l=>({planks:6*l,...(l>=3?{bricks:5*(l-2)}:{}),...(l>=6?{stone:20*(l-5),marble:l-5}:{}),...(l>=8?{parts:1}:{})}),
   tier:l=>l<=3?'Мастерская':l<=5?'Предприятие':l<=7?'Фабрика':l<=9?'Комбинат':'Флагман'};
 // ===== Модули зданий (сервер: add_module) =====
 export const MODS={store:{n:'Склад',ic:'📦',pl:5,bl:2,k:2,mat:{planks:10},eff:'+200 к складу'},
   brig:{n:'Бригадир',ic:'👷',pl:9,bl:3,k:3,mat:{planks:8,bricks:5},eff:'зарплаты работникам −30%'},
-  tech:{n:'Техника',ic:'🚜',pl:11,bl:4,k:5,mat:{bricks:10,stone:20},eff:'+15% выпуска',kinds:['gather','proc']},
+  tech:{n:'Техника',ic:'🚜',pl:11,bl:4,k:5,mat:{bricks:10,stone:20,parts:2},eff:'+15% выпуска',kinds:['gather','proc']},
   ads:{n:'Реклама',ic:'📣',pl:11,bl:4,k:5,mat:{planks:10,bricks:10},eff:'+30% спроса',kinds:['service','retail']},
-  auto:{n:'Автоматика',ic:'🤖',pl:13,bl:5,k:8,mat:{bricks:20,stone:30},eff:'офлайн 50% вместо 25%'}};
+  auto:{n:'Автоматика',ic:'🤖',pl:13,bl:5,k:8,mat:{bricks:20,stone:30,parts:3},eff:'офлайн 50% вместо 25%'}};
 export const needFor=b=>b.reg==='B'?NEED.office:b.kind==='service'?NEED.service:b.kind==='proc'?NEED.proc:b.kind==='retail'?3:NEED.gather;
 
 // ===== Telegram-канал: разовая награда за подписку (сервер: claim_tg, sql/007) =====
