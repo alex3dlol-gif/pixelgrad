@@ -164,9 +164,16 @@ export const TG={url:'https://t.me/pixel_grad',handle:'@pixel_grad',gems:50};
 // ===== Прогрессивный налог на имущество (сервер: wealth_tax, sql/007; держать в синхроне!) =====
 // Квартира-«дом» не считается. Объекты сортируются от дешёвого к дорогому: первые FREE — без доп. налога,
 // дальше каждый следующий платит % базы в сутки. База = max(цена, minBase) + стоимость стройки × уровень. Лимит max объектов.
-export const WEALTH_TAX={free:3,minBase:1000,max:15,tiers:[[6,0.01],[10,0.02],[Infinity,0.03]]};
+// Сверх лимита (объекты, купленные до лимита): с over-го облагаемого — 10% и ещё flat💰 за каждый (sql/013).
+export const WEALTH_TAX={free:3,minBase:1000,max:15,tiers:[[6,0.01],[10,0.02],[15,0.03],[Infinity,0.10]],over:15,flat:5000};
 export const wealthRate=n=>n<=WEALTH_TAX.free?0:WEALTH_TAX.tiers.find(([m])=>n<=m)[1];
-export const wealthTax=bases=>[...bases].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*wealthRate(i+1),0);
+export const wealthOver=n=>WEALTH_TAX.flat*Math.max(0,n-WEALTH_TAX.over);
+export const wealthTax=(bases,cut=0)=>[...bases].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*wealthRate(i+1),0)*(1-cut)+wealthOver(bases.length);
+// ===== Куда тратить богатым (sql/013): деньги сгорают =====
+export const YACHTS={boat:{n:'Катер',ic:'🚤',price:25000,r:1},yacht:{n:'Яхта',ic:'🛥',price:120000,r:2},mega:{n:'Мегаяхта',ic:'🛳',price:400000,r:3}};
+export const PROJECTS={tower:{n:'Телебашня Пиксельграда',ic:'🗼',min:1000,buff:'город покупает на 10% больше товаров — навсегда, для всех'}};
+// ===== Экспорт в другой город (sql/014) =====
+export const EXPORT={city:'Новоморск',lvl:6,every:3,hours:6,fee:.1,share:.4,goods:['furniture','cake','clothes','cheese','bricks','smoked','juice']};
 
 // ===== Ежедневная награда и скины (кристаллы 💎) =====
 export const DAILY=[5,5,10,10,15,20,40];

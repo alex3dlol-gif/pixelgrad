@@ -42,15 +42,15 @@ create or replace function public._ref_xp() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare d int; m profiles; today int;
 begin
-  if new.ref_by is null or coalesce(current_setting('pg.ref_inner', true), '') = '1' then return new; end if;
+  if new.ref_by is null or coalesce(current_setting('pixelgrad.ref_inner', true), '') = '1' then return new; end if;
   d := new.xp - old.xp;
   if d > 0 then
     if new.ref_at > now() - interval '3 days' then
       new.xp := new.xp + d / 2; d := d + d / 2; end if;
     if new.created_at > now() - interval '7 days' and d >= 10 then
-      perform set_config('pg.ref_inner', '1', true);
+      perform set_config('pixelgrad.ref_inner', '1', true);
       update profiles set xp = xp + d / 10 where id = new.ref_by;
-      perform set_config('pg.ref_inner', '', true);
+      perform set_config('pixelgrad.ref_inner', '', true);
     end if;
   end if;
   if new.ref_done_at is null and _lvl(new.xp) >= 5 then
@@ -58,7 +58,7 @@ begin
     new.money := new.money + 300;
     select count(*) into today from profiles
       where ref_by = new.ref_by and ref_done_at > now() - interval '24 hours' and id <> new.id;
-    perform set_config('pg.ref_inner', '1', true);
+    perform set_config('pixelgrad.ref_inner', '1', true);
     update profiles set
       ref_count = ref_count + 1,
       gems = gems + case when today < 5 then 40 else 0 end,
@@ -67,7 +67,7 @@ begin
         || case when not skins ? 'beret' then '["beret"]'::jsonb else '[]'::jsonb end
         || case when ref_count + 1 >= 15 and not skins ? 'goldhelm' then '["goldhelm"]'::jsonb else '[]'::jsonb end
       where id = new.ref_by returning * into m;
-    perform set_config('pg.ref_inner', '', true);
+    perform set_config('pixelgrad.ref_inner', '', true);
     if m.id is not null then
       insert into events(uid, kind, txt, data)
         values (m.id, 'ref', new.nick || ' дорос до 5 уровня — ' || m.nick || ' получает награду за приглашение ('

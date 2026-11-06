@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,GIVEAWAY,WEALTH_TAX,wealthRate,wealthTax,BLV,MODS,titleOf,MAX_LVL,RK,REF,refTaxCut} from './config.js';
+import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,GIVEAWAY,WEALTH_TAX,wealthRate,wealthTax,BLV,MODS,titleOf,MAX_LVL,RK,REF,refTaxCut,YACHTS,PROJECTS,EXPORT,wealthOver} from './config.js';
 import {createWorld} from './world.js';
 import {createRoom,WALL_COLORS,FLOOR_COLORS} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
@@ -55,7 +55,7 @@ const myProps=()=>me?[...props.values()].filter(p=>p.owner===me.id):[];
 // налоги игрока в сутки: базовый (мэр, за каждый объект) + прогрессивный (за объекты сверх WEALTH_TAX.free, дом не считается)
 function myTax(){const own=myProps().filter(p=>p.kind==='land'||p.kind==='apt'||p.kind==='office'),c=city||{};
   const flat=c.newbie_exempt&&LV()<4?0:(c.prop_tax||0)*own.length,taxed=own.filter(p=>p.id!==me.home_unit);
-  return{n:own.length,taxed:taxed.length,flat,prog:Math.round(wealthTax(taxed.map(taxBase))*(1-refTaxCut(me.ref_count))),debt:+me.tax_debt||0};}
+  return{n:own.length,taxed:taxed.length,flat,prog:Math.round(wealthTax(taxed.map(taxBase),refTaxCut(me.ref_count))),over:wealthOver(taxed.length),debt:+me.tax_debt||0};}
 const taxBase=p=>Math.max(p.price,WEALTH_TAX.minBase)+(p.building&&BLD[p.building]?BLD[p.building].cost*(p.level||1):0);
 let tgOpened=0;
 const myPlots=()=>myProps().filter(p=>p.kind==='land').map(p=>({...plots[p.plot],...p,x:plots[p.plot].x,y:plots[p.plot].y}));
@@ -72,7 +72,7 @@ function onEvent(e){events.push(e);if(events.length>60)events.shift();
   if(e.kind==='join'&&e.uid)fetchProfile(e.uid);
   if(e.kind==='rare'&&me&&e.uid===me.id){const G=GOODS[e.data?.item];toast(`🎉 Находка! ${G?.ic||'💎'} ${G?.n||''}${e.data?.n>1?' ×'+e.data.n:''} — смотри «Склад»`,6000);const m=world.me;if(m)world.float(`🎉 ${G?.ic||'💎'}`,m.x,1.9,m.y,'#ffd166');}
   renderTicker();dirty=true;}
-const evIc=e=>e.kind==='online'?'🟢 ':e.kind==='offline'?'⚪ ':'';
+const evIc=e=>e.kind==='online'?'🟢 ':e.kind==='offline'?'⚪ ':e.kind==='yacht'?'🛥 ':e.kind==='project'?'🗼 ':e.kind==='export'||e.kind==='export_paid'?'🚢 ':e.kind==='ref'?'🤝 ':'';
 function renderTicker(){$('ticker').innerHTML=events.slice(-6).reverse().map((e,i)=>`<div style="opacity:${1-i*.14}">${evIc(e)}${esc(e.txt)}</div>`).join('');}
 
 // ================= ЗАГРУЗКА И REALTIME =================
@@ -152,7 +152,7 @@ async function afterLogin(){
 function enterWorld(){world.setFog(false);
   const h=homePlot(),ok=me.last_x!=null&&world.walkable(Math.round(me.last_x),Math.round(me.last_y));const sx=ok?me.last_x:h.x0+1,sy=ok?me.last_y:h.y0+3;
   world.setMe(me.nick,me.color,Math.round(sx),Math.round(sy),me.skin,me.look);world.jump(sx,sy);
-  joinPresence();act('settle',{},true);rpc('hello').catch(()=>{});loadQuestLog();loadChat();loadShips();if(me.club)act('club_leave',{},true);
+  joinPresence();loadExtras();act('settle',{},true);rpc('hello').catch(()=>{});loadQuestLog();loadChat();loadShips();if(me.club)act('club_leave',{},true);
   if(longOn()&&longLeft()<=0)toast('🕒 Долгая смена закончилась! Забери награду во вкладке «💼 Дела»',9000);tab='work';
   if(me.look&&me.last_daily!==new Date().toISOString().slice(0,10))showDaily();else setTimeout(maybeTg,1500);
   dirty=true;
@@ -525,12 +525,48 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
 let moreSec='goals';
 let moreOpen=false;
 function moreHTML(){const items=[...(gwOn()?[['gw','🎁','Розыгрыш',`${SKINS[GIVEAWAY.skin].n} + ${GIVEAWAY.gems}💎 · ещё ${gwLeft()}`]]:[]),['goals','📋','Цели','Чего добиться в игре'],...(LV()>=3?[['gear','🦺','Экипировка','Бонусы к производству']]:[]),['levels','⭐','Уровни','Что открывается дальше'],
+    ['tower','🗼','Телебашня',proj?`Стройка всем городом · ${Math.floor(proj.raised*100/proj.goal)}%`:'Стройка всем городом'],['yacht','⚓','Яхт-клуб','Катера и яхты у причала'],['export','🚢','Экспорт в '+EXPORT.city,'Контейнеровоз каждые '+EXPORT.every+' часа'],
     ['top','🏆','Рейтинг','Самые богатые игроки'],['feed','📰','Лента','Что происходит в городе'],['ref','🤝','Пригласи друга','Скины, редкие ресурсы и скидка налога'],['tax','🧾','Налоги','Сколько платишь и почему'],['tg','📣','Telegram-канал',me&&!me.tg_bonus?`Подпишись — +${TG.gems}💎`:'Новости и обновления'],['gov','🏛','Мэрия','В разработке']];
   if(!moreOpen)return'<h3>☰ Меню</h3>'+items.map(([k,ic,n,d])=>`<div class="mitem" data-act="moresec" data-s="${k}"><span class="mic">${ic}</span><span><b>${n}</b><br><span class="mut">${d}</span></span><span class="mgo">›</span></div>`).join('');
-  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,tax:taxHTML,tg:tgHTML,ref:refHTML,gw:()=>`<h3>🎁 Розыгрыш в Telegram</h3>${gwBody()}<a class="btn gold" href="${GIVEAWAY.url}" target="_blank" rel="noopener" data-act="tgopen">Участвовать в ${TG.handle}</a>`,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
+  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,tax:taxHTML,tg:tgHTML,ref:refHTML,tower:towerHTML,yacht:yachtHTML,export:exportHTML,gw:()=>`<h3>🎁 Розыгрыш в Telegram</h3>${gwBody()}<a class="btn gold" href="${GIVEAWAY.url}" target="_blank" rel="noopener" data-act="tgopen">Участвовать в ${TG.handle}</a>`,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
   return'<span class="btn sm blue" data-act="moreback">← Меню</span>'+body();}
+// ===== Телебашня, яхт-клуб, экспорт (sql/013–014) =====
+var proj=null,projTop=[],exq=null,myEx=[];
+const hhmm=t=>new Date(t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+async function nicksOf(ids){const need=ids.filter(i=>!profiles.has(i));if(need.length){const {data}=await sb.from('profiles').select('id,nick,color,money,shifts').in('id',need);for(const p of data||[])profiles.set(p.id,p);}}
+async function loadExtras(){if(!sb)return;try{
+  const [y,p,d,q,o]=await Promise.all([sb.from('profiles').select('nick,color,yacht').not('yacht','is',null),sb.from('city_projects').select('*').eq('id','tower').maybeSingle(),
+    sb.from('project_donors').select('uid,amt').eq('pid','tower').order('amt',{ascending:false}).limit(5),rpc('export_quote'),
+    sb.from('export_orders').select('uid,good,qty,pay,ship_at,arrive_at,paid').or(`ship_at.gt."${new Date().toISOString()}"${me?`,and(uid.eq.${me.id},paid.eq.false)`:''}`).limit(500)]);
+  world.setYachts((y.data||[]).map(r=>({nick:r.nick,color:r.color,kind:r.yacht})));
+  if(p.data){const ch=!proj||proj.raised!==p.data.raised||proj.done_at!==p.data.done_at;proj=p.data;
+    if(ch)world.setTower(proj.raised/proj.goal,!!proj.done_at,proj.done_at?'🗼 ТЕЛЕБАШНЯ ПИКСЕЛЬГРАДА':`🗼 Стройка телебашни · ${Math.floor(proj.raised*100/proj.goal)}%`);}
+  projTop=d.data||[];await nicksOf(projTop.map(r=>r.uid));exq=q;
+  const rows=o.data||[],next=rows.filter(r=>Date.parse(r.ship_at)>Date.now());myEx=me?rows.filter(r=>r.uid===me.id&&!r.paid):[];
+  world.setExport({n:next.length,ship:next.length?Math.min(...next.map(r=>Date.parse(r.ship_at))):0});dirty=true;}catch(e){console.warn('extras',e);}}
+setInterval(()=>{if(me&&document.visibilityState==='visible')loadExtras();},60000);
+function towerHTML(){if(!proj)return'<h3>🗼 Телебашня</h3><div class="mut">Загрузка…</div>';const P=PROJECTS.tower,pc=Math.min(100,proj.raised*100/proj.goal);
+  return`<h3>${P.ic} ${P.n}</h3><div class="mut">Стройка всем городом. Деньги уходят на стройку (не возвращаются). Когда башня достроится — ${P.buff}. Топ-3 вкладчика навсегда на табличке.</div>
+  <div class="row">Собрано: <b>${fmt(proj.raised)}</b> / ${fmt(proj.goal)}💰 (${pc.toFixed(1)}%)<div class="bar"><i style="width:${pc}%"></i></div></div>`+
+  (proj.done_at?'<div class="row" style="color:#7bd389">✔ Башня построена! Спрос города +10%</div>':
+  `<div class="row">Вложить: <input id="pj_amt" type="number" min="${P.min}" step="1000" value="${Math.max(P.min,Math.min(10000,Math.floor((me?.money||0)/1000)*1000))}" style="width:110px;display:inline-block"> <span class="btn sm gold" data-act="donate">Вложить 💰</span><br><span class="mut">минимум ${fmt(P.min)}💰</span></div>`)+
+  (projTop.length?'<h3>🏅 Главные вкладчики</h3>'+projTop.map((r,i)=>{const p=profiles.get(r.uid);return`<div class="row" style="${me&&r.uid===me.id?'background:#3a3148':''}">${['🥇','🥈','🥉','4.','5.'][i]} <span style="color:${p?.color||'#fff'}">■</span> ${esc(p?.nick||'?')} — <b>${fmt(r.amt)}💰</b></div>`;}).join(''):'<div class="mut">Пока никто не вложился — стань первым на табличке.</div>')+
+  `<span class="btn sm" data-act="flyx" data-x="214.5" data-y="152">📍 Показать на карте</span>`;}
+function yachtHTML(){if(!me)return'';const cur=me.yacht,r=YACHTS[cur]?.r||0;
+  return`<h3>⚓ Яхт-клуб</h3><div class="mut">Твоё судно стоит у причала яхт-клуба (у дороги к маяку) с твоим ником — его видят все. Чистый статус: денег не приносит.</div>`+
+  (cur?`<div class="row" style="color:#7bd389">✔ У тебя ${YACHTS[cur].ic} <b>${YACHTS[cur].n}</b></div>`:'')+
+  Object.entries(YACHTS).map(([k,Y])=>`<div class="row">${Y.ic} <b>${Y.n}</b> · ${fmt(Y.price)}💰 ${Y.r<=r?'<span class="mut">✔ есть не хуже</span>':`<span class="btn sm gold ${me.money>=Y.price?'':'dis'}" data-act="buyyacht" data-it="${k}">Купить</span>`}</div>`).join('')+
+  `<div class="mut">Покупка нового судна заменяет старое (без возврата денег).</div><span class="btn sm" data-act="flyx" data-x="209" data-y="166">📍 Показать на карте</span>`;}
+function exportHTML(){if(!me)return'';const E=EXPORT,lv=LV();let h=`<h3>🚢 Экспорт в ${E.city}</h3><div class="mut">Наш город не скупает всё подряд — дорогую переработку можно отправить в ${E.city}. Контейнеровоз уходит каждые ${E.every} часа, плывёт ${E.hours} ч, деньги приходят по прибытии. У ${E.city}а суточная квота на каждый товар: чем больше отгрузили сегодня, тем ниже цена. Фрахт ${E.fee*100}% уже вычтен.</div>`;
+  if(lv<E.lvl)return h+`<div class="row">🔒 Откроется на ${E.lvl} уровне</div>`;if(!exq)return h+'<div class="mut">Загрузка…</div>';
+  h+=`<div class="row">Ближайший рейс: <b>${hhmm(exq.ship_at)}</b> · прибытие ~${hhmm(Date.parse(exq.ship_at)+E.hours*36e5)}</div>`;
+  for(const g of E.goods){const q=exq.goods[g];if(!q)continue;const G=GOODS[g],have=Math.floor(inv(me,g)),left=Math.max(0,Math.min(q.quota-q.filled,Math.floor(q.quota*E.share)-q.mine));
+    h+=`<div class="row">${G.ic} <b>${G.n}</b> · ${q.price}💰/шт <span class="mut">(здесь ~${Math.round(price(g))}💰)</span><br><span class="mut">квота: ${fmt(Math.max(0,q.quota-q.filled))}/${fmt(q.quota)} · тебе можно ещё ${fmt(left)} · на складе ${fmt(have)}</span>`+
+      (have>=1&&left>=1?`<br><input id="ex_${g}" type="number" min="1" value="${Math.min(have,left)}" style="width:80px;display:inline-block"> <span class="btn sm gold" data-act="export" data-it="${g}">Погрузить</span>`:'')+'</div>';}
+  if(myEx.length)h+='<h3>📦 Твои грузы в пути</h3>'+myEx.map(r=>`<div class="row">${GOODS[r.good]?.ic||''} ${fmt(r.qty)} ${GOODS[r.good]?.n||r.good} → <b>${fmt(r.pay)}💰</b> <span class="mut">${Date.parse(r.ship_at)>Date.now()?'погрузка, отплытие '+hhmm(r.ship_at):'в пути, прибытие '+hhmm(r.arrive_at)}</span></div>`).join('');
+  return h+`<span class="btn sm" data-act="flyx" data-x="190.5" data-y="166">📍 Показать порт</span>`;}
 // ===== Пригласи друга (sql/012) =====
-let refList=null;
+var refList=null;
 const refLink=()=>REF.url+encodeURIComponent(me.nick);
 const refCan=()=>me&&!me.ref_by&&Date.now()-Date.parse(me.created_at)<REF.bindHours*36e5&&LV()<REF.lvl;
 async function loadRefs(){if(!sb||!me)return;const {data}=await sb.from('profiles').select('nick,color,xp,ref_done_at').eq('ref_by',me.id).order('ref_at',{ascending:false}).limit(50);refList=data||[];dirty=true;}
@@ -559,7 +595,7 @@ function taxHTML(){if(!me)return'';const c=city||{},t=myTax(),W=WEALTH_TAX;let l
   <div class="row"><b>1. Налог на имущество</b> — ${c.prop_tax||0}💰 в сутки за каждый объект (ставку выбирает мэр).${c.newbie_exempt?' Новички до 4 ур. не платят.':''}</div>
   <div class="row"><b>2. Налог на роскошь</b> — для тех, у кого много недвижимости. Чтобы один игрок не скупил весь город.<br>
     <div class="mut">База = цена объекта (не меньше ${fmt(W.minBase)}💰) + стоимость стройки × уровень здания.</div>
-    <div>• твоя квартира-дом — не считается</div><div>• первые ${W.free} объекта — <b>0%</b></div>${tiers}
+    <div>• твоя квартира-дом — не считается</div><div>• первые ${W.free} объекта — <b>0%</b></div>${tiers}<div>• с ${W.over+1}-го (сверх лимита, куплены раньше) — ещё <b>+${fmt(W.flat)}💰</b> за каждый</div>
     <div class="mut">Объекты считаются от дешёвых к дорогим: дорогие попадают в высокую ставку. Списывается раз в сутки ночью и идёт в казну.</div></div>
   <div class="row"><b>Лимит:</b> не больше <b>${W.max}</b> объектов на игрока (вместе с домом). Не хватило денег на налог — остаток становится <b>долгом</b>, и пока он есть, купить новое нельзя.</div>
   <div class="row"><b>3. Налог с продаж</b> — ${Math.round((c.sales_tax||0)*100)}% с продаж на базе.</div>
@@ -725,6 +761,11 @@ document.addEventListener('click',async e=>{
     case 'tgopen':tgOpened=Date.now();setTimeout(()=>{dirty=true;$('tgclaimbtn')?.classList.remove('dis');},300);break;
     case 'tgclaim':{if(!tgOpened){toast('Сначала открой канал и подпишись');break;}if(Date.now()-tgOpened<5000){toast('Подпишись на канал и вернись 🙂');break;}
       const r=await act('claim_tg');if(r){if($('tgclaimbtn'))$('auth').style.display='none';}if(r)toast(`📣 Спасибо за подписку! +${TG.gems}💎`);break;}
+    case 'donate':{const v=Math.floor(+($('pj_amt')?.value||0));if(v<PROJECTS.tower.min){toast(`Минимум ${PROJECTS.tower.min}💰`);break;}
+      if(!confirm(`Вложить ${fmt(v)}💰 в телебашню? Деньги не возвращаются.`))break;if(await act('donate_project',{p_id:'tower',p_amount:v})){toast(`🗼 Спасибо! −${fmt(v)}💰`);proj=null;loadExtras();}break;}
+    case 'buyyacht':{const Y=YACHTS[t.dataset.it];if(!Y||!confirm(`Купить «${Y.n}» за ${fmt(Y.price)}💰?`))break;if(await act('buy_yacht',{p_kind:t.dataset.it})){toast(`${Y.ic} ${Y.n} уже у причала яхт-клуба!`);loadExtras();world.flyTo(209,166,mobile?11:14);}break;}
+    case 'export':{const g=t.dataset.it,v=Math.floor(+($('ex_'+g)?.value||0));if(v<1)break;if(await act('export_goods',{p_good:g,p_qty:v})){toast(`🚢 Погружено на контейнеровоз в ${EXPORT.city}`);loadExtras();}break;}
+    case 'flyx':world.flyTo(+t.dataset.x,+t.dataset.y,mobile?11:14);if(mobile)sheetOpen=false;break;
     case 'goref':tab='more';moreSec='ref';moreOpen=true;sheetOpen=true;lastBody='';break;
     case 'refcopy':try{await navigator.clipboard.writeText(refLink());toast('🔗 Ссылка скопирована');}catch{toast(refLink(),6000);}break;
     case 'refshare':try{await navigator.share({title:'Пиксельград',text:'Залетай в Пиксельград — онлайн-экономика в пиксельном городе',url:refLink()});}catch{}break;
@@ -956,6 +997,7 @@ function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/
 requestAnimationFrame(loop);
 renderUI();
 // отладка обучения без сервера: ?offline&obtest
+if(!sb&&new URLSearchParams(location.search).has('demo')){world.setYachts([{nick:'kostiks',color:'#ffd166',kind:'mega'},{nick:'01',color:'#e74c3c',kind:'yacht'},{nick:'Pelmeni',color:'#3498db',kind:'boat'},{nick:'alex3dlol',color:'#2ecc71',kind:'yacht'}]);new URLSearchParams(location.search).has('towerdone')?world.setTower(1,true,'🗼 ТЕЛЕБАШНЯ ПИКСЕЛЬГРАДА'):world.setTower(.37,false,'🗼 Стройка телебашни · 37%');world.setExport({n:14,ship:Date.now()+36e5});}
 {const r=new URLSearchParams(location.search).get('ref');if(r)localStorage.setItem('pg_ref',r.slice(0,16));}
 if(!sb&&new URLSearchParams(location.search).has('obtest')){me={id:'t',nick:'Тест',color:'#ffd166',look:null,skin:null,xp:0,money:0,gems:0,energy:60,energy_at:new Date().toISOString(),shifts:0,inv:{},furn:{}};startOnboarding();setTimeout(()=>{$('auth').style.display='none';},0);}
 if(new URLSearchParams(location.search).has('film'))import('./film.js').then(f=>f.run({world,room,CLUBS,setMode:v=>{mode=v;},$}));
