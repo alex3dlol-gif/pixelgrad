@@ -84,7 +84,7 @@ export function createWorld(canvas,{mobile}){
   const blockFoot=(p,full)=>{for(let y=p.y0+(full?0:1);y<=p.y0+(full?1:2);y++)for(let x=p.x0+(full?0:1);x<=p.x0+(full?3:2);x++)walk[I(x,y)]=0;};
 
   // ================= THREE =================
-  const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
   renderer.setPixelRatio(1);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.BasicShadowMap;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x8fbfe0);
   const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4a6b3a,1.0);scene.add(hemi);
@@ -863,7 +863,7 @@ export function createWorld(canvas,{mobile}){
     const sx=Math.round(camT.x/2)*2,sz=Math.round(camT.z/2)*2;sun.position.set(sx-30,60,sz+20);sun.target.position.set(sx,0,sz);}
   // холст — ровно видимая область (на телефоне 100vh больше экрана → клики и подписи съезжали)
   function resize(){const w=innerWidth,h=innerHeight;canvas.style.width=w+'px';canvas.style.height=h+'px';
-    PX=Math.max(1,Math.min(4,Math.round(Math.min(w,h*1.6)/540)));renderer.setSize(Math.ceil(w/PX),Math.ceil(h/PX),false);updateCam();}
+    PX=Math.max(1/Math.min(devicePixelRatio||1,2),Math.min(4,Math.min(w,h*1.6)/540)/1.5);/* мягкая графика: рендер ~1.5× крупнее прежнего + плавное растягивание */renderer.setSize(Math.ceil(w/PX),Math.ceil(h/PX),false);updateCam();}
   addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,200));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
   const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),gplane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
   function groundAt(cx,cy){ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(ndc,cam);return ray.ray.intersectPlane(gplane,new THREE.Vector3());}
