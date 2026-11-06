@@ -68,6 +68,9 @@ export function createWorld(canvas,{mobile}){
   const MARINA={x:208,y0:158,y1:174},TOWER={x:214.5,y:150.5};
   for(let y=MARINA.y0;y<=MARINA.y1;y++)for(let x=MARINA.x;x<=MARINA.x+1;x++)grid[I(x,y)]=grid[I(x,y)]===T.SEA||grid[I(x,y)]===T.SAND?T.BRIDGE:T.YARD;
   clearRect(212,147,217,154,T.YARD);carve(214,155,214,157);
+  // площадки: клуб яхт-клуба у причала и экспортный терминал у контейнеровоза
+  const CLUB={x:205,y:155},TERM={x:190,y:152};
+  clearRect(203,153,207,157,T.YARD);clearRect(187,150,193,155,T.YARD);
   // немного высоток за кольцевой — только на юге, у промзоны
   const BG=[];for(let x=98;x<=150;x+=18)BG.push([x,131,9+(x%3)*3]);
   for(const[bx,by]of BG)for(let y=by;y<by+3;y++)for(let x=bx;x<bx+5;x++)if(inb(x,y)&&grid[I(x,y)]===T.GRASS)grid[I(x,y)]=T.YARD;
@@ -679,6 +682,27 @@ export function createWorld(canvas,{mobile}){
       if(s.state==='in'){s.y=Math.max(EXP.y,s.y-sp);s.face=Math.PI;if(s.y<=EXP.y)s.state='dock';}
       else if(s.state==='out'){s.y+=sp;s.face=0;if(s.y>H+8){scene.remove(s.mesh);if(s.lab){s.lab.el.remove();wlabels.splice(wlabels.indexOf(s.lab),1);}exShip=null;}}
       if(exShip){s.mesh.position.set(s.x,Math.sin(time*1.4)*.04,s.y);s.mesh.rotation.y=s.face;if(s.lab)s.lab.p.set(s.x,2.6,s.y);}}}
+  // ===== Здание яхт-клуба: белый клубный дом с синей крышей, терраса, флаг =====
+  {const g=new THREE.Group();B(g,3.6,.15,3.4,0xd8d2c4,0,0,0);
+    B(g,3,1.1,2.4,0xf4f4f4,0,.15,-.2);B(g,3.1,.12,2.5,0x1f5f8b,0,1.25,-.2);B(g,2.2,.8,1.6,0xffffff,0,1.37,-.4);B(g,2.3,.14,1.7,0x1f5f8b,0,2.17,-.4);
+    for(let k=0;k<4;k++)B(g,.5,.45,.04,0x9fd3ff,-1.05+k*.7,.45,1.01,true);for(let k=0;k<3;k++)B(g,.45,.4,.04,0x9fd3ff,-.7+k*.7,1.6,.41,true);
+    B(g,.55,.75,.05,0x6b4a2f,0,.15,1.02);B(g,3.4,.08,.9,0x9c6b3e,0,.15,1.4);for(const x of[-1.6,1.6])B(g,.06,.35,.06,0xffffff,x,.23,1.82);B(g,3.26,.05,.05,0xffffff,0,.55,1.82);
+    B(g,.05,2.6,.05,0xdddddd,1.7,.15,-1.5);const fl=B(g,.6,.36,.02,0x1f5f8b,1.42,2.4,-1.5,true);B(g,.2,.12,.03,0xffd166,1.38,2.52,-1.49,true);g.userData.flag=fl;
+    CY(g,.32,.32,.06,12,0xc0392b,-1.75,.75,1.03);CY(g,.2,.2,.07,12,0xffffff,-1.75,.75,1.03);
+    g.position.set(CLUB.x,0,CLUB.y);scene.add(shadow(g));}
+  // ===== Экспортный терминал: склад, вывеска, кран, контейнеры =====
+  {const g=new THREE.Group();B(g,6.4,.12,5.6,0x8d939a,0,0,0);
+    B(g,4,1.6,2.4,0x5d6d7e,-.6,.12,-1.2);B(g,4.1,.18,2.5,0x2c3e50,-.6,1.72,-1.2);for(let k=0;k<3;k++)B(g,.9,1.1,.05,0xb9bec4,-1.9+k*1.3,.12,.03);
+    B(g,2.6,.55,.08,0x1f3a5f,-.6,1.95,.06);B(g,2.4,.35,.09,0xffd166,-.6,2.05,.07,true);
+    B(g,1.3,1,1.2,0xf4f4f4,2.2,.12,-1.6);B(g,1.32,.1,1.22,0xc0392b,2.2,1.12,-1.6);B(g,1.2,.25,.05,0x9fd3ff,2.2,.6,-.99,true);
+    const C=[0xc0392b,0x2980b9,0x27ae60,0xf39c12,0x8e44ad];for(let k=0;k<8;k++)B(g,.95,.45,.45,C[k%5],-2+(k%4)*1.05,.12+Math.floor(k/4)*.46,1.6);
+    for(const x of[1.6,3])for(const z of[.6,2.4])B(g,.12,3,.12,0xf39c12,x,.12,z);B(g,1.6,.18,2,0xf39c12,2.3,3.1,1.5);B(g,.6,.3,.5,0x333333,2.3,2.8,1.5);
+    g.position.set(TERM.x,0,TERM.y);scene.add(shadow(g));}
+  // кликабельные места: телебашня, яхт-клуб (дом+причал), экспорт (терминал+корабль)
+  const HOT=[['tower',TOWER.x,TOWER.y,3.2],['yacht',CLUB.x,CLUB.y,2.6],['export',TERM.x,TERM.y,3.6]];
+  function hotAt(x,z){for(const[k,hx,hz,r]of HOT)if(Math.hypot(x-hx,z-hz)<=r)return k;
+    if(x>=MARINA.x-2.5&&x<=MARINA.x+4.5&&z>=MARINA.y0-1&&z<=MARINA.y1+3)return 'yacht';
+    const sx=exShip?exShip.x:EXP.x,sy=exShip?exShip.y:EXP.y;if(exShip&&Math.abs(x-sx)<=1.6&&Math.abs(z-sy)<=4.5)return 'export';return null;}
   // учебный участок на острове (живёт только у клиента)
   const tutPlot={id:-1,sp:null,reg:'v',x0:ISLAND.plot.x0,y0:ISLAND.plot.y0,x:ISLAND.plot.x0+1.5,y:ISLAND.plot.y0+1.5,door:{x:ISLAND.plot.x0+1,y:ISLAND.plot.y0+3},stock:{x:ISLAND.plot.x0+3,y:ISLAND.plot.y0+3},
     crops:[],wk:[],owner:null,color:'#ffd166',building:null,workers:0,builtAt:0,level:1,mat:false,fast:true};
@@ -856,7 +880,7 @@ export function createWorld(canvas,{mobile}){
   wlabel('ОСТРОВ «УЧЕБНЫЙ»',(ISLAND.x0+ISLAND.x1)/2,0,ISLAND.y1+3,'big');wlabel('ГОРЫ · КАРЬЕР',135,2,16,'big');
   for(const[k,n]of[['pvz','ПВЗ «Коробас»'],['alko','Алкомаркет «Градус»'],['lavka','Лавка скупщика'],['spawn','Гостевой домик'],['pier','Пристань'],['mill','Мельница'],['board','Доска аукционов']]){wlabel(n,ISLAND[k].x,2.2,ISLAND[k].y,'emp','#ffe9a8');}
   wlabel("⛴ ПАРОМ В ПИКСЕЛЬГРАД",FERRY.x,3.6,FERRY.y,'emp','#ffd166');
-  wlabel('⚓ ЯХТ-КЛУБ',MARINA.x+1,1.2,MARINA.y0-1,'poi','#9fd3ff');
+  wlabel('⚓ ЯХТ-КЛУБ',CLUB.x,3.4,CLUB.y,'poi','#9fd3ff');wlabel('🚢 ЭКСПОРТ → НОВОМОРСК',TERM.x,3.6,TERM.y,'poi','#ffd166');
   wlabel('Учебный участок',ISLAND.plot.x0+1.5,1.2,ISLAND.plot.y0+1.5,'emp','#ffe9a8');wlabel('МОРЕ',200,0,192,'big');wlabel('СОСНОВЫЙ БОР',20,2,120,'big');for(const L of LAKES)wlabel(L.name,L.x,0,L.y,'big');
   for(const k in POIS){const P=POIS[k];wlabel(P.ic+' '+P.n,P.x,2.2,P.y,'poi','#c8ffb0');}
   // ===== Светофоры: цикл 12 с — 5 с зелёный по X, 1 с жёлтый, 5 с зелёный по Y, 1 с жёлтый =====
@@ -944,7 +968,7 @@ export function createWorld(canvas,{mobile}){
       const m=groundAt((a.x+b.x)/2,(a.y+b.y)/2);if(m&&pinch.mid){camT.x-=m.x-pinch.mid.x;camT.z-=m.z-pinch.mid.z;clampCam();updateCam();}return;}
     if(drag){if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>(e.pointerType==='touch'?10:5))drag.moved=true;
       if(drag.moved&&drag.g){const g=groundAt(e.clientX,e.clientY);if(g){camT.x-=g.x-drag.g.x;camT.z-=g.z-drag.g.z;clampCam();updateCam();}}return;}
-    if(e.pointerType==='mouse'){const p=plotAtScreen(e.clientX,e.clientY);if(p){hoverF.visible=true;hoverF.position.set(p.x,0,p.y);}else hoverF.visible=false;canvas.style.cursor=p?'pointer':'default';onHover&&onHover(p,e);}});
+    if(e.pointerType==='mouse'){const p=plotAtScreen(e.clientX,e.clientY);if(p){hoverF.visible=true;hoverF.position.set(p.x,0,p.y);}else hoverF.visible=false;let hot=null;if(!p){const g=groundAt(e.clientX,e.clientY);hot=g&&hotAt(g.x,g.z);}canvas.style.cursor=p||hot?'pointer':'default';onHover&&onHover(p,e);}});
   const endPtr=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;
     if(drag&&!drag.moved&&ptrs.size===0){onTap&&onTap(plotAtScreen(e.clientX,e.clientY),groundAt(e.clientX,e.clientY));}if(ptrs.size===0)drag=null;};
   canvas.addEventListener('pointerup',endPtr);canvas.addEventListener('pointercancel',endPtr);
@@ -1036,7 +1060,7 @@ export function createWorld(canvas,{mobile}){
       if(zoom>20||!a.mesh.visible){b.el.style.display='none';continue;}b.p.set(a.x,1.2,a.y);project(b.p,b.el);b.el.style.opacity=Math.min(1,b.t/.6);}
   }
 
-  return worldApi={setYachts,setTower,setExport,renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,say,
+  return worldApi={hotAt,setYachts,setTower,setExport,renderer,scene,cam,plots,layoutUnits,plotAt,frameUpdate,setPlotState,spawnTruck,flyTo,drawMini,float,say,
     get camT(){return camT;},get zoom(){return zoom;},set onTap(f){onTap=f;},set onHover(f){onHover=f;},
     select(p){if(p){selF.visible=true;selF.position.set(p.x,0,p.y);}else selF.visible=false;},
     set arrow(p){arrowTarget=p;},
