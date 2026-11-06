@@ -171,7 +171,10 @@ export const wealthTax=bases=>[...bases].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*we
 // ===== Ежедневная награда и скины (кристаллы 💎) =====
 export const DAILY=[5,5,10,10,15,20,40];
 export const SKINS={cap:{n:'Кепка',price:10,col:0xc0392b},ushanka:{n:'Ушанка',price:20,col:0x6b4a2f},helmet:{n:'Каска',price:25,col:0xf1c40f},
-  cowboy:{n:'Ковбойская шляпа',price:40,col:0x8b5a2b},tophat:{n:'Цилиндр',price:60,col:0x222222},crown:{n:'Корона',price:150,col:0xffd700}};
+  cowboy:{n:'Ковбойская шляпа',price:40,col:0x8b5a2b},tophat:{n:'Цилиндр',price:60,col:0x222222},crown:{n:'Корона',price:150,col:0xffd700},
+  halo:{n:'Нимб основателя',price:0,col:0xffe066,unique:true}};   // unique — не продаётся (buy_skin его не знает), выдаётся вручную победителю
+// ===== Розыгрыш в TG-канале: плашка/окно в игре, пока не прошёл until =====
+export const GIVEAWAY={id:'gw1',until:'2026-11-13T20:00:00+03:00',url:'https://t.me/pixel_grad',skin:'halo',gems:500,more:[5,150]};
 
 // ===== Мэрия =====
 export const POSITIONS={mayor:{n:'Мэр',ic:'🎩',power:'Ставит налоги (с продаж 0–15%, на имущество 0–30💰/день) и зарплаты начальникам. Зарплата 300💰/день из казны.'},

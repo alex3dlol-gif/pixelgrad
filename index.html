@@ -51,6 +51,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px;white-sp
 .skip{font-size:13px;color:#a99fb8;cursor:pointer;text-decoration:underline;margin-left:8px}
 .hl{animation:hl 1s infinite}
 @keyframes hl{0%,100%{box-shadow:0 0 0 3px #ffd166}50%{box-shadow:0 0 0 8px rgba(255,209,102,.35)}}
+#gwfab{animation:gwp 1.6s ease-in-out infinite}@keyframes gwp{50%{transform:scale(1.15);filter:drop-shadow(0 0 6px #ffd166)}}
 #toast{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:20;display:none;max-width:90vw;text-align:center}
 .float{position:fixed;pointer-events:none;font-weight:700;font-size:16px;text-shadow:2px 2px 0 #000;transform:translate(-50%,-50%);white-space:nowrap;z-index:2}
 .wlab{position:fixed;pointer-events:none;transform:translate(-50%,-100%);white-space:nowrap;font-size:12px;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;font-weight:700;z-index:1}
@@ -163,7 +164,7 @@ window.addEventListener('unhandledrejection',e=>{const b=document.getElementById
   <div class="pill" id="money">💰 —</div><div class="pill" id="hgems" data-act="gems">💎 0</div><div class="pill" id="hen" data-act="energy">⚡ —</div>
   <div class="pill sm" id="htime"></div><div class="pill sm deskonly" id="online"></div><div class="pill" id="hprof" data-act="profile" title="Профиль">👤</div><div class="pill sm deskonly logo">ПИКСЕЛЬГРАД</div>
 </div></div>
-<div id="fabs"><span class="fab" data-act="findme" title="К себе">📍</span><span class="fab" data-act="home" id="topbtns" title="Домой">🏠</span><span class="fab" data-act="inv" id="inv" title="Склад">📦<b id="invn"></b></span></div>
+<div id="fabs"><span class="fab" data-act="findme" title="К себе">📍</span><span class="fab" data-act="home" id="topbtns" title="Домой">🏠</span><span class="fab" data-act="gw" id="gwfab" title="Розыгрыш" style="display:none">🎁</span><span class="fab" data-act="inv" id="inv" title="Склад">📦<b id="invn"></b></span></div>
 <div class="box" id="sheet"><div id="tabs"></div><div id="sheetbar" class="mobonly" data-act="closesheet">▾ свернуть</div><div id="tabbody"></div></div>
 <div class="box" id="mmbox"><canvas id="mm" width="280" height="220"></canvas></div>
 <div id="ticker"></div>

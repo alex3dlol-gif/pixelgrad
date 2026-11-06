@@ -406,6 +406,7 @@ export function createWorld(canvas,{mobile}){
       else if(skin==='helmet'){B(g,.25,.1,.25,c,0,.74,0);B(g,.3,.03,.3,c,0,.73,0);}
       else if(skin==='cowboy'){B(g,.42,.03,.42,c,0,.74,0);B(g,.2,.12,.2,c,0,.76,0);}
       else if(skin==='tophat'){B(g,.32,.03,.32,c,0,.74,0);B(g,.2,.24,.2,c,0,.76,0);}
+      else if(skin==='halo'){for(let i=0;i<18;i++){const a=i/18*Math.PI*2;B(g,.05,.035,.05,c,Math.cos(a)*.16,.88,Math.sin(a)*.16,true);}}
       else if(skin==='crown'){B(g,.24,.08,.24,c,0,.74,0);for(const[x,z]of[[-.09,-.09],[.09,-.09],[-.09,.09],[.09,.09]])B(g,.05,.08,.05,c,x,.82,z);}}}
   function makePerson(shirt,hat,pants=0x34495e,skin=null){const g=new THREE.Group();if(skin&&SKINS[skin])hat=null;
     const limb=(x,y,w,h,c)=>{const p=new THREE.Group();p.position.set(x,y,0);const m=new THREE.Mesh(BOX,mat(c));m.scale.set(w,h,w);m.position.y=-h/2;p.add(m);g.add(p);return p;};
@@ -458,7 +459,7 @@ export function createWorld(canvas,{mobile}){
     if(look.glasses&&look.glasses!=='none'){const fr=0x1a1a1a,lens=look.glasses==='sun'?0x111111:0xbfe3ff;
       for(const x of[-.05,.05]){B(g,.06,look.glasses==='round'?.05:.045,.008,fr,x,.605,.104);B(g,.045,.032,.008,lens,x,.612,.108,true);}B(g,.03,.008,.008,fr,0,.625,.106);}
     // причёска
-    const hat=skin&&SKINS[skin];
+    const hat=skin&&SKINS[skin]&&skin!=='halo';   // нимб парит над причёской
     if(!hat)switch(look.hair){
       case 'short':B(g,.22,.06,.22,hc,0,.73,0);B(g,.22,.1,.04,hc,0,.65,-.09);B(g,.03,.07,.2,hc,-.105,.68,-.01);B(g,.03,.07,.2,hc,.105,.68,-.01);break;
       case 'buzz':B(g,.21,.03,.21,hc,0,.735,0);B(g,.21,.08,.02,hc,0,.68,-.1);break;

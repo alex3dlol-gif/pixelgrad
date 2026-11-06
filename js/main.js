@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,WEALTH_TAX,wealthRate,wealthTax,BLV,MODS,titleOf,MAX_LVL,RK} from './config.js';
+import {GOODS,GK,BLD,EMP,RES,FURN,REGN,HIRE_FEE,MAX_WORKERS,SHIFT_SEC,OWNER_JOB_PAY,careerOf,DORM_ROOM,BCT,lvlOf,xpFor,NEED,UNLOCKS,needFor,DAILY,SKINS,POSITIONS,QUESTS,GEAR,SLOTS,LOOK,DEFAULT_LOOK,OFFLINE_RATE,ENERGY,BUILD_MIN,TG,GIVEAWAY,WEALTH_TAX,wealthRate,wealthTax,BLV,MODS,titleOf,MAX_LVL,RK} from './config.js';
 import {createWorld} from './world.js';
 import {createRoom,WALL_COLORS,FLOOR_COLORS} from './room.js';
 import {sb,rpc,selectAll} from './net.js';
@@ -342,6 +342,7 @@ function profileHTML(){if(!me)return'';const l=LV(),x0=xpFor(l),x1=xpFor(l+1),bi
     <span class="mut">${careerOf(me.shifts)} · уровень ${l}${titleOf(l)?` · <b style="color:#ffd166">${titleOf(l)}</b>`:''} (${fmt(me.xp||0)}/${fmt(x1)} XP)</span><div class="bar"><i style="width:${Math.min(100,((me.xp||0)-x0)/(x1-x0)*100)}%"></i></div></div>
   <div class="row">💰 ${fmt(me.money)} · 💎 ${me.gems||0} · ⚡ ${Math.floor(EN())}/${EMAX()}<br><span class="mut">Смен: ${me.shifts} · бизнесов: ${biz} · квартир: ${apt} · серия входов: ${me.streak||0} дн.</span></div>
   ${(()=>{const t=myTax();return t.n?`<div class="row">🧾 Налоги в сутки: <b>${fmt(t.flat+t.prog)}💰</b>${t.prog?` <span class="mut">(из них за много имущества ${fmt(t.prog)}💰)</span>`:''} <span class="btn sm blue" data-act="psec" data-s="tax">Подробнее</span>${t.debt?`<br><b style="color:#ff8a80">Налоговый долг: ${fmt(t.debt)}💰</b> — пока не погашен, новые объекты не купить`:''}</div>`:'';})()}
+  ${gwOn()?`<div class="row" style="background:#3a2a10">🎁 В ${TG.handle} разыгрываем <b>${SKINS[GIVEAWAY.skin].n}</b> + ${GIVEAWAY.gems}💎 <span class="btn sm gold" data-act="gw">Участвовать</span></div>`:''}
   ${me.tg_bonus?'':`<div class="row" style="background:#1f3a5a">📣 Подпишись на наш Telegram ${TG.handle} — <b>+${TG.gems}💎</b> <span class="btn sm gold" data-act="psec" data-s="tg">Забрать</span></div>`}
   <div class="row"><span class="btn blue" data-act="plook">👤 Внешность</span>${l>=3?'<span class="btn blue" data-act="psec" data-s="gear">🦺 Экипировка</span>':''}</div>
   <div class="row"><span class="btn red" data-act="logout2">🚪 Выйти из аккаунта</span></div>`;}
@@ -523,13 +524,13 @@ function guestsHTML(){const st=room.state;if(!st)return'';let h=`<h3>👥 Гос
   h+=`<div class="row">В комнате: ${[...st.people.keys()].map(nm).join(', ')||'—'}</div><div class="mut">Пиши в чат сверху — сообщения увидят все в комнате.</div>`;return h;}
 let moreSec='goals';
 let moreOpen=false;
-function moreHTML(){const items=[['goals','📋','Цели','Чего добиться в игре'],...(LV()>=3?[['gear','🦺','Экипировка','Бонусы к производству']]:[]),['levels','⭐','Уровни','Что открывается дальше'],
+function moreHTML(){const items=[...(gwOn()?[['gw','🎁','Розыгрыш',`${SKINS[GIVEAWAY.skin].n} + ${GIVEAWAY.gems}💎 · ещё ${gwLeft()}`]]:[]),['goals','📋','Цели','Чего добиться в игре'],...(LV()>=3?[['gear','🦺','Экипировка','Бонусы к производству']]:[]),['levels','⭐','Уровни','Что открывается дальше'],
     ['top','🏆','Рейтинг','Самые богатые игроки'],['feed','📰','Лента','Что происходит в городе'],['tax','🧾','Налоги','Сколько платишь и почему'],['tg','📣','Telegram-канал',me&&!me.tg_bonus?`Подпишись — +${TG.gems}💎`:'Новости и обновления'],['gov','🏛','Мэрия','В разработке']];
   if(!moreOpen)return'<h3>☰ Меню</h3>'+items.map(([k,ic,n,d])=>`<div class="mitem" data-act="moresec" data-s="${k}"><span class="mic">${ic}</span><span><b>${n}</b><br><span class="mut">${d}</span></span><span class="mgo">›</span></div>`).join('');
-  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,tax:taxHTML,tg:tgHTML,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
+  const body={gov:()=>'<h3>🏛 Мэрия</h3><div class="row">🚧 Мэрия, налоги и выборы мэра сейчас <b>в разработке</b>. Скоро тут можно будет баллотироваться и управлять городом.</div>',goals:goalsHTML,gear:gearHTML,tax:taxHTML,tg:tgHTML,gw:()=>`<h3>🎁 Розыгрыш в Telegram</h3>${gwBody()}<a class="btn gold" href="${GIVEAWAY.url}" target="_blank" rel="noopener" data-act="tgopen">Участвовать в ${TG.handle}</a>`,top:topHTML,feed:feedHTML,levels:levelsHTML}[moreSec]||goalsHTML;
   return'<span class="btn sm blue" data-act="moreback">← Меню</span>'+body();}
 function tgHTML(){const got=me&&me.tg_bonus;
-  return`<h3>📣 Канал Пиксельграда</h3><div class="row">В канале ${TG.handle}: обновления, новые здания, выборы мэра, конкурсы и коды на кристаллы.</div>`+
+  return`<h3>📣 Канал Пиксельграда</h3><div class="row">В канале ${TG.handle}: обновления, новые здания, выборы мэра, конкурсы и коды на кристаллы.</div>`+(gwOn()?`<div class="row" style="background:#3a2a10">🎁 Сейчас идёт розыгрыш: <b>${SKINS[GIVEAWAY.skin].n}</b> + ${GIVEAWAY.gems}💎 <span class="btn sm gold" data-act="gw">Подробнее</span></div>`:'')+
     (got?'<div class="row" style="color:#7bd389">✔ Награда за подписку получена. Спасибо!</div>':`<div class="row">Награда за подписку: <b>+${TG.gems}💎</b> (один раз)</div>
     <div class="mut">1) Открой канал и нажми «Подписаться». 2) Вернись сюда и забери награду.</div>`)+
     `<div style="margin-top:6px"><a class="btn blue" href="${TG.url}" target="_blank" rel="noopener" data-act="tgopen">Открыть ${TG.handle}</a>`+
@@ -561,7 +562,7 @@ function gearHTML(){if(!me)return'';const own=me.gear||[],eq=me.equip||{};let h=
 function levelsHTML(){if(!me)return'<div class="mut">Войди в игру</div>';const l=LV();return`<h3>⭐ Уровни (1–${MAX_LVL})</h3><div class="mut">Ты на <b>${l}</b> уровне${titleOf(l)?` · титул «${titleOf(l)}»`:''}. Опыт: ${fmt(me.xp||0)}. Даётся за смены, стройку, улучшения, продажи, покупки и ежедневный вход. После 10 уровня расти дольше, зато открываются модули, здания до 10 ур. и титулы.</div>`+
   Object.entries(UNLOCKS).map(([k,t])=>`<div class="row" style="${+k<=l?'color:#7bd389':''}">${+k<=l?'✔':'🔒'} <b>Ур. ${k}</b> (${fmt(xpFor(+k))} XP) — ${t}</div>`).join('');}
 function skinsHTML(){if(!me)return'';const own=me.skins||[];let h=`<h3>💎 Скины</h3><div class="mut">Кристаллы дают за ежедневный вход (серия до 7 дней — до 40💎 в день). Скины видят все игроки.</div>`;
-  for(const[k,s]of Object.entries(SKINS)){const has=own.includes(k);h+=`<div class="row">${s.n} · <b>${s.price}💎</b> ${has?(me.skin===k?'<span class="mut">надето</span>':`<span class="btn sm" data-act="equip" data-it="${k}">Надеть</span>`):`<span class="btn sm gold ${(me.gems||0)>=s.price?'':'dis'}" data-act="buyskin" data-it="${k}">Купить</span>`}</div>`;}
+  for(const[k,s]of Object.entries(SKINS)){const has=own.includes(k);if(s.unique&&!has){h+=`<div class="row" style="background:#3a2a10">✨ <b>${s.n}</b> · единственный в игре<br><span class="mut">${gwOn()?'Разыгрывается в Telegram-канале':'Не продаётся'}</span> ${gwOn()?'<span class="btn sm gold" data-act="gw">Как получить</span>':''}</div>`;continue;}h+=`<div class="row">${s.n} · ${s.unique?'<b style="color:#ffd166">✨ единственный в игре</b>':`<b>${s.price}💎</b>`} ${has?(me.skin===k?'<span class="mut">надето</span>':`<span class="btn sm" data-act="equip" data-it="${k}">Надеть</span>`):`<span class="btn sm gold ${(me.gems||0)>=s.price?'':'dis'}" data-act="buyskin" data-it="${k}">Купить</span>`}</div>`;}
   return h+(me.skin?`<span class="btn sm red" data-act="equip" data-it="">Снять головной убор</span>`:'');}
 function govControls(pos){const inp=(k,v,pct)=>`<input id="gv_${k}" value="${v}" style="width:80px;display:inline-block"><span class="btn sm" data-act="govset" data-k="${k}" ${pct?'data-pct="1"':''}>OK</span>`;
   if(pos==='mayor')return`<div style="margin-top:4px">Налог с продаж, %: ${inp('sales_tax',Math.round(city.sales_tax*100),1)}<br>Налог на имущество 💰: ${inp('prop_tax',city.prop_tax)}<br>`+
@@ -635,8 +636,21 @@ function showGems(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 s
   <div class="mut" style="margin:6px 0">Кристаллы ускоряют стройку, восполняют энергию и покупают редкую экипировку. Бесплатно — за ежедневный вход и задания.</div>
   ${[[100,'99 ₽'],[550,'449 ₽ · +10%'],[1200,'899 ₽ · +20%'],[3000,'1990 ₽ · +50%']].map(([g,p])=>`<div class="row">💎 <b>${g}</b> — ${p} <span class="btn sm dis">Скоро</span></div>`).join('')}
   <div class="mut">Скоро</div><span class="btn" data-act="closedaily">Закрыть</span>`;}
+// ===== Розыгрыш в TG-канале =====
+const gwOn=()=>Date.now()<Date.parse(GIVEAWAY.until);
+function gwLeft(){const ms=Date.parse(GIVEAWAY.until)-Date.now(),d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),m=Math.floor(ms%36e5/6e4);return d?`${d} д ${h} ч`:h?`${h} ч ${m} мин`:`${m} мин`;}
+const gwDate=()=>new Date(GIVEAWAY.until).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Moscow'})+' МСК';
+function gwBody(){const S=SKINS[GIVEAWAY.skin],[n,g]=GIVEAWAY.more;
+  return`<div class="row" style="background:#3a2a10;border:2px solid #ffd166">🥇 <b style="color:#ffd166">${S.n}</b> — единственный в игре, второго не будет. Светится над головой, его видят все.<br>+ <b>${GIVEAWAY.gems}💎</b></div>
+  <div class="row">🎁 Ещё <b>${n}</b> победителей — по <b>${g}💎</b></div>
+  <div class="mut" style="margin:6px 0">Условия: 1) подпишись на ${TG.handle} 2) под постом о розыгрыше напиши свой <b>ник в игре</b>${me?` — твой: <b style="color:${me.color}">${esc(me.nick)}</b>`:''}.<br>Итоги — ${gwDate()} (осталось ${gwLeft()}). Приз придёт прямо на аккаунт.</div>`;}
+function showGw(){localStorage.setItem('pg_gw_'+GIVEAWAY.id,new Date().toISOString().slice(0,10));$('auth').style.display='flex';
+  $('authbox').innerHTML=`<h3 style="font-size:15px">🎁 Розыгрыш в Telegram</h3>${gwBody()}
+  <a class="btn gold" href="${GIVEAWAY.url}" target="_blank" rel="noopener" data-act="tgopen" style="font-size:16px">Участвовать в ${TG.handle}</a><span class="btn" data-act="closegw">Позже</span>`;}
+// окно розыгрыша — раз в день, пока идёт; иначе — обычное предложение подписки
+function maybeGw(){if(!me||!me.look||ob||!gwOn()||$('auth').style.display==='flex'||localStorage.getItem('pg_gw_'+GIVEAWAY.id)===new Date().toISOString().slice(0,10))return false;showGw();return true;}
 // при входе: предложить подписку на TG, пока награда не забрана (раз за сессию, после ежедневной награды)
-function maybeTg(){if(!me||me.tg_bonus||!me.look||ob||sessionStorage.getItem('pg_tg')||$('auth').style.display==='flex')return;sessionStorage.setItem('pg_tg','1');showTg();}
+function maybeTg(){if(maybeGw())return;if(!me||me.tg_bonus||!me.look||ob||sessionStorage.getItem('pg_tg')||$('auth').style.display==='flex')return;sessionStorage.setItem('pg_tg','1');showTg();}
 function showTg(){$('auth').style.display='flex';$('authbox').innerHTML=`<h3 style="font-size:15px">📣 +${TG.gems}💎 за подписку</h3>
   <div>Подпишись на наш Telegram <b>${TG.handle}</b> и забери <b>${TG.gems} кристаллов</b>. Это больше, чем за неделю ежедневных наград!</div>
   <div class="mut" style="margin:8px 0">В канале — обновления, новые здания, выборы мэра, конкурсы и коды на кристаллы.<br>1) Открой канал и нажми «Подписаться». 2) Вернись сюда и забери награду.</div>
@@ -649,6 +663,7 @@ function showDaily(){const y=new Date(Date.now()-864e5).toISOString().slice(0,10
   <div class="mut">Заходи каждый день — серия растёт. Кристаллы 💎 восполняют энергию и ускоряют стройку.</div><span class="btn gold" data-act="daily" style="font-size:17px">Забрать</span><span class="btn blue" data-act="closedaily">Позже</span>`;}
 let lastBody='',lastTabs='';
 function renderUI(){
+  {const f=$('gwfab');if(f)f.style.display=gwOn()&&me?'':'none';}
   if(roomCtx&&roomCtx.club&&room.state){const C=roomCtx.club,e=EN(),mx=EMAX();$('chic').textContent=C.ic;$('chn').textContent=C.n;$('chppl').textContent='👥 '+Math.max(1,room.state.people.size);
     $('chbar').style.width=(e/mx*100).toFixed(1)+'%';$('chval').textContent=`${Math.floor(e)}/${mx}`;}
   document.body.classList.toggle('chaton',!!me&&!ob&&mode==='city');
@@ -687,6 +702,8 @@ document.addEventListener('click',async e=>{
   const a=t.dataset.act,id=t.dataset.id!=null?+t.dataset.id:null;
   switch(a){
     case 'daily':{const r=await act('claim_daily');if(r){$('auth').style.display='none';toast(`🎁 +${DAILY[Math.min(me.streak,7)-1]}💎 · серия ${me.streak} дн.`);setTimeout(maybeTg,1200);}break;}
+    case 'closegw':$('auth').style.display='none';break;
+    case 'gw':showGw();break;
     case 'closedaily':$('auth').style.display='none';setTimeout(maybeTg,800);break;
     case 'tgopen':tgOpened=Date.now();setTimeout(()=>{dirty=true;$('tgclaimbtn')?.classList.remove('dis');},300);break;
     case 'tgclaim':{if(!tgOpened){toast('Сначала открой канал и подпишись');break;}if(Date.now()-tgOpened<5000){toast('Подпишись на канал и вернись 🙂');break;}
