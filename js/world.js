@@ -863,7 +863,7 @@ export function createWorld(canvas,{mobile}){
     const sx=Math.round(camT.x/2)*2,sz=Math.round(camT.z/2)*2;sun.position.set(sx-30,60,sz+20);sun.target.position.set(sx,0,sz);}
   // холст — ровно видимая область (на телефоне 100vh больше экрана → клики и подписи съезжали)
   function resize(){const w=innerWidth,h=innerHeight;canvas.style.width=w+'px';canvas.style.height=h+'px';
-    PX=Math.max(1/Math.min(devicePixelRatio||1,2),Math.min(4,Math.min(w,h*1.6)/540)/1.5);/* мягкая графика: рендер ~1.5× крупнее прежнего + плавное растягивание */renderer.setSize(Math.ceil(w/PX),Math.ceil(h/PX),false);updateCam();}
+    const dpr=devicePixelRatio||1;PX=Math.max(1,Math.ceil(dpr/2),Math.round(Math.min(w,h*1.6)*dpr/810))/dpr;/* пиксель рендера = целое число пикселей экрана (без мыла), ~1.5× мельче прежнего */renderer.setSize(Math.ceil(w/PX),Math.ceil(h/PX),false);updateCam();}
   addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,200));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
   const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),gplane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
   function groundAt(cx,cy){ndc.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(ndc,cam);return ray.ray.intersectPlane(gplane,new THREE.Vector3());}
