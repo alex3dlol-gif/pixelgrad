@@ -406,6 +406,8 @@ export function createWorld(canvas,{mobile}){
       else if(skin==='helmet'){B(g,.25,.1,.25,c,0,.74,0);B(g,.3,.03,.3,c,0,.73,0);}
       else if(skin==='cowboy'){B(g,.42,.03,.42,c,0,.74,0);B(g,.2,.12,.2,c,0,.76,0);}
       else if(skin==='tophat'){B(g,.32,.03,.32,c,0,.74,0);B(g,.2,.24,.2,c,0,.76,0);}
+      else if(skin==='beret'){B(g,.27,.06,.27,c,-.02,.74,0);B(g,.06,.05,.06,c,-.02,.8,0);B(g,.05,.04,.1,0xf1c40f,.11,.75,.08,true);}
+      else if(skin==='goldhelm'){B(g,.25,.1,.25,c,0,.74,0,true);B(g,.3,.03,.3,c,0,.73,0,true);B(g,.05,.05,.05,0xffffff,0,.79,.13,true);}
       else if(skin==='halo'){for(let i=0;i<18;i++){const a=i/18*Math.PI*2;B(g,.05,.035,.05,c,Math.cos(a)*.16,.88,Math.sin(a)*.16,true);}}
       else if(skin==='crown'){B(g,.24,.08,.24,c,0,.74,0);for(const[x,z]of[[-.09,-.09],[.09,-.09],[-.09,.09],[.09,.09]])B(g,.05,.08,.05,c,x,.82,z);}}}
   function makePerson(shirt,hat,pants=0x34495e,skin=null){const g=new THREE.Group();if(skin&&SKINS[skin])hat=null;

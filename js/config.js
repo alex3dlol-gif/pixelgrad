@@ -172,7 +172,14 @@ export const wealthTax=bases=>[...bases].sort((a,b)=>a-b).reduce((s,p,i)=>s+p*we
 export const DAILY=[5,5,10,10,15,20,40];
 export const SKINS={cap:{n:'Кепка',price:10,col:0xc0392b},ushanka:{n:'Ушанка',price:20,col:0x6b4a2f},helmet:{n:'Каска',price:25,col:0xf1c40f},
   cowboy:{n:'Ковбойская шляпа',price:40,col:0x8b5a2b},tophat:{n:'Цилиндр',price:60,col:0x222222},crown:{n:'Корона',price:150,col:0xffd700},
-  halo:{n:'Нимб основателя',price:0,col:0xffe066,unique:true}};   // unique — не продаётся (buy_skin его не знает), выдаётся вручную победителю
+  halo:{n:'Нимб основателя',price:0,col:0xffe066,unique:true},
+  beret:{n:'Берет вербовщика',price:0,col:0xb03a2e,unique:true,ref:1},goldhelm:{n:'Золотая каска',price:0,col:0xffc93c,unique:true,ref:15}};   // ref — за N приглашённых (sql/012)
+// ===== «Пригласи друга» (сервер: set_referrer, _ref_xp, wealth_tax в sql/012; держать в синхроне!) =====
+// Друг засчитывается на lvl-м уровне. Пригласившему: gems + rare за друга (не больше daily в сутки), xpShare опыта друга
+// его первые 7 дней, скидка налога на роскошь taxStep за каждые taxPer друзей (до taxMax). Новичку: ×xpBoost опыта boostDays дня и money на lvl.
+export const REF={lvl:5,gems:40,rare:{marble:2,parts:1},daily:5,xpShare:.1,xpBoost:1.5,boostDays:3,money:300,bindHours:48,
+  taxPer:3,taxStep:.1,taxMax:.5,title:[5,'Градообразующий'],url:'https://pixelgrad.cc/?ref='};
+export const refTaxCut=n=>Math.min(REF.taxMax,Math.floor((n||0)/REF.taxPer)*REF.taxStep);   // unique — не продаётся (buy_skin его не знает), выдаётся вручную победителю
 // ===== Розыгрыш в TG-канале: плашка/окно в игре, пока не прошёл until =====
 export const GIVEAWAY={id:'gw1',until:'2026-11-13T20:00:00+03:00',url:'https://t.me/pixel_grad/6',skin:'halo',gems:500,more:[5,150]};
 
